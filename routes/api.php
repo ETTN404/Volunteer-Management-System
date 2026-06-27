@@ -58,7 +58,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/volunteer/schedule', [VolunteerController::class, 'getSchedule']);
         
         // Attendance
-        Route::post('/volunteer/check-in', [AttendanceController::class, 'checkIn']);
+        Route::post('/volunteer/check-in', [AttendanceController::class, 'checkIn'])->middleware('throttle:3,1');
         Route::post('/volunteer/check-out', [AttendanceController::class, 'checkOut']);
         
         // Chatbot AI

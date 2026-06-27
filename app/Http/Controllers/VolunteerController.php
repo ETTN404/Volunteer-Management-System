@@ -27,8 +27,8 @@ class VolunteerController extends Controller
 
         $volunteerSkills = $volunteer->skills ?? [];
 
-        // Fetch events with shifts
-        $events = Event::with('shifts')->get();
+        // Task 10.2.2.1: Paginated event fetching instead of loading all records
+        $events = Event::with('shifts')->paginate(10);
 
         // Calculate skill match score for each shift dynamically
         $events->each(function ($event) use ($volunteerSkills) {
@@ -50,7 +50,13 @@ class VolunteerController extends Controller
 
         return response()->json([
             'status' => 'success',
-            'data' => $events
+            'data' => $events->items(),
+            'pagination' => [
+                'current_page' => $events->currentPage(),
+                'last_page' => $events->lastPage(),
+                'per_page' => $events->perPage(),
+                'total' => $events->total(),
+            ]
         ]);
     }
 
