@@ -43,7 +43,17 @@ class AttendanceController extends Controller
             'qr_code_signature' => 'required|string',
             'latitude' => 'required|numeric|between:-90,90',
             'longitude' => 'required|numeric|between:-180,180',
+            'client_timestamp' => 'required|date',
         ]);
+
+        // Subtask 9.2.1.2: Time-drift Anti-Fraud Validation
+        $clientTime = Carbon::parse($request->client_timestamp);
+        if ($clientTime->diffInMinutes(now()) > 2) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Security Error: High time-drift detected. Ensure your device clock is synced accurately to the network.'
+            ], 422);
+        }
 
         $shift = Shift::with('event')->findOrFail($request->shift_id);
         $user = Auth::user();
