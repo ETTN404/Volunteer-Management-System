@@ -35,11 +35,29 @@ class ReportController extends Controller
 
         Storage::makeDirectory('public/reports');
 
-        // Generate CSV Data
+        // Generate CSV Data with anonymized PII (Task 9.2.2.2)
         $csvContent = "SaaS Impact Report,Period: " . $request->period . "\n";
         $csvContent .= "Generated At," . Carbon::now()->toDateTimeString() . "\n";
         $csvContent .= "Total Active Volunteers," . $totalVolunteers . "\n";
-        $csvContent .= "Total Logged Service Hours," . $totalHours . "\n";
+        $csvContent .= "Total Logged Service Hours," . $totalHours . "\n\n";
+
+        // Per-volunteer breakdown with anonymized identifiers
+        $csvContent .= "Volunteer ID,Anonymized Name,Masked Email,Hours Served,Impact Score\n";
+
+        $volunteers = Volunteer::join('users', 'volunteers.user_id', '=', 'users.id')
+            ->where('users.org_id', $orgId)
+            ->select('volunteers.id', 'users.full_name', 'users.email', 'volunteers.total_hours', 'volunteers.impact_score')
+            ->get();
+
+        foreach ($volunteers as $vol) {
+            // Anonymize: hash the name to a short identifier
+            $anonName = 'VOL-' . strtoupper(substr(md5($vol->full_name . $vol->id), 0, 6));
+            // Mask email: show first 2 chars + domain
+            $emailParts = explode('@', $vol->email);
+            $maskedEmail = substr($emailParts[0], 0, 2) . '****@' . ($emailParts[1] ?? 'unknown');
+
+            $csvContent .= "{$vol->id},{$anonName},{$maskedEmail},{$vol->total_hours},{$vol->impact_score}\n";
+        }
 
         Storage::put('public/' . $filePath, $csvContent);
 
@@ -55,7 +73,7 @@ class ReportController extends Controller
 
         return response()->json([
             'status' => 'success',
-            'message' => 'Impact report compiled successfully.',
+            'message' => 'Impact report compiled successfully. PII has been anonymized.',
             'data' => $report
         ], 201);
     }
