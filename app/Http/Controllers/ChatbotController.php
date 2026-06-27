@@ -8,6 +8,7 @@ use App\Models\Attendance;
 use App\Models\Announcement;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Redis;
 
 class ChatbotController extends Controller
 {
@@ -66,48 +67,47 @@ class ChatbotController extends Controller
             ->take(3)
             ->get();
 
-        // 2. Format Context Payload as a structured text block
-        $context = "You are VolunBot, the highly intelligent and friendly AI assistant for the Volunteer Management System (VMS).\n";
-        $context .= "Here is the real-time verified context of the currently logged-in volunteer user:\n";
-        $context .= "- Name: " . $user->full_name . "\n";
-        $context .= "- Email: " . $user->email . "\n";
-        $context .= "- Primary Skills: " . (empty($skills) ? 'None listed' : implode(', ', $skills)) . "\n";
-        $context .= "- Total Verified Service Hours: " . $volunteer->total_hours . " hours\n";
-        $context .= "- Calculated Impact Score: " . $volunteer->impact_score . "/100\n";
-        $context .= "- Bio: " . ($volunteer->bio ?? 'Not provided') . "\n\n";
+        // 2. Format Context Payload as a compressed JSON block to minimize token usage
+        $currentTime = now()->format('Y-m-d H:i:s T');
+        $contextData = [
+            'server_time' => $currentTime, // Dynamic time-context injection
+            'volunteer' => [
+                'name' => $user->full_name,
+                'email' => $user->email,
+                'skills' => empty($skills) ? [] : $skills,
+                'hours' => $volunteer->total_hours,
+                'score' => $volunteer->impact_score,
+            ],
+            'upcoming_shifts' => $upcomingShifts->map(function($u) {
+                return ['event' => $u->event_title, 'loc' => $u->location, 'start' => $u->start_time, 'end' => $u->end_time];
+            })->toArray(),
+            'past_shifts' => $pastShifts->map(function($p) {
+                return ['event' => $p->event_title, 'in' => $p->check_in_time, 'out' => $p->check_out_time];
+            })->toArray(),
+            'announcements' => $announcements->map(function($a) {
+                return ['title' => $a->title, 'msg' => $a->message];
+            })->toArray(),
+        ];
 
-        $context .= "UPCOMING CONFIRMED SHIFTS SCHEDULED:\n";
-        if ($upcomingShifts->isEmpty()) {
-            $context .= " - No upcoming shifts scheduled.\n";
-        } else {
-            foreach ($upcomingShifts as $u) {
-                $context .= " - Event: '{$u->event_title}' at Location: '{$u->location}' starting at: '{$u->start_time}' ending at: '{$u->end_time}'\n";
-            }
-        }
-        $context .= "\n";
+        $context = "SYSTEM_INSTRUCTION: You are VolunBot, the VMS AI assistant. RULES: 1. Answer concisely. 2. Base all answers strictly on the CONTEXT_JSON. Do not hallucinate dates/events. 3. Detect the user's prompt language and respond in the exact same language (e.g. Amharic, English). 4. Use localized date formatting. Current Server Time: {$currentTime}. CONTEXT_JSON=" . json_encode($contextData);
 
-        $context .= "PAST COMPLETED SERVICE ATTENDANCES:\n";
-        if ($pastShifts->isEmpty()) {
-            $context .= " - No past shift history in database.\n";
-        } else {
-            foreach ($pastShifts as $p) {
-                $context .= " - Event: '{$p->event_title}' served from '{$p->check_in_time}' to '{$p->check_out_time}'\n";
-            }
-        }
-        $context .= "\n";
-
-        $context .= "ACTIVE ORGANIZATIONAL ANNOUNCEMENTS:\n";
-        if ($announcements->isEmpty()) {
-            $context .= " - No active announcements.\n";
-        } else {
-            foreach ($announcements as $a) {
-                $context .= " - Title: '{$a->title}' | Content: '{$a->message}' (Posted on {$a->created_at})\n";
-            }
-        }
-
-        // 3. Query the Gemini Service with compiled context
-        $history = $request->history ?? [];
+        // 3. Query the Gemini Service with compiled context and Redis memory
+        $redisKey = 'chat_session_' . $volunteer->id;
+        $history = json_decode(Redis::get($redisKey), true) ?? [];
+        
+        // Discard frontend history and strictly use Redis server-side memory
         $aiMessage = $this->gemini->ask($request->message, $context, $history);
+
+        // 4. Update History in Redis (Maintain last 10 interactions = 20 total messages)
+        $history[] = ['role' => 'user', 'parts' => [['text' => $request->message]]];
+        $history[] = ['role' => 'model', 'parts' => [['text' => $aiMessage]]];
+        
+        if (count($history) > 20) {
+            $history = array_slice($history, -20);
+        }
+        
+        // Cache for 2 hours (7200 seconds) - inactive sessions handled by cron later
+        Redis::setex($redisKey, 7200, json_encode($history));
 
         return response()->json([
             'status' => 'success',
