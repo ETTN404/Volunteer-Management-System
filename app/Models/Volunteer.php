@@ -38,6 +38,7 @@ class Volunteer extends Model
             'availability' => 'array',
             'total_hours' => 'decimal:2',
             'impact_score' => 'decimal:2',
+            'bio' => 'encrypted', // Task 9.2.2.1: PII Protection - encrypt sensitive volunteer bio at rest
         ];
     }
 
