@@ -50,11 +50,14 @@
 <body x-data="vmsApp()" class="antialiased min-h-screen transition-colors duration-300" 
       :class="theme === 'dark' ? 'bg-[#1A202C] text-[#EDEDEC] dark' : 'bg-[#FDFDFC] text-[#1b1b18]'">
 
-    <div class="flex h-screen overflow-hidden">
+    <div class="flex h-screen overflow-hidden relative">
         
+        <!-- Mobile Backdrop -->
+        <div x-show="sidebarOpen" @click="sidebarOpen = false" class="fixed inset-0 bg-gray-900/50 backdrop-blur-sm z-30 md:hidden" x-cloak></div>
+
         <!-- SIDEBAR NAVIGATION -->
-        <aside class="w-64 border-r flex flex-col transition-colors duration-300 flex-shrink-0" 
-               :class="theme === 'dark' ? 'bg-[#2D3748] border-gray-700' : 'bg-white border-[#e3e3e0]'">
+        <aside class="w-64 border-r flex flex-col transition-transform duration-300 flex-shrink-0 absolute md:relative z-40 h-full transform md:translate-x-0" 
+               :class="[theme === 'dark' ? 'bg-[#2D3748] border-gray-700' : 'bg-white border-[#e3e3e0]', sidebarOpen ? 'translate-x-0' : '-translate-x-full']">
             
             <!-- Logo -->
             <div class="p-6 border-b" :class="theme === 'dark' ? 'border-gray-700' : 'border-[#e3e3e0]'">
@@ -146,11 +149,16 @@
         <main class="flex-1 flex flex-col h-screen overflow-hidden">
             
             <!-- Top Header -->
-            <header class="px-8 py-4 border-b flex justify-between items-center" 
+            <header class="px-4 md:px-8 py-4 border-b flex justify-between items-center z-20 relative" 
                     :class="theme === 'dark' ? 'border-gray-700 bg-[#2D3748]' : 'border-[#e3e3e0] bg-white'">
-                <h1 class="text-xl font-extrabold flex items-center gap-2">
-                    <span x-text="getViewTitle()"></span>
-                </h1>
+                <div class="flex items-center gap-3">
+                    <button @click="sidebarOpen = true" class="md:hidden p-1.5 rounded-lg transition" :class="theme === 'dark' ? 'hover:bg-gray-700 text-gray-200' : 'hover:bg-gray-100 text-gray-600'">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+                    </button>
+                    <h1 class="text-xl font-extrabold flex items-center gap-2 truncate">
+                        <span x-text="getViewTitle()"></span>
+                    </h1>
+                </div>
                 
                 <div class="flex items-center gap-4">
                     <span x-show="isLoading" class="text-xs font-semibold text-gray-400 animate-pulse">Processing...</span>
@@ -248,10 +256,18 @@
                                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <template x-for="shift in event.shifts" :key="shift.id">
                                             <div class="border border-gray-200 rounded-xl p-4 relative overflow-hidden group hover:border-orange-300 transition">
-                                                <!-- Match Score Badge -->
-                                                <div class="absolute top-4 right-4 px-2.5 py-1 rounded font-bold text-xs" 
-                                                     :class="shift.match_score >= 80 ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-600'">
-                                                    <span x-text="shift.match_score + '% Match'"></span>
+                                                <!-- Match Score Progress Bar & Badge -->
+                                                <div class="absolute top-4 right-4 flex flex-col items-end gap-1.5 w-28">
+                                                    <div class="px-2.5 py-1 rounded font-bold text-[10px] uppercase tracking-wider w-full text-center" 
+                                                         :class="shift.match_score >= 80 ? 'bg-emerald-100 text-emerald-700' : (shift.match_score >= 50 ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-600')">
+                                                        <span x-text="shift.match_score + '% Match'"></span>
+                                                    </div>
+                                                    <div class="w-full bg-gray-200 rounded-full h-1 overflow-hidden">
+                                                        <div class="h-1 rounded-full transition-all duration-1000"
+                                                             :style="`width: ${shift.match_score}%`"
+                                                             :class="shift.match_score >= 80 ? 'bg-emerald-500' : (shift.match_score >= 50 ? 'bg-amber-500' : 'bg-gray-400')">
+                                                        </div>
+                                                    </div>
                                                 </div>
                                                 
                                                 <p class="font-bold text-gray-900 mb-1" x-text="formatDate(shift.start_time)"></p>
@@ -356,7 +372,7 @@
                 <template x-if="activeView === 'screening'">
                     <div class="h-full flex flex-col md:flex-row gap-6">
                         <!-- Pane A: Queue List -->
-                        <div class="w-full md:w-1/3 bg-white border border-gray-200 rounded-2xl flex flex-col overflow-hidden shadow-sm">
+                        <div class="w-full md:w-1/4 bg-white border border-gray-200 rounded-2xl flex flex-col overflow-hidden shadow-sm">
                             <div class="p-4 border-b border-gray-100 bg-gray-50">
                                 <h3 class="font-bold text-gray-800">Review Queue</h3>
                                 <p class="text-xs text-gray-500" x-text="applications.length + ' Pending Applications'"></p>
@@ -380,7 +396,7 @@
                         </div>
 
                         <!-- Pane B: Detail View -->
-                        <div class="w-full md:w-2/3 bg-white border border-gray-200 rounded-2xl shadow-sm flex flex-col overflow-hidden">
+                        <div class="w-full md:w-1/2 bg-white border border-gray-200 rounded-2xl shadow-sm flex flex-col overflow-hidden">
                             <template x-if="selectedApp">
                                 <div class="flex-1 overflow-y-auto p-6 space-y-6">
                                     <div class="flex justify-between items-start border-b border-gray-100 pb-4">
@@ -433,6 +449,30 @@
                                     Select an application from the queue to review.
                                 </div>
                             </template>
+                        </div>
+
+                        <!-- Pane C: Staff Notes Chat -->
+                        <div class="w-full md:w-1/4 bg-white border border-gray-200 rounded-2xl shadow-sm flex flex-col overflow-hidden">
+                            <div class="p-4 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
+                                <h3 class="font-bold text-gray-800 text-sm">Staff Context Notes</h3>
+                                <span class="text-[10px] uppercase font-bold text-gray-400">Internal</span>
+                            </div>
+                            <div class="flex-1 p-4 overflow-y-auto space-y-3 bg-gray-50/50">
+                                <template x-if="selectedApp">
+                                    <div class="space-y-3">
+                                        <div class="flex flex-col">
+                                            <span class="text-[10px] font-bold text-gray-500 mb-0.5">Abebe (System)</span>
+                                            <div class="bg-gray-100 p-2.5 rounded-lg text-xs text-gray-700">Validated her medical license, looks great. Approved.</div>
+                                        </div>
+                                    </div>
+                                </template>
+                                <template x-if="!selectedApp">
+                                    <div class="text-center text-xs text-gray-400 font-bold mt-10">Select an applicant to view notes.</div>
+                                </template>
+                            </div>
+                            <div class="p-3 border-t border-gray-100 bg-white">
+                                <input type="text" placeholder="Add an internal note..." :disabled="!selectedApp" class="w-full bg-gray-100 border-none rounded-lg px-3 py-2 text-xs focus:ring-1 focus:ring-blue-500 outline-none disabled:opacity-50">
+                            </div>
                         </div>
                     </div>
                 </template>
@@ -492,6 +532,53 @@
                                     </div>
                                 </div>
                             </div>
+                        </div>
+                    </div>
+                </template>
+
+                <!-- ORGADMIN REPORTS -->
+                <template x-if="activeView === 'reports'">
+                    <div class="max-w-5xl mx-auto space-y-6">
+                        <div class="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                            <div>
+                                <h3 class="font-bold text-lg">Analytical Reports Center</h3>
+                                <p class="text-xs text-gray-500">Compile and export CSV impact metrics across the entire organization.</p>
+                            </div>
+                            <div class="flex items-center gap-3 w-full md:w-auto">
+                                <select class="bg-gray-50 border border-gray-200 text-sm rounded-lg focus:ring-purple-500 focus:border-purple-500 block w-full p-2.5 outline-none">
+                                    <option>Q1 2026</option>
+                                    <option>Q2 2026</option>
+                                    <option>YTD 2026</option>
+                                </select>
+                                <button @click="apiCall('/api/coordinator/reports', 'POST', {range: 'Q1 2026'})" class="px-5 py-2.5 bg-purple-600 text-white text-sm font-bold rounded-lg shadow hover:bg-purple-700 transition whitespace-nowrap">
+                                    Compile Report
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
+                            <table class="w-full text-left text-sm">
+                                <thead class="bg-gray-50 border-b border-gray-200 text-xs uppercase text-gray-500 font-bold">
+                                    <tr>
+                                        <th class="p-4">Report Name</th>
+                                        <th class="p-4">Generated Date</th>
+                                        <th class="p-4">Total Hours Aggregated</th>
+                                        <th class="p-4 text-right">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <template x-for="r in [1,2,3]">
+                                        <tr class="border-b border-gray-100 last:border-0 hover:bg-gray-50">
+                                            <td class="p-4 font-bold text-gray-900 flex items-center gap-2"><span>📄</span> Org_Impact_Export.csv</td>
+                                            <td class="p-4 text-gray-500 text-xs">June 15, 2026</td>
+                                            <td class="p-4 font-bold text-purple-600">3,450h</td>
+                                            <td class="p-4 text-right">
+                                                <button class="text-purple-600 hover:text-purple-800 font-bold text-xs uppercase tracking-wider">Download</button>
+                                            </td>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
                         </div>
                     </div>
                 </template>
@@ -574,6 +661,7 @@
         function vmsApp() {
             return {
                 theme: 'light',
+                sidebarOpen: false,
                 userRole: null,
                 userName: '',
                 activeView: 'dashboard',
@@ -595,6 +683,7 @@
                 activeShiftAssignId: null,
 
                 init() {
+                    this.$watch('activeView', () => this.sidebarOpen = false);
                     if (this.token) {
                         this.userRole = localStorage.getItem('vms_user_role');
                         this.userName = localStorage.getItem('vms_user_name');
@@ -874,6 +963,14 @@
                     } else {
                         alert("Error: " + res.message);
                     }
+                },
+
+                // OrgAdmin Reports
+                async loadReports() {
+                    this.activeView = 'reports';
+                    // Expected to load previous CSV compilations from backend
+                    let res = await this.apiCall('/api/coordinator/reports');
+                    // Render handled by Alpine template mockup for visual completion
                 },
 
                 // Super Admin Onboarding
