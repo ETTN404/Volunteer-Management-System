@@ -11,7 +11,7 @@ use Carbon\Carbon;
 class CoordinatorController extends Controller
 {
     /**
-     * Create a new event.
+     * Create a new event for the authenticated organization.
      */
     public function createEvent(Request $request)
     {
@@ -26,6 +26,7 @@ class CoordinatorController extends Controller
         ]);
 
         $event = Event::create([
+            'org_id' => auth()->user()->org_id,
             'title' => $request->title,
             'description' => $request->description,
             'location' => $request->location,
@@ -44,11 +45,12 @@ class CoordinatorController extends Controller
     }
 
     /**
-     * Get all events belonging to the organization.
+     * Get all events belonging to the authenticated organization.
      */
     public function getEvents()
     {
-        $events = Event::with('shifts')->get();
+        // TenantScope automatically scopes queries by org_id for non-SuperAdmins
+        $events = Event::with('shifts')->latest()->paginate(15);
 
         return response()->json([
             'status' => 'success',
