@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Models\Announcement;
 use App\Models\Shift;
 use App\Models\Volunteer;
+use App\Notifications\ShiftBroadcastNotification;
 use App\Services\SkillMatchingService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -56,6 +57,9 @@ class SendShiftAlertJob implements ShouldQueue
 
             // Notify if score > 0 (or if shift has no required skills, score is 100)
             if ($score > 0) {
+                if ($vol->user) {
+                    $vol->user->notify(new ShiftBroadcastNotification($shift));
+                }
                 Log::info("SendShiftAlertJob: Shift alert dispatched to volunteer #{$vol->id} (Match Score: {$score}%) for event '{$event->title}'.");
                 $notifiedCount++;
             }

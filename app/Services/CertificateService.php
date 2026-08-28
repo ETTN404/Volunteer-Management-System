@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Certificate;
 use App\Models\Volunteer;
+use App\Notifications\CertificateIssuedNotification;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Storage;
@@ -59,14 +60,21 @@ class CertificateService
         // Render PDF to disk
         $filePath = $this->renderPdf($volunteer->id, $milestoneHours, $templateData);
 
-        // Create and return the DB record
-        return Certificate::create([
+        // Create DB record
+        $certificate = Certificate::create([
             'volunteer_id'    => $volunteer->id,
             'org_id'          => $issuedByOrgId,
             'issued_date'     => Carbon::now()->toDateString(),
             'milestone_hours' => $milestoneHours,
             'file_path'       => 'storage/' . $filePath,
         ]);
+
+        // Send Notification
+        if ($user) {
+            $user->notify(new CertificateIssuedNotification($certificate));
+        }
+
+        return $certificate;
     }
 
     /**

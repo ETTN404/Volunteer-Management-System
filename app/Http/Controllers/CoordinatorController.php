@@ -14,6 +14,7 @@ use App\Models\Event;
 use App\Models\Shift;
 use App\Models\ShiftAssignment;
 use App\Models\Volunteer;
+use App\Notifications\ShiftApprovedNotification;
 use App\Services\AuditLogService;
 use Carbon\Carbon;
 
@@ -171,9 +172,13 @@ class CoordinatorController extends Controller
         }
 
         $assignment->update([
-            'status' => $request->status,
+            'status'      => $request->status,
             'assigned_at' => $request->status === 'confirmed' ? now() : null,
         ]);
+
+        if ($request->status === 'confirmed' && $assignment->volunteer?->user) {
+            $assignment->volunteer->user->notify(new ShiftApprovedNotification($assignment->shift));
+        }
 
         return response()->json([
             'status' => 'success',

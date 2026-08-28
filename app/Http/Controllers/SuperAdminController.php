@@ -6,6 +6,7 @@ use App\Http\Resources\OrganizationResource;
 use App\Http\Resources\UserResource;
 use App\Models\Organization;
 use App\Models\User;
+use App\Notifications\OrganizationSuspendedNotification;
 use App\Services\AuditLogService;
 use Illuminate\Http\Request;
 
@@ -80,6 +81,17 @@ class SuperAdminController extends Controller
         $oldData      = $organization->only(['status', 'subscription_plan']);
 
         $organization->update($request->only(['status', 'subscription_plan']));
+
+        if ($request->status === 'suspended') {
+            $orgAdmins = User::withoutGlobalScopes()
+                ->where('org_id', $organization->id)
+                ->where('role', 'OrgAdmin')
+                ->get();
+
+            foreach ($orgAdmins as $admin) {
+                $admin->notify(new OrganizationSuspendedNotification($organization));
+            }
+        }
 
         $this->audit->log(
             'tenant.status_updated',
