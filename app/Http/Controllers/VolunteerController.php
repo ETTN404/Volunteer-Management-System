@@ -2,6 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\UpdateVolunteerProfileRequest;
+use App\Http\Resources\CertificateResource;
+use App\Http\Resources\EventResource;
+use App\Http\Resources\ShiftAssignmentResource;
+use App\Http\Resources\VolunteerResource;
+use App\Models\Certificate;
 use App\Models\Event;
 use App\Models\Shift;
 use App\Models\ShiftAssignment;
@@ -44,12 +50,12 @@ class VolunteerController extends Controller
 
         return response()->json([
             'status' => 'success',
-            'data' => $events->items(),
+            'data'   => EventResource::collection($events->items()),
             'pagination' => [
                 'current_page' => $events->currentPage(),
-                'last_page' => $events->lastPage(),
-                'per_page' => $events->perPage(),
-                'total' => $events->total(),
+                'last_page'    => $events->lastPage(),
+                'per_page'     => $events->perPage(),
+                'total'        => $events->total(),
             ]
         ]);
     }
@@ -109,9 +115,9 @@ class VolunteerController extends Controller
         ]);
 
         return response()->json([
-            'status' => 'success',
+            'status'  => 'success',
             'message' => 'Application submitted successfully. Under coordinator review.',
-            'data' => $assignment
+            'data'    => new ShiftAssignmentResource($assignment)
         ], 201);
     }
 
@@ -137,7 +143,85 @@ class VolunteerController extends Controller
 
         return response()->json([
             'status' => 'success',
-            'data' => $schedule
+            'data'   => ShiftAssignmentResource::collection($schedule)
+        ]);
+    }
+
+    /**
+     * Get the authenticated volunteer's full profile details including metrics.
+     */
+    public function getProfile()
+    {
+        $user = Auth::user();
+        $volunteer = $user->volunteer;
+
+        if (!$volunteer) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Volunteer profile not found.'
+            ], 404);
+        }
+
+        return response()->json([
+            'status' => 'success',
+            'data'   => [
+                'volunteer'        => new VolunteerResource($volunteer->load('user')),
+                'reliability'      => $volunteer->getReliabilityMetrics(),
+                'skills_alignment' => $volunteer->getSkillsAlignment(),
+            ]
+        ]);
+    }
+
+    /**
+     * Update volunteer profile details (skills, availability, bio, full_name).
+     */
+    public function updateProfile(UpdateVolunteerProfileRequest $request)
+    {
+        $user = Auth::user();
+        $volunteer = $user->volunteer;
+
+        if (!$volunteer) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Volunteer profile not found.'
+            ], 404);
+        }
+
+        if ($request->has('full_name')) {
+            $user->update(['full_name' => $request->full_name]);
+        }
+
+        $volunteer->update($request->only(['skills', 'availability', 'bio']));
+
+        return response()->json([
+            'status'  => 'success',
+            'message' => 'Volunteer profile updated successfully.',
+            'data'    => new VolunteerResource($volunteer->fresh('user')),
+        ]);
+    }
+
+    /**
+     * Get all certificates earned by the authenticated volunteer.
+     */
+    public function getCertificates()
+    {
+        $user = Auth::user();
+        $volunteer = $user->volunteer;
+
+        if (!$volunteer) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Volunteer profile not found.'
+            ], 404);
+        }
+
+        $certificates = Certificate::where('volunteer_id', $volunteer->id)
+            ->latest()
+            ->get();
+
+        return response()->json([
+            'status' => 'success',
+            'data'   => CertificateResource::collection($certificates),
         ]);
     }
 }

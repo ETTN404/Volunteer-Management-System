@@ -7,13 +7,18 @@ use App\Http\Requests\CreateEventRequest;
 use App\Http\Requests\CreateShiftRequest;
 use App\Http\Requests\ForceCheckInRequest;
 use App\Http\Resources\EventResource;
+use App\Http\Resources\ShiftAssignmentResource;
+use App\Http\Resources\VolunteerResource;
 use App\Models\Event;
 use App\Models\Shift;
 use App\Models\ShiftAssignment;
+use App\Models\Volunteer;
+use App\Services\AuditLogService;
 use Carbon\Carbon;
 
 class CoordinatorController extends Controller
 {
+    public function __construct(private AuditLogService $audit) {}
     public function createEvent(CreateEventRequest $request)
     {
         $event = Event::create([
@@ -50,6 +55,46 @@ class CoordinatorController extends Controller
                 'per_page'     => $events->perPage(),
                 'total'        => $events->total(),
             ],
+        ]);
+    }
+
+    /**
+     * Get single event details with shifts.
+     */
+    public function showEvent($eventId)
+    {
+        $event = Event::with('shifts')->findOrFail($eventId);
+
+        return response()->json([
+            'status' => 'success',
+            'data'   => new EventResource($event),
+        ]);
+    }
+
+    /**
+     * Update event details or status (upcoming, ongoing, completed, cancelled).
+     */
+    public function updateEvent(Request $request, $eventId)
+    {
+        $request->validate([
+            'title'           => 'sometimes|string|max:150',
+            'description'     => 'sometimes|nullable|string',
+            'location'        => 'sometimes|string|max:255',
+            'status'          => 'sometimes|in:upcoming,ongoing,completed,cancelled',
+            'geofence_radius' => 'sometimes|integer|min:50|max:5000',
+        ]);
+
+        $event   = Event::findOrFail($eventId);
+        $oldData = $event->only(['title', 'status', 'geofence_radius']);
+
+        $event->update($request->only(['title', 'description', 'location', 'status', 'geofence_radius']));
+
+        $this->audit->log('event.updated', $event, $oldData, $event->fresh()->only(['title', 'status', 'geofence_radius']));
+
+        return response()->json([
+            'status'  => 'success',
+            'message' => 'Event updated successfully.',
+            'data'    => new EventResource($event->fresh()),
         ]);
     }
 
@@ -99,7 +144,7 @@ class CoordinatorController extends Controller
 
         return response()->json([
             'status' => 'success',
-            'data' => $assignments
+            'data'   => ShiftAssignmentResource::collection($assignments),
         ]);
     }
 
@@ -221,5 +266,45 @@ class CoordinatorController extends Controller
             'message' => 'Coordinator Override Check-in completed. Hand-drawn signature captured.',
             'data' => $attendance
         ], 201);
+    }
+
+    /**
+     * List all volunteers registered in this organization.
+     */
+    public function listVolunteers()
+    {
+        $volunteers = Volunteer::with('user')
+            ->whereHas('user', fn ($q) => $q->where('org_id', auth()->user()->org_id))
+            ->paginate(config('vms.per_page', 15));
+
+        return response()->json([
+            'status'     => 'success',
+            'data'       => VolunteerResource::collection($volunteers->items()),
+            'pagination' => [
+                'current_page' => $volunteers->currentPage(),
+                'last_page'    => $volunteers->lastPage(),
+                'per_page'     => $volunteers->perPage(),
+                'total'        => $volunteers->total(),
+            ],
+        ]);
+    }
+
+    /**
+     * View full volunteer profile & reliability metrics for screening/approval.
+     */
+    public function showVolunteer($volunteerId)
+    {
+        $volunteer = Volunteer::with('user')
+            ->whereHas('user', fn ($q) => $q->where('org_id', auth()->user()->org_id))
+            ->findOrFail($volunteerId);
+
+        return response()->json([
+            'status' => 'success',
+            'data'   => [
+                'volunteer'        => new VolunteerResource($volunteer->load('user')),
+                'reliability'      => $volunteer->getReliabilityMetrics(),
+                'skills_alignment' => $volunteer->getSkillsAlignment(),
+            ],
+        ]);
     }
 }

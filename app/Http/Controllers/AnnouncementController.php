@@ -2,13 +2,16 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Shift;
+use App\Http\Requests\CreateAnnouncementRequest;
 use App\Models\Announcement;
+use App\Models\Shift;
 use App\Models\Volunteer;
+use App\Services\AuditLogService;
 use Illuminate\Http\Request;
 
 class AnnouncementController extends Controller
 {
+    public function __construct(private AuditLogService $audit) {}
     /**
      * Broadcast an urgent shift coverage alert to matching qualified volunteers.
      */
@@ -69,15 +72,45 @@ class AnnouncementController extends Controller
     }
 
     /**
-     * Get announcements.
+     * Create a general announcement for organization members.
+     */
+    public function createAnnouncement(CreateAnnouncementRequest $request)
+    {
+        $announcement = Announcement::create([
+            'org_id'          => auth()->user()->org_id,
+            'posted_by'       => auth()->id(),
+            'title'           => $request->title,
+            'message'         => $request->message,
+            'target_audience' => $request->target_audience,
+        ]);
+
+        $this->audit->log('announcement.created', $announcement);
+
+        return response()->json([
+            'status'  => 'success',
+            'message' => 'Announcement posted successfully.',
+            'data'    => $announcement,
+        ], 201);
+    }
+
+    /**
+     * Get announcements for the organization.
      */
     public function getAnnouncements()
     {
-        $announcements = Announcement::orderBy('created_at', 'desc')->get();
+        $announcements = Announcement::where('org_id', auth()->user()->org_id)
+            ->orderBy('created_at', 'desc')
+            ->paginate(config('vms.per_page', 15));
 
         return response()->json([
-            'status' => 'success',
-            'data' => $announcements
+            'status'     => 'success',
+            'data'       => $announcements->items(),
+            'pagination' => [
+                'current_page' => $announcements->currentPage(),
+                'last_page'    => $announcements->lastPage(),
+                'per_page'     => $announcements->perPage(),
+                'total'        => $announcements->total(),
+            ],
         ]);
     }
 }

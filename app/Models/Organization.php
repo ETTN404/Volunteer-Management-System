@@ -20,6 +20,10 @@ class Organization extends Model
         'name',
         'email',
         'address',
+        'phone',
+        'logo_path',
+        'website',
+        'subscription_plan',
         'status',
     ];
 

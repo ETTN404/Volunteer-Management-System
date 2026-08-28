@@ -2,10 +2,11 @@
 
 namespace App\Http\Controllers;
 
-use App\Services\GeminiService;
-use App\Models\ShiftAssignment;
-use App\Models\Attendance;
+use App\Http\Requests\ChatRequest;
 use App\Models\Announcement;
+use App\Models\Attendance;
+use App\Models\ShiftAssignment;
+use App\Services\GeminiService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Redis;
@@ -22,12 +23,8 @@ class ChatbotController extends Controller
     /**
      * Intercept query, compile real-time database context (RAG), and ask Gemini.
      */
-    public function chat(Request $request)
+    public function chat(ChatRequest $request)
     {
-        $request->validate([
-            'message' => 'required|string|max:1000',
-            'history' => 'nullable|array', // optional conversation history
-        ]);
 
         $user = Auth::user();
         $volunteer = $user->volunteer;
