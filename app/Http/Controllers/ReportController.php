@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\GenerateReportRequest;
+use App\Jobs\CompileReportJob;
 use App\Models\Report;
 use App\Services\ReportService;
 
@@ -14,11 +15,20 @@ class ReportController extends Controller
      */
     public function generateReport(GenerateReportRequest $request)
     {
-        $report = $this->reportService->compile(
-            orgId:       auth()->user()->org_id,
-            generatedBy: auth()->id(),
-            period:      $request->period
-        );
+        $orgId       = auth()->user()->org_id;
+        $generatedBy = auth()->id();
+        $period      = $request->period;
+
+        if ($request->boolean('async')) {
+            CompileReportJob::dispatch($orgId, $generatedBy, $period);
+
+            return response()->json([
+                'status'  => 'success',
+                'message' => 'Impact report compilation queued in background worker. PII will be anonymized.',
+            ], 202);
+        }
+
+        $report = $this->reportService->compile($orgId, $generatedBy, $period);
 
         return response()->json([
             'status'  => 'success',

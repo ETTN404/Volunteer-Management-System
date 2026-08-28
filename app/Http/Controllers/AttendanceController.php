@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\CheckInRequest;
 use App\Http\Requests\CheckOutRequest;
 use App\Http\Resources\AttendanceResource;
+use App\Jobs\GenerateCertificateJob;
 use App\Models\Attendance;
 use App\Models\Shift;
 use App\Models\ShiftAssignment;
@@ -194,9 +195,15 @@ class AttendanceController extends Controller
             'impact_score' => $newImpact,
         ]);
 
-        // Check for newly crossed certificate milestones
+        // Check for newly crossed certificate milestones & dispatch async jobs
         $newMilestones = $this->impact->checkMilestones($volunteer, $prevHours, $newHours);
-        // Note: Phase 5 will dispatch GenerateCertificateJob for each milestone here
+        foreach ($newMilestones as $milestone) {
+            GenerateCertificateJob::dispatch(
+                $volunteer->id,
+                (float) $milestone,
+                $user->org_id ?? $shift->event->org_id
+            );
+        }
 
         return response()->json([
             'status'  => 'success',
