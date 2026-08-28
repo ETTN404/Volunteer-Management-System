@@ -1,0 +1,330 @@
+openapi: 3.0.3
+info:
+  title: Volunteer Management System (VMS) API Specification
+  description: Multi-tenant, enterprise-grade RESTful API for non-profit volunteer management, featuring automated QR check-ins, Haversine GPS geofencing, AI-powered skill matching, certificate generation, and reporting.
+  version: 1.0.0
+servers:
+  - url: http://localhost:8000/api
+    description: Local Development Server
+  - url: https://api.voluntrackapp.com/api
+    description: Production Environment
+
+paths:
+  # --- Authentication ---
+  /register:
+    post:
+      summary: Register a new volunteer
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [full_name, email, password]
+              properties:
+                org_id: { type: integer, example: 1 }
+                full_name: { type: string, example: "Jane Doe" }
+                email: { type: string, example: "jane@example.com" }
+                password: { type: string, format: password, example: "password123" }
+                skills: { type: array, items: { type: string }, example: ["First Aid", "Teaching"] }
+                availability: { type: object, example: { weekends: true } }
+                bio: { type: string, example: "Dedicated community volunteer." }
+      responses:
+        '201':
+          description: Volunteer registered successfully
+        '422':
+          description: Validation Error
+
+  /login:
+    post:
+      summary: Authenticate user and issue Sanctum token
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, example: "volunteer@example.com" }
+                password: { type: string, format: password, example: "password123" }
+      responses:
+        '200':
+          description: Login successful
+        '401':
+          description: Invalid Credentials
+
+  /logout:
+    post:
+      summary: Revoke current API token
+      tags: [Auth]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Logged out successfully
+
+  /me:
+    get:
+      summary: Get authenticated user details
+      tags: [Auth]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Current user profile
+
+  # --- Volunteer Endpoints ---
+  /volunteer/profile:
+    get:
+      summary: Get volunteer profile and reliability metrics
+      tags: [Volunteer]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Profile retrieved successfully
+    patch:
+      summary: Update volunteer profile
+      tags: [Volunteer]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Profile updated
+
+  /volunteer/events:
+    get:
+      summary: Browse events with calculated skill match scores
+      tags: [Volunteer]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of available events with match scores
+
+  /volunteer/shifts/{shiftId}/apply:
+    post:
+      summary: Apply for a shift with overlap conflict detection
+      tags: [Volunteer]
+      security:
+        - bearerAuth: []
+      responses:
+        '201':
+          description: Shift application submitted
+
+  /volunteer/applications/{assignmentId}/withdraw:
+    post:
+      summary: Withdraw a pending shift application
+      tags: [Volunteer]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Application withdrawn
+
+  /volunteer/schedule:
+    get:
+      summary: Get authenticated volunteer shift schedule
+      tags: [Volunteer]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Volunteer shift schedule
+
+  /volunteer/check-in:
+    post:
+      summary: Verify QR code signature and GPS geofence for shift check-in
+      tags: [Attendance]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [shift_id, qr_code_signature, latitude, longitude, client_timestamp]
+              properties:
+                shift_id: { type: integer }
+                qr_code_signature: { type: string }
+                latitude: { type: number, format: float }
+                longitude: { type: number, format: float }
+                client_timestamp: { type: string, format: date-time }
+      responses:
+        '201':
+          description: Check-in verified
+        '422':
+          description: Geofence or QR verification failed
+
+  /volunteer/check-out:
+    post:
+      summary: Check out of shift, calculate duration, and credit impact score
+      tags: [Attendance]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [shift_id]
+              properties:
+                shift_id: { type: integer }
+      responses:
+        '200':
+          description: Check-out recorded
+
+  /volunteer/certificates:
+    get:
+      summary: List volunteer milestone certificates
+      tags: [Volunteer]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of certificates
+
+  /volunteer/impact:
+    get:
+      summary: Get volunteer community impact breakdown and progress to next milestone
+      tags: [Volunteer]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Impact metrics
+
+  /volunteer/chat:
+    post:
+      summary: VolunBot AI assistant query with RAG context
+      tags: [AI Assistant]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [message]
+              properties:
+                message: { type: string, example: "What is my upcoming schedule?" }
+      responses:
+        '200':
+          description: VolunBot response
+
+  # --- Coordinator Endpoints ---
+  /coordinator/events:
+    get:
+      summary: List coordinator organization events
+      tags: [Coordinator]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Organization events
+    post:
+      summary: Create a new event
+      tags: [Coordinator]
+      security:
+        - bearerAuth: []
+      responses:
+        '201':
+          description: Event created
+
+  /coordinator/events/{eventId}:
+    get:
+      summary: Get event details with shifts
+      tags: [Coordinator]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Event details
+    patch:
+      summary: Update event details or status
+      tags: [Coordinator]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Event updated
+    delete:
+      summary: Delete an event
+      tags: [Coordinator]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Event deleted
+
+  /coordinator/events/{eventId}/shifts:
+    post:
+      summary: Create a shift within an event
+      tags: [Coordinator]
+      security:
+        - bearerAuth: []
+      responses:
+        '201':
+          description: Shift created
+
+  /coordinator/shifts/{shiftId}/capacity:
+    get:
+      summary: Get live shift capacity metrics
+      tags: [Coordinator]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Live shift capacity
+
+  /coordinator/applications/{assignmentId}/approve:
+    post:
+      summary: Approve or reject shift application
+      tags: [Coordinator]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Application decision recorded
+
+  /coordinator/reports:
+    post:
+      summary: Request async compilation of donor impact report
+      tags: [Reports]
+      security:
+        - bearerAuth: []
+      responses:
+        '202':
+          description: Report compilation queued
+
+  /coordinator/reports/{reportId}/status:
+    get:
+      summary: Poll queued report status and get download URL
+      tags: [Reports]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Report status and URL
+
+  # --- Public Verification ---
+  /certificates/verify/{certificateNumber}:
+    get:
+      summary: Public verification endpoint for milestone certificates
+      tags: [Public Verification]
+      responses:
+        '200':
+          description: Certificate validity confirmed
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
