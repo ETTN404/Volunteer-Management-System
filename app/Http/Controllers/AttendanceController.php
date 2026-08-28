@@ -2,13 +2,14 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\CheckInRequest;
+use App\Http\Requests\CheckOutRequest;
+use App\Http\Resources\AttendanceResource;
+use App\Models\Attendance;
 use App\Models\Shift;
 use App\Models\ShiftAssignment;
-use App\Models\Attendance;
-use App\Models\Volunteer;
 use App\Services\GeofenceService;
 use App\Services\ImpactScoreService;
-use Illuminate\Http\Request;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 
@@ -42,16 +43,8 @@ class AttendanceController extends Controller
     /**
      * Perform GPS-verified & QR-verified check-in for volunteers.
      */
-    public function checkIn(Request $request)
+    public function checkIn(CheckInRequest $request)
     {
-        $request->validate([
-            'shift_id' => 'required|exists:shifts,id',
-            'qr_code_signature' => 'required|string',
-            'latitude' => 'required|numeric|between:-90,90',
-            'longitude' => 'required|numeric|between:-180,180',
-            'client_timestamp' => 'required|date',
-        ]);
-
         // Subtask 9.2.1.2: Time-drift Anti-Fraud Validation
         $clientTime = Carbon::parse($request->client_timestamp);
         if ($clientTime->diffInMinutes(now()) > 2) {
@@ -144,21 +137,17 @@ class AttendanceController extends Controller
         ]);
 
         return response()->json([
-            'status' => 'success',
+            'status'  => 'success',
             'message' => 'Check-in verified successfully. Welcome to your shift!',
-            'data' => $attendance
+            'data'    => new AttendanceResource($attendance),
         ], 201);
     }
 
     /**
      * Perform shift check-out and dynamically accumulate hours and impact metrics.
      */
-    public function checkOut(Request $request)
+    public function checkOut(CheckOutRequest $request)
     {
-        $request->validate([
-            'shift_id' => 'required|exists:shifts,id',
-        ]);
-
         $user = Auth::user();
         $volunteer = $user->volunteer;
 

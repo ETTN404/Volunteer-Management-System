@@ -2,9 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\GenerateReportRequest;
 use App\Models\Report;
 use App\Services\ReportService;
-use Illuminate\Http\Request;
 
 class ReportController extends Controller
 {
@@ -12,12 +12,8 @@ class ReportController extends Controller
     /**
      * Generate an analytical organization-level impact report for donors/stakeholders.
      */
-    public function generateReport(Request $request)
+    public function generateReport(GenerateReportRequest $request)
     {
-        $request->validate([
-            'period' => 'required|string|max:50',
-        ]);
-
         $report = $this->reportService->compile(
             orgId:       auth()->user()->org_id,
             generatedBy: auth()->id(),

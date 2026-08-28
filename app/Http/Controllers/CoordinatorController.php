@@ -2,100 +2,87 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\ApproveApplicationRequest;
+use App\Http\Requests\CreateEventRequest;
+use App\Http\Requests\CreateShiftRequest;
+use App\Http\Requests\ForceCheckInRequest;
+use App\Http\Resources\EventResource;
 use App\Models\Event;
 use App\Models\Shift;
 use App\Models\ShiftAssignment;
-use Illuminate\Http\Request;
 use Carbon\Carbon;
 
 class CoordinatorController extends Controller
 {
-    /**
-     * Create a new event for the authenticated organization.
-     */
-    public function createEvent(Request $request)
+    public function createEvent(CreateEventRequest $request)
     {
-        $request->validate([
-            'title' => 'required|string|max:150',
-            'description' => 'nullable|string',
-            'location' => 'required|string|max:255',
-            'latitude' => 'nullable|numeric|between:-90,90',
-            'longitude' => 'nullable|numeric|between:-180,180',
-            'start_date' => 'required|date',
-            'end_date' => 'required|date|after_or_equal:start_date',
-        ]);
-
         $event = Event::create([
-            'org_id' => auth()->user()->org_id,
-            'title' => $request->title,
-            'description' => $request->description,
-            'location' => $request->location,
-            'latitude' => $request->latitude,
-            'longitude' => $request->longitude,
-            'start_date' => $request->start_date,
-            'end_date' => $request->end_date,
-            'status' => 'upcoming',
+            'org_id'          => auth()->user()->org_id,
+            'title'           => $request->title,
+            'description'     => $request->description,
+            'location'        => $request->location,
+            'latitude'        => $request->latitude,
+            'longitude'       => $request->longitude,
+            'start_date'      => $request->start_date,
+            'end_date'        => $request->end_date,
+            'status'          => 'upcoming',
+            'geofence_radius' => $request->geofence_radius ?? config('vms.geofence_default_radius', 100),
         ]);
 
         return response()->json([
-            'status' => 'success',
+            'status'  => 'success',
             'message' => 'Event created successfully.',
-            'data' => $event
+            'data'    => new EventResource($event),
         ], 201);
     }
 
-    /**
-     * Get all events belonging to the authenticated organization.
-     */
     public function getEvents()
     {
         // TenantScope automatically scopes queries by org_id for non-SuperAdmins
-        $events = Event::with('shifts')->latest()->paginate(15);
+        $events = Event::with('shifts')->latest()->paginate(config('vms.events_per_page', 15));
 
         return response()->json([
             'status' => 'success',
-            'data' => $events
+            'data'   => EventResource::collection($events->items()),
+            'pagination' => [
+                'current_page' => $events->currentPage(),
+                'last_page'    => $events->lastPage(),
+                'per_page'     => $events->perPage(),
+                'total'        => $events->total(),
+            ],
         ]);
     }
 
-    /**
-     * Create a shift for an event.
-     */
-    public function createShift(Request $request, $eventId)
+    public function createShift(CreateShiftRequest $request, $eventId)
     {
         $event = Event::findOrFail($eventId);
 
-        $request->validate([
-            'start_time' => 'required|date_format:Y-m-d H:i:s',
-            'end_time' => 'required|date_format:Y-m-d H:i:s|after:start_time',
-            'required_skills' => 'nullable|array',
-            'capacity' => 'required|integer|min:1',
-        ]);
-
         // Validate shift dates fall within event dates
         $shiftStart = Carbon::parse($request->start_time)->toDateString();
-        $shiftEnd = Carbon::parse($request->end_time)->toDateString();
+        $shiftEnd   = Carbon::parse($request->end_time)->toDateString();
 
         if ($shiftStart < $event->start_date->toDateString() || $shiftEnd > $event->end_date->toDateString()) {
             return response()->json([
-                'status' => 'error',
+                'status'  => 'error',
                 'message' => 'Shift timings must fall within the event boundaries (' . $event->start_date->toDateString() . ' to ' . $event->end_date->toDateString() . ').'
             ], 422);
         }
 
+        $expiryMinutes = config('vms.qr_expiry_minutes', 15);
         $shift = Shift::create([
-            'event_id' => $event->id,
-            'start_time' => $request->start_time,
-            'end_time' => $request->end_time,
-            'required_skills' => $request->required_skills ?? [],
-            'capacity' => $request->capacity,
-            'qr_code_signature' => bin2hex(random_bytes(16)), // dynamic signed QR code signature
+            'event_id'          => $event->id,
+            'start_time'        => $request->start_time,
+            'end_time'          => $request->end_time,
+            'required_skills'   => $request->required_skills ?? [],
+            'capacity'          => $request->capacity,
+            'qr_code_signature' => bin2hex(random_bytes(16)),
+            'qr_expires_at'     => now()->addMinutes($expiryMinutes),
         ]);
 
         return response()->json([
-            'status' => 'success',
+            'status'  => 'success',
             'message' => 'Shift created successfully.',
-            'data' => $shift
+            'data'    => $shift,
         ], 201);
     }
 
@@ -119,12 +106,8 @@ class CoordinatorController extends Controller
     /**
      * Approve or reject a volunteer shift assignment.
      */
-    public function approveApplication(Request $request, $assignmentId)
+    public function approveApplication(ApproveApplicationRequest $request, $assignmentId)
     {
-        $request->validate([
-            'status' => 'required|in:confirmed,cancelled',
-        ]);
-
         $assignment = ShiftAssignment::with('shift')->findOrFail($assignmentId);
 
         // Security check: Make sure this assignment belongs to an event of this organization
@@ -196,12 +179,8 @@ class CoordinatorController extends Controller
     /**
      * Force manual check-in override with drawn signature verification capture.
      */
-    public function forceCheckIn(Request $request, $assignmentId)
+    public function forceCheckIn(ForceCheckInRequest $request, $assignmentId)
     {
-        $request->validate([
-            'signature_data' => 'required|string', // base64 drawn signature data
-        ]);
-
         $assignment = ShiftAssignment::with('shift')->findOrFail($assignmentId);
         $volunteer = $assignment->volunteer;
 

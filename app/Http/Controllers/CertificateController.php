@@ -2,10 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\GenerateCertificateRequest;
 use App\Models\Certificate;
 use App\Models\Volunteer;
 use App\Services\CertificateService;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
 class CertificateController extends Controller
@@ -14,13 +14,8 @@ class CertificateController extends Controller
     /**
      * Generate a milestone certificate of appreciation for a volunteer.
      */
-    public function generateCertificate(Request $request)
+    public function generateCertificate(GenerateCertificateRequest $request)
     {
-        $request->validate([
-            'volunteer_id'    => 'required|exists:volunteers,id',
-            'milestone_hours' => 'required|numeric|min:1',
-        ]);
-
         $volunteer = Volunteer::with('user')->findOrFail($request->volunteer_id);
 
         try {
