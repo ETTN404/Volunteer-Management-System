@@ -6,6 +6,7 @@ use App\Http\Requests\ApproveApplicationRequest;
 use App\Http\Requests\CreateEventRequest;
 use App\Http\Requests\CreateShiftRequest;
 use App\Http\Requests\ForceCheckInRequest;
+use App\Http\Requests\UpdateEventRequest;
 use App\Http\Resources\EventResource;
 use App\Http\Resources\ShiftAssignmentResource;
 use App\Http\Resources\VolunteerResource;
@@ -74,16 +75,8 @@ class CoordinatorController extends Controller
     /**
      * Update event details or status (upcoming, ongoing, completed, cancelled).
      */
-    public function updateEvent(Request $request, $eventId)
+    public function updateEvent(UpdateEventRequest $request, $eventId)
     {
-        $request->validate([
-            'title'           => 'sometimes|string|max:150',
-            'description'     => 'sometimes|nullable|string',
-            'location'        => 'sometimes|string|max:255',
-            'status'          => 'sometimes|in:upcoming,ongoing,completed,cancelled',
-            'geofence_radius' => 'sometimes|integer|min:50|max:5000',
-        ]);
-
         $event   = Event::findOrFail($eventId);
         $oldData = $event->only(['title', 'status', 'geofence_radius']);
 

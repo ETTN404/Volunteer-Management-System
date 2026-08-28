@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\ChatRequest;
+use App\Http\Resources\ChatbotResponseResource;
 use App\Models\Announcement;
 use App\Models\Attendance;
 use App\Models\ShiftAssignment;
@@ -106,9 +107,8 @@ class ChatbotController extends Controller
         // Cache for 2 hours (7200 seconds) - inactive sessions handled by cron later
         Redis::setex($redisKey, 7200, json_encode($history));
 
-        return response()->json([
-            'status' => 'success',
-            'query' => $request->message,
+        return new ChatbotResponseResource([
+            'query'    => $request->message,
             'response' => $aiMessage,
         ]);
     }

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\GenerateReportRequest;
+use App\Http\Resources\ReportResource;
 use App\Jobs\CompileReportJob;
 use App\Models\Report;
 use App\Services\ReportService;
@@ -33,7 +34,7 @@ class ReportController extends Controller
         return response()->json([
             'status'  => 'success',
             'message' => 'Impact report compiled successfully. PII has been anonymized.',
-            'data'    => $report
+            'data'    => new ReportResource($report)
         ], 201);
     }
 
@@ -46,7 +47,7 @@ class ReportController extends Controller
 
         return response()->json([
             'status' => 'success',
-            'data'   => $reports
+            'data'   => ReportResource::collection($reports)
         ]);
     }
 
@@ -59,7 +60,7 @@ class ReportController extends Controller
 
         return response()->json([
             'status' => 'success',
-            'data'   => $report
+            'data'   => new ReportResource($report)
         ]);
     }
 }

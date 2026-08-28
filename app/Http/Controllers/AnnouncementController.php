@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\CreateAnnouncementRequest;
+use App\Http\Resources\AnnouncementResource;
 use App\Jobs\SendShiftAlertJob;
 use App\Models\Announcement;
 use App\Models\Shift;
@@ -64,7 +65,7 @@ class AnnouncementController extends Controller
         return response()->json([
             'status'  => 'success',
             'message' => 'Announcement posted successfully.',
-            'data'    => $announcement,
+            'data'    => new AnnouncementResource($announcement),
         ], 201);
     }
 
@@ -79,7 +80,7 @@ class AnnouncementController extends Controller
 
         return response()->json([
             'status'     => 'success',
-            'data'       => $announcements->items(),
+            'data'       => AnnouncementResource::collection($announcements->items()),
             'pagination' => [
                 'current_page' => $announcements->currentPage(),
                 'last_page'    => $announcements->lastPage(),
