@@ -2,12 +2,11 @@
 
 namespace Tests\Feature;
 
-use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Foundation\Testing\WithFaker;
-use Tests\TestCase;
-use App\Models\User;
-use App\Models\Organization;
 use App\Models\Event;
+use App\Models\Organization;
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
 
 class TenantIsolationSecurityTest extends TestCase
 {
@@ -20,14 +19,38 @@ class TenantIsolationSecurityTest extends TestCase
     public function test_tenant_a_cannot_access_tenant_b_data()
     {
         // 1. Setup Tenant A
-        $orgA = Organization::factory()->create(['name' => 'Tenant A - Red Cross']);
-        $userA = User::factory()->create(['org_id' => $orgA->id, 'role' => 'Coordinator']);
-        $eventA = Event::factory()->create(['org_id' => $orgA->id, 'title' => 'Blood Drive A']);
+        $orgA = Organization::create(['name' => 'Tenant A - Red Cross', 'email' => 'redcross@example.com']);
+        $userA = User::create([
+            'org_id'    => $orgA->id,
+            'full_name' => 'Coord A',
+            'email'     => 'coorda@example.com',
+            'password'  => bcrypt('password123'),
+            'role'      => 'Coordinator',
+        ]);
+        $eventA = Event::create([
+            'org_id'     => $orgA->id,
+            'title'      => 'Blood Drive A',
+            'location'   => 'Location A',
+            'start_date' => now()->toDateString(),
+            'end_date'   => now()->addDays(2)->toDateString(),
+        ]);
 
         // 2. Setup Tenant B
-        $orgB = Organization::factory()->create(['name' => 'Tenant B - UNICEF']);
-        $userB = User::factory()->create(['org_id' => $orgB->id, 'role' => 'Coordinator']);
-        $eventB = Event::factory()->create(['org_id' => $orgB->id, 'title' => 'Vaccine Drive B']);
+        $orgB = Organization::create(['name' => 'Tenant B - UNICEF', 'email' => 'unicef@example.com']);
+        $userB = User::create([
+            'org_id'    => $orgB->id,
+            'full_name' => 'Coord B',
+            'email'     => 'coordb@example.com',
+            'password'  => bcrypt('password123'),
+            'role'      => 'Coordinator',
+        ]);
+        $eventB = Event::create([
+            'org_id'     => $orgB->id,
+            'title'      => 'Vaccine Drive B',
+            'location'   => 'Location B',
+            'start_date' => now()->toDateString(),
+            'end_date'   => now()->addDays(2)->toDateString(),
+        ]);
 
         // 3. Authenticate as User A and attempt to fetch events
         $responseA = $this->actingAs($userA, 'sanctum')->getJson('/api/coordinator/events');

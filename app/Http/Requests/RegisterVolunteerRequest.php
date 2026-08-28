@@ -20,9 +20,9 @@ class RegisterVolunteerRequest extends FormRequest
             'password'     => 'required|string|min:8',
             'skills'       => 'nullable|array',
             'skills.*'     => 'string|max:100',
-            'availability' => 'nullable|array',
-            'availability.*' => 'string|max:100',
-            'bio'          => 'nullable|string|max:1000',
+            'availability'   => 'nullable|array',
+            'availability.*' => 'nullable',
+            'bio'            => 'nullable|string|max:1000',
         ];
     }
 

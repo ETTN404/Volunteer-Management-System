@@ -10,7 +10,7 @@ use App\Models\ShiftAssignment;
 use App\Services\GeminiService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Redis;
+use Illuminate\Support\Facades\Cache;
 
 class ChatbotController extends Controller
 {
@@ -89,14 +89,14 @@ class ChatbotController extends Controller
 
         $context = "SYSTEM_INSTRUCTION: You are VolunBot, the VMS AI assistant. RULES: 1. Answer concisely. 2. Base all answers strictly on the CONTEXT_JSON. Do not hallucinate dates/events. 3. Detect the user's prompt language and respond in the exact same language (e.g. Amharic, English). 4. Use localized date formatting. Current Server Time: {$currentTime}. CONTEXT_JSON=" . json_encode($contextData);
 
-        // 3. Query the Gemini Service with compiled context and Redis memory
-        $redisKey = 'chat_session_' . $volunteer->id;
-        $history = json_decode(Redis::get($redisKey), true) ?? [];
+        // 3. Query the Gemini Service with compiled context and Cache memory
+        $cacheKey = 'chat_session_' . $volunteer->id;
+        $history = Cache::get($cacheKey, []);
         
-        // Discard frontend history and strictly use Redis server-side memory
+        // Discard frontend history and strictly use server-side memory
         $aiMessage = $this->gemini->ask($request->message, $context, $history);
 
-        // 4. Update History in Redis (Maintain last 10 interactions = 20 total messages)
+        // 4. Update History in Cache (Maintain last 10 interactions = 20 total messages)
         $history[] = ['role' => 'user', 'parts' => [['text' => $request->message]]];
         $history[] = ['role' => 'model', 'parts' => [['text' => $aiMessage]]];
         
@@ -104,8 +104,8 @@ class ChatbotController extends Controller
             $history = array_slice($history, -20);
         }
         
-        // Cache for 2 hours (7200 seconds) - inactive sessions handled by cron later
-        Redis::setex($redisKey, 7200, json_encode($history));
+        // Cache for 2 hours (7200 seconds)
+        Cache::put($cacheKey, $history, 7200);
 
         return new ChatbotResponseResource([
             'query'    => $request->message,

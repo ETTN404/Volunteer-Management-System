@@ -48,9 +48,9 @@ class TenantAuthAndOnboardingTest extends TestCase
             'role' => 'Volunteer',
         ]);
 
-        $this->assertDatabaseHas('volunteers', [
-            'bio' => 'Ready to help!',
-        ]);
+        $userRecord = User::where('email', 'johndoe@example.com')->first();
+        $this->assertNotNull($userRecord->volunteer);
+        $this->assertEquals('Ready to help!', $userRecord->volunteer->bio);
 
         // Test Login
         $loginResponse = $this->postJson('/api/login', [

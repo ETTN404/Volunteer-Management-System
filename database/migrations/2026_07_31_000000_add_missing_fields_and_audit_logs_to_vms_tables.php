@@ -46,6 +46,11 @@ return new class extends Migration
             $table->string('signature_path', 500)->nullable()->after('signature_data');
         });
 
+        // 6b. Add status to reports
+        Schema::table('reports', function (Blueprint $table) {
+            $table->string('status', 50)->default('completed')->after('file_path');
+        });
+
         // 7. Create audit_logs table
         Schema::create('audit_logs', function (Blueprint $table) {
             $table->id();
@@ -81,6 +86,10 @@ return new class extends Migration
     {
         Schema::dropIfExists('announcement_reads');
         Schema::dropIfExists('audit_logs');
+
+        Schema::table('reports', function (Blueprint $table) {
+            $table->dropColumn('status');
+        });
 
         Schema::table('attendances', function (Blueprint $table) {
             $table->dropColumn('signature_path');

@@ -61,6 +61,13 @@ class DashboardEventAndShiftTest extends TestCase
      */
     public function test_event_and_shift_creation_flow()
     {
+        $startDate  = now()->addDays(5)->toDateString();
+        $endDate    = now()->addDays(10)->toDateString();
+        $shiftStart = now()->addDays(6)->setTime(9, 0)->format('Y-m-d H:i:s');
+        $shiftEnd   = now()->addDays(6)->setTime(12, 0)->format('Y-m-d H:i:s');
+        $badStart   = now()->addDays(15)->setTime(9, 0)->format('Y-m-d H:i:s');
+        $badEnd     = now()->addDays(15)->setTime(12, 0)->format('Y-m-d H:i:s');
+
         $response = $this->actingAs($this->coord, 'sanctum')
                          ->postJson('/api/coordinator/events', [
                              'title' => 'Disaster Response Drill',
@@ -68,8 +75,8 @@ class DashboardEventAndShiftTest extends TestCase
                              'location' => 'Addis Ababa Stadium',
                              'latitude' => 9.010000,
                              'longitude' => 38.740000,
-                             'start_date' => '2026-06-15',
-                             'end_date' => '2026-06-20',
+                             'start_date' => $startDate,
+                             'end_date' => $endDate,
                          ]);
 
         $response->assertStatus(201);
@@ -78,8 +85,8 @@ class DashboardEventAndShiftTest extends TestCase
         // Test Shift within boundaries (Succeeds)
         $shiftResponse = $this->actingAs($this->coord, 'sanctum')
                               ->postJson("/api/coordinator/events/{$eventId}/shifts", [
-                                  'start_time' => '2026-06-16 09:00:00',
-                                  'end_time' => '2026-06-16 12:00:00',
+                                  'start_time' => $shiftStart,
+                                  'end_time' => $shiftEnd,
                                   'required_skills' => ['first_aid'],
                                   'capacity' => 10,
                               ]);
@@ -88,8 +95,8 @@ class DashboardEventAndShiftTest extends TestCase
         // Test Shift outside event boundaries (Fails with 422)
         $badShiftResponse = $this->actingAs($this->coord, 'sanctum')
                                  ->postJson("/api/coordinator/events/{$eventId}/shifts", [
-                                     'start_time' => '2026-06-25 09:00:00',
-                                     'end_time' => '2026-06-25 12:00:00',
+                                     'start_time' => $badStart,
+                                     'end_time' => $badEnd,
                                      'required_skills' => ['first_aid'],
                                      'capacity' => 10,
                                  ]);
