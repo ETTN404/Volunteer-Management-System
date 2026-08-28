@@ -17,6 +17,7 @@ use App\Models\Volunteer;
 use App\Notifications\ShiftApprovedNotification;
 use App\Services\AuditLogService;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Cache;
 
 class CoordinatorController extends Controller
 {
@@ -35,6 +36,9 @@ class CoordinatorController extends Controller
             'status'          => 'upcoming',
             'geofence_radius' => $request->geofence_radius ?? config('vms.geofence_default_radius', 100),
         ]);
+
+        // Invalidate org events cache
+        Cache::forget("org_" . auth()->user()->org_id . "_events");
 
         return response()->json([
             'status'  => 'success',
@@ -84,6 +88,9 @@ class CoordinatorController extends Controller
         $event->update($request->only(['title', 'description', 'location', 'status', 'geofence_radius']));
 
         $this->audit->log('event.updated', $event, $oldData, $event->fresh()->only(['title', 'status', 'geofence_radius']));
+
+        // Invalidate org events cache
+        Cache::forget("org_" . auth()->user()->org_id . "_events");
 
         return response()->json([
             'status'  => 'success',
@@ -179,6 +186,10 @@ class CoordinatorController extends Controller
         if ($request->status === 'confirmed' && $assignment->volunteer?->user) {
             $assignment->volunteer->user->notify(new ShiftApprovedNotification($assignment->shift));
         }
+
+        // Invalidate shift capacity & volunteer schedule cache
+        Cache::forget("shift_{$assignment->shift_id}_capacity");
+        Cache::forget("volunteer_{$assignment->volunteer_id}_schedule");
 
         return response()->json([
             'status' => 'success',
@@ -318,6 +329,9 @@ class CoordinatorController extends Controller
 
         $this->audit->log('event.deleted', null, $oldData, []);
 
+        // Invalidate org events cache
+        Cache::forget("org_" . auth()->user()->org_id . "_events");
+
         return response()->json([
             'status'  => 'success',
             'message' => 'Event deleted successfully.',
@@ -331,21 +345,25 @@ class CoordinatorController extends Controller
     {
         $shift = Shift::findOrFail($shiftId);
 
-        $confirmedCount = ShiftAssignment::where('shift_id', $shift->id)
-            ->where('status', 'confirmed')
-            ->count();
+        $capacityData = Cache::remember("shift_{$shift->id}_capacity", 60, function () use ($shift) {
+            $confirmedCount = ShiftAssignment::where('shift_id', $shift->id)
+                ->where('status', 'confirmed')
+                ->count();
 
-        $remainingSlots = max(0, $shift->capacity - $confirmedCount);
+            $remainingSlots = max(0, $shift->capacity - $confirmedCount);
 
-        return response()->json([
-            'status' => 'success',
-            'data'   => [
+            return [
                 'shift_id'        => $shift->id,
                 'total_capacity'  => $shift->capacity,
                 'confirmed_count' => $confirmedCount,
                 'remaining_slots' => $remainingSlots,
                 'is_full'         => $remainingSlots === 0,
-            ],
+            ];
+        });
+
+        return response()->json([
+            'status' => 'success',
+            'data'   => $capacityData,
         ]);
     }
 }

@@ -13,6 +13,7 @@ use App\Services\GeofenceService;
 use App\Services\ImpactScoreService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 
 class AttendanceController extends Controller
 {
@@ -204,6 +205,10 @@ class AttendanceController extends Controller
                 $user->org_id ?? $shift->event->org_id
             );
         }
+
+        // Invalidate volunteer profile & impact breakdown caches
+        Cache::forget("volunteer_{$volunteer->id}_profile");
+        Cache::forget("volunteer_{$volunteer->id}_impact");
 
         return response()->json([
             'status'  => 'success',

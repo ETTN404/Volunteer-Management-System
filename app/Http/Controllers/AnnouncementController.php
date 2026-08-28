@@ -10,6 +10,7 @@ use App\Models\Shift;
 use App\Models\Volunteer;
 use App\Services\AuditLogService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 
 class AnnouncementController extends Controller
 {
@@ -35,6 +36,9 @@ class AnnouncementController extends Controller
         );
 
         $this->audit->log('shift.urgent_broadcast', $shift);
+
+        // Invalidate announcements cache
+        Cache::forget("org_" . auth()->user()->org_id . "_announcements");
 
         return response()->json([
             'status'  => 'success',
@@ -62,6 +66,9 @@ class AnnouncementController extends Controller
 
         $this->audit->log('announcement.created', $announcement);
 
+        // Invalidate announcements cache
+        Cache::forget("org_" . auth()->user()->org_id . "_announcements");
+
         return response()->json([
             'status'  => 'success',
             'message' => 'Announcement posted successfully.',
@@ -74,19 +81,28 @@ class AnnouncementController extends Controller
      */
     public function getAnnouncements()
     {
-        $announcements = Announcement::where('org_id', auth()->user()->org_id)
-            ->orderBy('created_at', 'desc')
-            ->paginate(config('vms.per_page', 15));
+        $orgId = auth()->user()->org_id;
+
+        $announcementsData = Cache::remember("org_{$orgId}_announcements", 120, function () use ($orgId) {
+            $announcements = Announcement::where('org_id', $orgId)
+                ->orderBy('created_at', 'desc')
+                ->paginate(config('vms.per_page', 15));
+
+            return [
+                'items'      => AnnouncementResource::collection($announcements->items()),
+                'pagination' => [
+                    'current_page' => $announcements->currentPage(),
+                    'last_page'    => $announcements->lastPage(),
+                    'per_page'     => $announcements->perPage(),
+                    'total'        => $announcements->total(),
+                ],
+            ];
+        });
 
         return response()->json([
             'status'     => 'success',
-            'data'       => AnnouncementResource::collection($announcements->items()),
-            'pagination' => [
-                'current_page' => $announcements->currentPage(),
-                'last_page'    => $announcements->lastPage(),
-                'per_page'     => $announcements->perPage(),
-                'total'        => $announcements->total(),
-            ],
+            'data'       => $announcementsData['items'],
+            'pagination' => $announcementsData['pagination'],
         ]);
     }
 }

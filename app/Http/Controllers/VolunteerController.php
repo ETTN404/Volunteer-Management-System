@@ -14,6 +14,7 @@ use App\Models\ShiftAssignment;
 use App\Services\SkillMatchingService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 
 class VolunteerController extends Controller
 {
@@ -114,6 +115,9 @@ class VolunteerController extends Controller
             'assigned_at' => null,
         ]);
 
+        // Invalidate schedule cache for volunteer
+        Cache::forget("volunteer_{$volunteer->id}_schedule");
+
         return response()->json([
             'status'  => 'success',
             'message' => 'Application submitted successfully. Under coordinator review.',
@@ -136,14 +140,17 @@ class VolunteerController extends Controller
             ], 404);
         }
 
-        $schedule = ShiftAssignment::where('volunteer_id', $volunteer->id)
-            ->with(['shift.event'])
-            ->orderBy('created_at', 'desc')
-            ->get();
+        $scheduleData = Cache::remember("volunteer_{$volunteer->id}_schedule", 300, function () use ($volunteer) {
+            $schedule = ShiftAssignment::where('volunteer_id', $volunteer->id)
+                ->with(['shift.event'])
+                ->orderBy('created_at', 'desc')
+                ->get();
+            return ShiftAssignmentResource::collection($schedule);
+        });
 
         return response()->json([
             'status' => 'success',
-            'data'   => ShiftAssignmentResource::collection($schedule)
+            'data'   => $scheduleData,
         ]);
     }
 
@@ -162,13 +169,17 @@ class VolunteerController extends Controller
             ], 404);
         }
 
-        return response()->json([
-            'status' => 'success',
-            'data'   => [
+        $profileData = Cache::remember("volunteer_{$volunteer->id}_profile", 600, function () use ($volunteer) {
+            return [
                 'volunteer'        => new VolunteerResource($volunteer->load('user')),
                 'reliability'      => $volunteer->getReliabilityMetrics(),
                 'skills_alignment' => $volunteer->getSkillsAlignment(),
-            ]
+            ];
+        });
+
+        return response()->json([
+            'status' => 'success',
+            'data'   => $profileData,
         ]);
     }
 
@@ -192,6 +203,9 @@ class VolunteerController extends Controller
         }
 
         $volunteer->update($request->only(['skills', 'availability', 'bio']));
+
+        // Invalidate volunteer profile cache
+        Cache::forget("volunteer_{$volunteer->id}_profile");
 
         return response()->json([
             'status'  => 'success',
@@ -240,33 +254,37 @@ class VolunteerController extends Controller
             ], 404);
         }
 
-        $completedShiftsCount = \App\Models\Attendance::where('volunteer_id', $volunteer->id)
-            ->whereNotNull('check_out_time')
-            ->count();
+        $impactData = Cache::remember("volunteer_{$volunteer->id}_impact", 600, function () use ($volunteer) {
+            $completedShiftsCount = \App\Models\Attendance::where('volunteer_id', $volunteer->id)
+                ->whereNotNull('check_out_time')
+                ->count();
 
-        $milestones = config('vms.certificate_milestones', [10, 25, 50, 100, 200, 500]);
-        $currentHours = (float) $volunteer->total_hours;
+            $milestones = config('vms.certificate_milestones', [10, 25, 50, 100, 200, 500]);
+            $currentHours = (float) $volunteer->total_hours;
 
-        $nextMilestone = null;
-        foreach ($milestones as $m) {
-            if ($m > $currentHours) {
-                $nextMilestone = $m;
-                break;
+            $nextMilestone = null;
+            foreach ($milestones as $m) {
+                if ($m > $currentHours) {
+                    $nextMilestone = $m;
+                    break;
+                }
             }
-        }
 
-        $hoursToNextMilestone = $nextMilestone ? round($nextMilestone - $currentHours, 2) : 0.00;
+            $hoursToNextMilestone = $nextMilestone ? round($nextMilestone - $currentHours, 2) : 0.00;
 
-        return response()->json([
-            'status' => 'success',
-            'data'   => [
+            return [
                 'total_hours'            => $currentHours,
                 'impact_score'           => (float) $volunteer->impact_score,
                 'completed_shifts_count' => $completedShiftsCount,
                 'next_milestone'         => $nextMilestone,
                 'hours_to_next'          => $hoursToNextMilestone,
                 'earned_certificates'    => Certificate::where('volunteer_id', $volunteer->id)->count(),
-            ],
+            ];
+        });
+
+        return response()->json([
+            'status' => 'success',
+            'data'   => $impactData,
         ]);
     }
 
@@ -284,6 +302,9 @@ class VolunteerController extends Controller
             ->firstOrFail();
 
         $assignment->delete();
+
+        // Invalidate volunteer schedule cache
+        Cache::forget("volunteer_{$volunteer->id}_schedule");
 
         return response()->json([
             'status'  => 'success',
