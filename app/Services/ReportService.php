@@ -40,13 +40,14 @@ class ReportService
         // 3. Write to storage
         $filePath = $this->persistToDisk($orgId, $period, $csvContent);
 
-        // 4. Create and return the Report record
+        // 4. Create and return the Report record with status
         return Report::create([
             'org_id'           => $orgId,
             'generated_by'     => $generatedBy,
             'period'           => $period,
             'total_volunteers' => $totalVolunteers,
             'total_hours'      => $totalHours,
+            'status'           => 'completed',
             'file_path'        => 'storage/' . $filePath,
         ]);
     }

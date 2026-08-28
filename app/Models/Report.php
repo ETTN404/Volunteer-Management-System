@@ -24,6 +24,7 @@ class Report extends Model
         'total_volunteers',
         'total_hours',
         'file_path',
+        'status',
     ];
 
     /**

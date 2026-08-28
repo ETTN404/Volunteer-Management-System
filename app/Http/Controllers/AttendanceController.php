@@ -105,11 +105,11 @@ class AttendanceController extends Controller
             ], 422);
         }
 
-        // 4. QR Signature Validation
-        if ($shift->qr_code_signature !== $request->qr_code_signature) {
+        // 4. QR Signature & Expiration Validation (Task 26)
+        if ($shift->qr_code_signature !== $request->qr_code_signature || ($shift->qr_expires_at && $shift->qr_expires_at->isPast())) {
             return response()->json([
-                'status' => 'error',
-                'message' => 'Validation Failed: Scanned QR code is invalid or has expired.'
+                'status'  => 'error',
+                'message' => 'Validation Failed: Scanned QR code signature is invalid or has expired.'
             ], 422);
         }
 

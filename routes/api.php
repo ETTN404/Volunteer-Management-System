@@ -78,6 +78,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/coordinator/certificates', [CertificateController::class, 'generateCertificate']);
         Route::post('/coordinator/reports', [ReportController::class, 'generateReport']);
         Route::get('/coordinator/reports', [ReportController::class, 'getReports']);
+        Route::get('/coordinator/reports/{id}', [ReportController::class, 'showReport']);
         Route::post('/coordinator/announcements', [AnnouncementController::class, 'createAnnouncement']);
         Route::post('/coordinator/shifts/{shiftId}/broadcast', [AnnouncementController::class, 'broadcastUrgentShift']);
     });

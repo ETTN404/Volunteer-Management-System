@@ -46,7 +46,20 @@ class ReportController extends Controller
 
         return response()->json([
             'status' => 'success',
-            'data' => $reports
+            'data'   => $reports
+        ]);
+    }
+
+    /**
+     * Poll status or view single report details.
+     */
+    public function showReport($id)
+    {
+        $report = Report::findOrFail($id);
+
+        return response()->json([
+            'status' => 'success',
+            'data'   => $report
         ]);
     }
 }
