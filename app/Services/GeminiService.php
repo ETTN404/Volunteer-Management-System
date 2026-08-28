@@ -8,11 +8,12 @@ use Illuminate\Support\Facades\Log;
 class GeminiService
 {
     protected ?string $apiKey;
-    protected string $model = 'gemini-1.5-flash'; // standard Gemini model
+    protected string $model;
 
     public function __construct()
     {
         $this->apiKey = config('services.gemini.key') ?? env('GEMINI_API_KEY');
+        $this->model  = config('services.gemini.model', 'gemini-1.5-flash');
     }
 
     /**
