@@ -11,13 +11,15 @@ use App\Http\Controllers\ReportController;
 use App\Http\Controllers\SuperAdminController;
 use App\Http\Controllers\TenantOnboardingController;
 use App\Http\Controllers\VolunteerController;
+use App\Http\Middleware\EnsureVolunteerProfile;
 use App\Http\Resources\UserResource;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
-// Public Auth routes
+// Public Auth & Verification routes (No auth required)
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
+Route::get('/verify/certificate/{number}', [CertificateController::class, 'verifyCertificate']);
 
 // Protected routes (requires valid Sanctum Bearer token)
 Route::middleware('auth:sanctum')->group(function () {
@@ -54,12 +56,14 @@ Route::middleware('auth:sanctum')->group(function () {
     // Coordinator & OrgAdmin Routes
     // ------------------------------------------------------------------
     Route::middleware('role:Coordinator,OrgAdmin')->group(function () {
-        // Event Management
+        // Event & Shift Management
         Route::post('/coordinator/events', [CoordinatorController::class, 'createEvent']);
         Route::get('/coordinator/events', [CoordinatorController::class, 'getEvents']);
         Route::get('/coordinator/events/{eventId}', [CoordinatorController::class, 'showEvent']);
         Route::patch('/coordinator/events/{eventId}', [CoordinatorController::class, 'updateEvent']);
+        Route::delete('/coordinator/events/{eventId}', [CoordinatorController::class, 'deleteEvent']);
         Route::post('/coordinator/events/{eventId}/shifts', [CoordinatorController::class, 'createShift']);
+        Route::get('/coordinator/shifts/{shiftId}/capacity', [CoordinatorController::class, 'getShiftCapacity']);
 
         // Application & Screening Management
         Route::get('/coordinator/events/{eventId}/applications', [CoordinatorController::class, 'getApplications']);
@@ -84,16 +88,18 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
     // ------------------------------------------------------------------
-    // Volunteer Only Routes
+    // Volunteer Only Routes (Guarded by role:Volunteer and EnsureVolunteerProfile)
     // ------------------------------------------------------------------
-    Route::middleware('role:Volunteer')->group(function () {
-        // Profile Management
+    Route::middleware(['role:Volunteer', EnsureVolunteerProfile::class])->group(function () {
+        // Profile & Impact Management
         Route::get('/volunteer/profile', [VolunteerController::class, 'getProfile']);
         Route::patch('/volunteer/profile', [VolunteerController::class, 'updateProfile']);
+        Route::get('/volunteer/impact', [VolunteerController::class, 'getImpactBreakdown']);
 
         // Shift Applications & Schedule
         Route::get('/volunteer/events', [VolunteerController::class, 'browseEvents']);
         Route::post('/volunteer/apply/{shiftId}', [VolunteerController::class, 'applyForShift']);
+        Route::delete('/volunteer/apply/{assignmentId}', [VolunteerController::class, 'withdrawApplication']);
         Route::get('/volunteer/schedule', [VolunteerController::class, 'getSchedule']);
 
         // GPS & QR Attendance Tracking

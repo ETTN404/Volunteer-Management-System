@@ -307,4 +307,47 @@ class CoordinatorController extends Controller
             ],
         ]);
     }
+
+    /**
+     * Delete or archive an event.
+     */
+    public function deleteEvent($eventId)
+    {
+        $event = Event::findOrFail($eventId);
+        $oldData = $event->toArray();
+
+        $event->delete();
+
+        $this->audit->log('event.deleted', null, $oldData, []);
+
+        return response()->json([
+            'status'  => 'success',
+            'message' => 'Event deleted successfully.',
+        ]);
+    }
+
+    /**
+     * Get live capacity status for a specific shift.
+     */
+    public function getShiftCapacity($shiftId)
+    {
+        $shift = Shift::findOrFail($shiftId);
+
+        $confirmedCount = ShiftAssignment::where('shift_id', $shift->id)
+            ->where('status', 'confirmed')
+            ->count();
+
+        $remainingSlots = max(0, $shift->capacity - $confirmedCount);
+
+        return response()->json([
+            'status' => 'success',
+            'data'   => [
+                'shift_id'        => $shift->id,
+                'total_capacity'  => $shift->capacity,
+                'confirmed_count' => $confirmedCount,
+                'remaining_slots' => $remainingSlots,
+                'is_full'         => $remainingSlots === 0,
+            ],
+        ]);
+    }
 }

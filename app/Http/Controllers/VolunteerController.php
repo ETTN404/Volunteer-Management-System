@@ -224,4 +224,70 @@ class VolunteerController extends Controller
             'data'   => CertificateResource::collection($certificates),
         ]);
     }
+
+    /**
+     * Get detailed community impact breakdown for the volunteer dashboard.
+     */
+    public function getImpactBreakdown()
+    {
+        $user = Auth::user();
+        $volunteer = $user->volunteer;
+
+        if (!$volunteer) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Volunteer profile not found.'
+            ], 404);
+        }
+
+        $completedShiftsCount = \App\Models\Attendance::where('volunteer_id', $volunteer->id)
+            ->whereNotNull('check_out_time')
+            ->count();
+
+        $milestones = config('vms.certificate_milestones', [10, 25, 50, 100, 200, 500]);
+        $currentHours = (float) $volunteer->total_hours;
+
+        $nextMilestone = null;
+        foreach ($milestones as $m) {
+            if ($m > $currentHours) {
+                $nextMilestone = $m;
+                break;
+            }
+        }
+
+        $hoursToNextMilestone = $nextMilestone ? round($nextMilestone - $currentHours, 2) : 0.00;
+
+        return response()->json([
+            'status' => 'success',
+            'data'   => [
+                'total_hours'            => $currentHours,
+                'impact_score'           => (float) $volunteer->impact_score,
+                'completed_shifts_count' => $completedShiftsCount,
+                'next_milestone'         => $nextMilestone,
+                'hours_to_next'          => $hoursToNextMilestone,
+                'earned_certificates'    => Certificate::where('volunteer_id', $volunteer->id)->count(),
+            ],
+        ]);
+    }
+
+    /**
+     * Withdraw a pending shift application.
+     */
+    public function withdrawApplication($assignmentId)
+    {
+        $user = Auth::user();
+        $volunteer = $user->volunteer;
+
+        $assignment = ShiftAssignment::where('id', $assignmentId)
+            ->where('volunteer_id', $volunteer->id)
+            ->where('status', 'pending')
+            ->firstOrFail();
+
+        $assignment->delete();
+
+        return response()->json([
+            'status'  => 'success',
+            'message' => 'Shift application withdrawn successfully.',
+        ]);
+    }
 }
