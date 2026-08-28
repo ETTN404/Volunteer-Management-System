@@ -6,12 +6,18 @@ use App\Models\Shift;
 use App\Models\ShiftAssignment;
 use App\Models\Attendance;
 use App\Models\Volunteer;
+use App\Services\GeofenceService;
+use App\Services\ImpactScoreService;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 
 class AttendanceController extends Controller
 {
+    public function __construct(
+        private GeofenceService $geofence,
+        private ImpactScoreService $impact,
+    ) {}
     /**
      * Generate a signed QR code signature for a shift.
      * Accessible by Coordinators.
@@ -113,21 +119,16 @@ class AttendanceController extends Controller
             ], 422);
         }
 
-        // 5. GPS Geofence Validation using Haversine Formula
+        // 5. GPS Geofence Validation — delegated to GeofenceService
         $event = $shift->event;
         if ($event->latitude && $event->longitude) {
-            $distance = $this->calculateDistance(
-                $request->latitude,
-                $request->longitude,
-                $event->latitude,
-                $event->longitude
-            );
-
-            // Geofence boundary: 100 meters
-            if ($distance > 100) {
+            if (!$this->geofence->isWithinGeofence((float) $request->latitude, (float) $request->longitude, $event)) {
+                $distance = $this->geofence->getDistanceFromVenue((float) $request->latitude, (float) $request->longitude, $event);
+                $radius   = $event->geofence_radius ?? config('vms.geofence_default_radius', 100);
                 return response()->json([
-                    'status' => 'error',
-                    'message' => 'Location Blocked: You must be present at the physical venue to check in. Scanned distance was ' . round($distance, 1) . ' meters away (Geofence limit: 100 meters).'
+                    'status'  => 'error',
+                    'message' => 'Location Blocked: You must be present at the physical venue to check in. ' .
+                                 'You are ' . round($distance, 1) . ' meters away (Geofence limit: ' . $radius . ' meters).'
                 ], 422);
             }
         }
@@ -192,47 +193,35 @@ class AttendanceController extends Controller
             'check_out_time' => $checkOut,
         ]);
 
-        // Accumulate metrics on volunteer profile
-        $newHours = $volunteer->total_hours + $durationHours;
-        
-        // Calculate incremental impact score (0.1 points per hour, capped at 100)
-        $impactIncrement = round($durationHours * 0.1, 2);
-        $newImpact = min(100, $volunteer->impact_score + $impactIncrement);
+        // Accumulate metrics — delegated to ImpactScoreService
+        $prevHours       = (float) $volunteer->total_hours;
+        $newHours        = round($prevHours + $durationHours, 2);
+        $shift           = $attendance->shift;
+        $impactIncrement = $this->impact->calculateIncrement($volunteer, $attendance, $shift);
+        $newImpact       = min(config('vms.impact_score_max', 100), $volunteer->impact_score + $impactIncrement);
 
         $volunteer->update([
-            'total_hours' => $newHours,
+            'total_hours'  => $newHours,
             'impact_score' => $newImpact,
         ]);
 
+        // Check for newly crossed certificate milestones
+        $newMilestones = $this->impact->checkMilestones($volunteer, $prevHours, $newHours);
+        // Note: Phase 5 will dispatch GenerateCertificateJob for each milestone here
+
         return response()->json([
-            'status' => 'success',
+            'status'  => 'success',
             'message' => 'Check-out completed. Thank you for your service!',
-            'data' => [
-                'check_in' => $checkIn->toDateTimeString(),
-                'check_out' => $checkOut->toDateTimeString(),
-                'hours_logged' => $durationHours,
+            'data'    => [
+                'check_in'         => $checkIn->toDateTimeString(),
+                'check_out'        => $checkOut->toDateTimeString(),
+                'hours_logged'     => $durationHours,
                 'cumulative_hours' => $newHours,
-                'impact_score' => $newImpact
+                'impact_score'     => $newImpact,
+                'milestones_reached' => $newMilestones,
             ]
         ]);
     }
 
-    /**
-     * Haversine Distance Calculator (returns distance in meters between two coordinates)
-     */
-    private function calculateDistance($lat1, $lon1, $lat2, $longitude2)
-    {
-        $earthRadius = 6371000; // in meters
-
-        $latDelta = deg2rad($lat2 - $lat1);
-        $lonDelta = deg2rad($longitude2 - $lon1);
-
-        $a = sin($latDelta / 2) * sin($latDelta / 2) +
-             cos(deg2rad($lat1)) * cos(deg2rad($lat2)) *
-             sin($lonDelta / 2) * sin($lonDelta / 2);
-
-        $c = 2 * atan2(sqrt($a), sqrt(1 - $a));
-
-        return $earthRadius * $c;
-    }
 }
+

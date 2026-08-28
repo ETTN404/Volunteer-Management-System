@@ -5,11 +5,13 @@ namespace App\Http\Controllers;
 use App\Models\Event;
 use App\Models\Shift;
 use App\Models\ShiftAssignment;
+use App\Services\SkillMatchingService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
 class VolunteerController extends Controller
 {
+    public function __construct(private SkillMatchingService $skillMatcher) {}
     /**
      * Browse available events with shifts and calculate personalized skill match scores.
      */
@@ -30,21 +32,13 @@ class VolunteerController extends Controller
         // Task 10.2.2.1: Paginated event fetching instead of loading all records
         $events = Event::with('shifts')->paginate(10);
 
-        // Calculate skill match score for each shift dynamically
+        // Calculate skill match score for each shift using SkillMatchingService
         $events->each(function ($event) use ($volunteerSkills) {
             $event->shifts->each(function ($shift) use ($volunteerSkills) {
-                $requiredSkills = $shift->required_skills ?? [];
-
-                if (empty($requiredSkills)) {
-                    $shift->match_score = 100.00; // No skills required, perfect match
-                } else {
-                    $matchedCount = count(array_intersect(
-                        array_map('strtolower', $volunteerSkills),
-                        array_map('strtolower', $requiredSkills)
-                    ));
-                    $totalCount = count($requiredSkills);
-                    $shift->match_score = round(($matchedCount / $totalCount) * 100, 2);
-                }
+                $shift->match_score = $this->skillMatcher->calculateMatchScore(
+                    $volunteerSkills,
+                    $shift->required_skills ?? []
+                );
             });
         });
 
