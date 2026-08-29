@@ -47,20 +47,18 @@ Open your web browser and go to: **`http://localhost:5173`** (or the port displa
 
 ---
 
-### Step 1: SuperAdmin Tenant Onboarding (Phases 1 & 4)
+### Step 1: SuperAdmin / Tenant Onboarding (Phases 1 & 4)
 
-1. On the top navigation bar of the frontend, select **SuperAdmin** role.
-2. Navigate to the **Tenant Onboarding** tab.
-3. Complete the form:
+1. On the left sidebar under **RBAC ACTIVE ROLE**, select the **ORG ADMIN** red button (you are already on this screen in your screenshot!).
+2. In the top-right header area, click the blue **`+ PROVISION TENANT`** button.
+3. A modal dialog titled **"Provision New Tenant Organization"** will appear. Complete the form:
    - **Organization Name**: `Red Cross Disaster Response`
-   - **Organization Email**: `contact@redcross.org`
-   - **Org Admin Name**: `Abebe Bikila`
-   - **Org Admin Email**: `admin@redcross.org`
-   - **Password**: `password123`
-4. Click **Onboard Tenant**.
+   - **Subdomain / Slug**: `redcross` (or email: `contact@redcross.org`)
+   - **Subscription Plan**: Select `Pro` or `Enterprise`
+4. Click **Provision Tenant**.
 5. **What to Expect**:
-   - A `201 Created` JSON response is returned from `POST /api/superadmin/onboard-tenant`.
-   - The organization record is created with `status: active` in the database, and an audit log entry (`tenant.onboarded`) is generated.
+   - A `201 Created` response is sent to `POST /api/superadmin/onboard-tenant`.
+   - A new tenant card (`Red Cross Disaster Response`) appears immediately under **ACTIVE TENANT ORGANIZATIONS**, and an immutable audit log entry is recorded in the **SOC-2 Audit Trail**.
 
 ---
 
