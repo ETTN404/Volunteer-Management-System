@@ -84,8 +84,8 @@ Open your web browser and go to: **`http://localhost:5173`** (or the port displa
 
 ### Step 3: Coordinator Event Creation & Shift Scheduling (Phases 2 & 4)
 
-1. Switch role to **Coordinator** in the top navigation bar.
-2. Go to **Event Management**.
+1. On the left sidebar under **RBAC ACTIVE ROLE**, select the **COORD** red button.
+2. Go to **Event Management** (or click **+ Create Event**).
 3. Click **Create New Event**:
    - **Event Title**: `National Disaster Relief Drill`
    - **Description**: `Simulated emergency response training for flood relief.`
@@ -110,7 +110,7 @@ Open your web browser and go to: **`http://localhost:5173`** (or the port displa
 
 ### Step 4: Volunteer Event Browsing & Skill Match Scoring (Phases 2 & 4)
 
-1. Switch role back to **Volunteer** (`Sara Jenkins`).
+1. On the left sidebar under **RBAC ACTIVE ROLE**, select the **VOLUNTEER** button.
 2. Go to **Browse Events**.
 3. **What to Expect**:
    - Calls `GET /api/volunteer/events`.
@@ -132,8 +132,8 @@ Open your web browser and go to: **`http://localhost:5173`** (or the port displa
 
 ### Step 6: Coordinator Application Approval & Capacity Limits (Phases 3, 4, 6)
 
-1. Switch role to **Coordinator**.
-2. Go to **Application Review**.
+1. On the left sidebar under **RBAC ACTIVE ROLE**, select the **COORD** button.
+2. Go to **Application Review** (or **Live Shift Attendance**).
 3. Locate Sara Jenkins' pending application and click **Approve Application**.
 4. **What to Expect**:
    - Calls `POST /api/coordinator/applications/{id}/approve`.
@@ -195,7 +195,7 @@ Open your web browser and go to: **`http://localhost:5173`** (or the port displa
 
 ### Step 11: Donor Impact Report Request & Queue Polling (Phases 4, 5)
 
-1. Switch role to **Coordinator**.
+1. On the left sidebar under **RBAC ACTIVE ROLE**, select the **COORD** button.
 2. Go to **Reports Center**.
 3. Click **Generate Quarterly Impact Report**:
    - Select Period: `Q3 2026`
