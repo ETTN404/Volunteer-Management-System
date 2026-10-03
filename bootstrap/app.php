@@ -22,6 +22,7 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->append(\App\Http\Middleware\RequestLoggingMiddleware::class);
         $middleware->append(SecurityHeadersMiddleware::class);
         $middleware->append(TenantMiddleware::class);
         $middleware->alias([
@@ -30,6 +31,18 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
+        // Detailed error reporting to stderr for live tail viewing in Wasmer / Docker
+        $exceptions->report(function (\Throwable $e) {
+            $errMessage = sprintf(
+                "🚨 [VOLUNTRACK EXCEPTION] %s: %s in %s:%d",
+                get_class($e),
+                $e->getMessage(),
+                $e->getFile(),
+                $e->getLine()
+            );
+            file_put_contents('php://stderr', $errMessage . PHP_EOL);
+        });
+
         // Standardized 401 Unauthenticated
         $exceptions->render(function (AuthenticationException $e, $request) {
             if ($request->is('api/*') || $request->wantsJson()) {

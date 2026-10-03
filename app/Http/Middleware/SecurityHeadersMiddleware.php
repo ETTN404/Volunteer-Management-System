@@ -15,13 +15,22 @@ class SecurityHeadersMiddleware
     {
         $response = $next($request);
 
-        $response->headers->set('X-Frame-Options', 'DENY');
+        $response->headers->set('X-Frame-Options', 'SAMEORIGIN');
         $response->headers->set('X-Content-Type-Options', 'nosniff');
         $response->headers->set('X-XSS-Protection', '1; mode=block');
         $response->headers->set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
-        $response->headers->set('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: storage:;");
+
+        // Allow CDN assets for Tailwind, Alpine.js, Chart.js, Google Fonts, and inline scripts
+        $csp = "default-src 'self' 'unsafe-inline' https:; "
+            . "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://cdn.jsdelivr.net; "
+            . "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+            . "font-src 'self' data: https://fonts.gstatic.com; "
+            . "img-src 'self' data: https: blob: storage:; "
+            . "connect-src 'self' https: ws: wss:;";
+
+        $response->headers->set('Content-Security-Policy', $csp);
         $response->headers->set('Referrer-Policy', 'strict-origin-when-cross-origin');
-        $response->headers->set('Permissions-Policy', 'geolocation=(self), camera=()');
+        $response->headers->set('Permissions-Policy', 'geolocation=(self), camera=(self)');
 
         return $response;
     }
