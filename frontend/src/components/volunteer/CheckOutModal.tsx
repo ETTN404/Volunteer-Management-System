@@ -52,7 +52,7 @@ export const CheckOutModal: React.FC<CheckOutModalProps> = ({
       hours_worked: hoursWorked,
     };
 
-    const res = await ApiClient.request('POST', '/api/volunteer/check-out', payload);
+    const res = await ApiClient.request('POST', '/volunteer/check-out', payload);
 
     setIsCheckingOut(false);
     if (res.status === 200) {

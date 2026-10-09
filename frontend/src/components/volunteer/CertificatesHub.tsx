@@ -35,7 +35,7 @@ export const CertificatesHub: React.FC<CertificatesHubProps> = ({
   const handleDownload = async (cert: Certificate) => {
     setDownloadingId(cert.id);
     setDownloadMsg(null);
-    const res = await ApiClient.request('GET', `/api/volunteer/certificates/${cert.id}/download`);
+    const res = await ApiClient.request('GET', `/volunteer/certificates/${cert.id}/download`);
     setDownloadingId(null);
     if (res.status === 200) {
       const url = res.data?.download_url || cert.download_url;

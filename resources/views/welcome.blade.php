@@ -46,7 +46,24 @@
 <body x-data="vmsApp()" class="antialiased min-h-screen transition-colors duration-300" 
       :class="theme === 'dark' ? 'bg-[#1A202C] text-[#EDEDEC] dark' : 'bg-[#FDFDFC] text-[#1b1b18]'">
 
-    <div class="flex h-screen overflow-hidden relative">
+    <!-- Senior Capstone Project Executive Banner -->
+    <div class="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 border-b border-indigo-500/30 text-white px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 text-xs z-50 shadow-md">
+        <div class="flex items-center gap-2.5">
+            <span class="px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-400/30 font-mono font-bold tracking-wider">SENIOR CAPSTONE PROJECT</span>
+            <span class="font-medium text-slate-300">VolunTrack Enterprise Multi-Tenant VMS • Based on <code class="text-indigo-300 font-mono">Documentation.md</code></span>
+        </div>
+        <div class="flex items-center gap-2.5">
+            <a href="http://localhost:3000" target="_blank" class="px-3.5 py-1.5 rounded-lg bg-[#FF750F] hover:bg-orange-600 text-white font-bold transition flex items-center gap-1.5 shadow-md shadow-orange-500/20">
+                <span>🚀 Launch React 19 Application (Port 3000)</span>
+                <span>&rarr;</span>
+            </a>
+            <a href="/setup-database" class="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition flex items-center gap-1">
+                <span>⚡ Auto-Setup Database</span>
+            </a>
+        </div>
+    </div>
+
+    <div class="flex h-[calc(100vh-42px)] overflow-hidden relative">
         
         <!-- Mobile Backdrop -->
         <div x-show="sidebarOpen" @click="sidebarOpen = false" class="fixed inset-0 bg-gray-900/50 backdrop-blur-sm z-30 md:hidden" x-cloak></div>

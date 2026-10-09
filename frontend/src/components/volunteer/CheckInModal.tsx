@@ -124,16 +124,17 @@ export const CheckInModal: React.FC<CheckInModalProps> = ({
 
     const payload = {
       shift_id: shift.id,
-      qr_signature: qrInput,
+      qr_code_signature: qrInput,
       latitude: simulatedLat,
       longitude: simulatedLon,
+      client_timestamp: new Date().toISOString(),
       signature_preview: signaturePreview,
     };
 
-    const res = await ApiClient.request('POST', '/api/volunteer/check-in', payload);
+    const res = await ApiClient.request('POST', '/volunteer/check-in', payload);
 
     setIsCheckingIn(false);
-    if (res.status === 200) {
+    if (res.status === 200 || res.status === 201) {
       onSuccess(res.message || 'Check-in verified successfully!');
       onClose();
     } else {

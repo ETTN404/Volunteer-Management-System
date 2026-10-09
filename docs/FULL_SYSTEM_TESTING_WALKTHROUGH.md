@@ -23,7 +23,7 @@ php artisan queue:work
 
 ### Terminal 3 — React Frontend (Port 3000)
 ```bash
-cd "f:\Volunteer Management System\front end demo to test the backend"
+cd "f:\Volunteer Management System\frontend"
 npm run dev
 ```
 

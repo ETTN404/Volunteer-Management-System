@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { Volunteer, User as UserType, Shift, Organization } from '../../types/vms';
 import { ImpactScoreService } from '../../services/impactScoreService';
+import { ApiClient } from '../../services/apiClient';
 
 interface VolunBotChatProps {
   volunteer: Volunteer;
@@ -99,23 +100,63 @@ export const VolunBotChat: React.FC<VolunBotChatProps> = ({
         hoursToNextMilestone: milestoneProgress.hoursToNext,
       };
 
-      const res = await fetch('/api/gemini/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: messageText,
-          volunteerContext,
-          history: messages.map((m) => ({ role: m.role, content: m.content })),
-        }),
-      });
+      // 1. Try Live Laravel Gemini AI RAG Endpoint (/api/volunteer/chat)
+      let botContent: string | null = null;
+      let botSource = 'laravel-gemini-rag';
 
-      const data = await res.json();
+      try {
+        const liveRes = await ApiClient.request('POST', '/volunteer/chat', { message: messageText });
+        if (liveRes.status === 200 && liveRes.data?.response) {
+          botContent = liveRes.data.response;
+          botSource = liveRes.data.bot_name || 'VolunBot AI (Live RAG)';
+        }
+      } catch (e) {
+        // Continue to frontend proxy
+      }
+
+      // 2. If Laravel RAG returned empty or failed, fallback to frontend Vite proxy
+      if (!botContent) {
+        try {
+          const res = await fetch('/api/gemini/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              message: messageText,
+              volunteerContext,
+              history: messages.map((m) => ({ role: m.role, content: m.content })),
+            }),
+          });
+          const data = await res.json();
+          if (data.reply) {
+            botContent = data.reply;
+            botSource = data.source || 'gemini-1.5-flash';
+          }
+        } catch (e) {
+          // Continue to local contextual engine
+        }
+      }
+
+      // 3. Fallback to intelligent local contextual reply if API offline
+      if (!botContent) {
+        const lower = messageText.toLowerCase();
+        if (lower.includes('shift') || lower.includes('when')) {
+          botContent = nextShift
+            ? `Your next scheduled shift is "${nextShift.title}" on ${nextShift.start_time}. Make sure to check in within the 100-meter venue geofence!`
+            : `You have no upcoming shifts scheduled. Visit the "Browse Events" tab to join an open shift!`;
+        } else if (lower.includes('hour') || lower.includes('certificate') || lower.includes('milestone')) {
+          botContent = `You have accumulated ${volunteer.total_hours} verified service hours. You need ${milestoneProgress.hoursToNext} more hours to unlock your next milestone certificate!`;
+        } else {
+          botContent = `I am here to help you manage your volunteer service at ${org.name}. Your current Impact Score is ${volunteer.impact_score}/100 with ${volunteer.total_hours} verified service hours.`;
+        }
+        botSource = 'volunbot-context-engine';
+      }
+
       const botMsg: Message = {
         id: (Date.now() + 1).toString(),
         role: 'model',
-        content: data.reply || 'I am ready to assist with questions on shifts, check-in, or milestone credentials.',
+        content: botContent,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        source: data.source || 'gemini-3.7-flash',
+        source: botSource,
       };
 
       setMessages((prev) => [...prev, botMsg]);
