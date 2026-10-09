@@ -38,6 +38,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/superadmin/organizations', [SuperAdminController::class, 'listOrganizations']);
         Route::get('/superadmin/organizations/{id}', [SuperAdminController::class, 'showOrganization']);
         Route::patch('/superadmin/organizations/{id}/status', [SuperAdminController::class, 'updateOrganizationStatus']);
+        Route::get('/superadmin/audit-logs', [SuperAdminController::class, 'listAuditLogs']);
     });
 
     // ------------------------------------------------------------------

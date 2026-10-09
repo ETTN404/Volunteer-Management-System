@@ -96,14 +96,44 @@ class SuperAdminController extends Controller
         $this->audit->log(
             'tenant.status_updated',
             $organization,
-            $oldData,
-            $organization->fresh()->only(['status', 'subscription_plan'])
+            array_merge($oldData, ['org_name' => $organization->name]),
+            array_merge($organization->fresh()->only(['status', 'subscription_plan']), ['org_name' => $organization->name])
         );
 
         return response()->json([
             'status'  => 'success',
             'message' => 'Organization status updated successfully.',
             'data'    => new OrganizationResource($organization->fresh()),
+        ]);
+    }
+
+    /**
+     * List all system audit logs from the audit_logs database table.
+     */
+    public function listAuditLogs()
+    {
+        $logs = \Illuminate\Support\Facades\DB::table('audit_logs')
+            ->orderBy('id', 'desc')
+            ->limit(100)
+            ->get()
+            ->map(function ($log) {
+                return [
+                    'id'          => $log->id,
+                    'user_id'     => $log->user_id,
+                    'org_id'      => $log->org_id,
+                    'action'      => $log->action,
+                    'model_type'  => $log->model_type,
+                    'model_id'    => $log->model_id,
+                    'old_values'  => is_string($log->old_values) ? json_decode($log->old_values, true) : $log->old_values,
+                    'new_values'  => is_string($log->new_values) ? json_decode($log->new_values, true) : $log->new_values,
+                    'ip_address'  => $log->ip_address ?? '127.0.0.1',
+                    'created_at'  => $log->created_at,
+                ];
+            });
+
+        return response()->json([
+            'status' => 'success',
+            'data'   => $logs,
         ]);
     }
 }

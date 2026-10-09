@@ -1,0 +1,7 @@
+{
+  "name": "VolunTrack VMS - Volunteer Management System",
+  "description": "Enterprise multi-tenant volunteer management platform with RBAC, AI-powered volunteer assistant, geofenced QR check-in, certificates, reporting, and comprehensive API phase tester.",
+  "requestFramePermissions": ["camera", "geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+

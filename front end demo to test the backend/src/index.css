@@ -1,0 +1,96 @@
+@import "tailwindcss";
+
+/* Light Mode Overrides for High-Density Engineering UI */
+.light-theme {
+  background-color: #f8fafc !important;
+  color: #0f172a !important;
+}
+
+.light-theme .bg-\[\#0f172a\] {
+  background-color: #f8fafc !important;
+}
+
+.light-theme .bg-\[\#1e293b\] {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
+}
+
+.light-theme .bg-\[\#131d2e\],
+.light-theme .bg-\[\#101928\],
+.light-theme .bg-\[\#162235\] {
+  background-color: #ffffff !important;
+}
+
+.light-theme .bg-slate-900 {
+  background-color: #f1f5f9 !important;
+}
+
+.light-theme .bg-slate-800 {
+  background-color: #e2e8f0 !important;
+}
+
+.light-theme .bg-slate-800\/60,
+.light-theme .bg-slate-800\/50,
+.light-theme .bg-slate-800\/40,
+.light-theme .bg-slate-800\/30 {
+  background-color: #f8fafc !important;
+}
+
+.light-theme .bg-slate-900\/90,
+.light-theme .bg-slate-900\/80,
+.light-theme .bg-slate-900\/50 {
+  background-color: #f1f5f9 !important;
+}
+
+.light-theme .border-slate-700,
+.light-theme .border-slate-800,
+.light-theme .border-slate-700\/60,
+.light-theme .border-slate-700\/80 {
+  border-color: #e2e8f0 !important;
+}
+
+.light-theme .text-slate-200,
+.light-theme .text-slate-300 {
+  color: #334155 !important;
+}
+
+.light-theme .text-slate-400 {
+  color: #64748b !important;
+}
+
+.light-theme .text-slate-500 {
+  color: #94a3b8 !important;
+}
+
+.light-theme h1.text-white,
+.light-theme h2.text-white,
+.light-theme h3.text-white,
+.light-theme h4.text-white,
+.light-theme span.text-white,
+.light-theme div.text-white {
+  color: #0f172a !important;
+}
+
+/* Ensure vibrant colored badges and buttons preserve light text */
+.light-theme .bg-indigo-600 text-white,
+.light-theme .bg-indigo-700 text-white,
+.light-theme .bg-emerald-600 text-white,
+.light-theme .bg-rose-600 text-white,
+.light-theme .bg-amber-600 text-white,
+.light-theme .btn-primary text-white {
+  color: #ffffff !important;
+}
+
+.light-theme input,
+.light-theme select,
+.light-theme textarea {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  border-color: #cbd5e1 !important;
+}
+
+.light-theme input::placeholder,
+.light-theme textarea::placeholder {
+  color: #94a3b8 !important;
+}
