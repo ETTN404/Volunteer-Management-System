@@ -11,18 +11,20 @@ if [ ! -f /var/www/html/.env ]; then
     cp /var/www/html/.env.example /var/www/html/.env
 fi
 
-# Ensure SQLite database file exists if DB_CONNECTION is sqlite
-if [ "${DB_CONNECTION:-sqlite}" = "sqlite" ]; then
-    if [ ! -f /var/www/html/database/database.sqlite ]; then
-        touch /var/www/html/database/database.sqlite
-    fi
-    chown -R www-data:www-data /var/www/html/database
-    chmod -R 775 /var/www/html/database
+# Ensure APP_KEY exists
+if [ -z "$APP_KEY" ]; then
+    php artisan key:generate --force
 fi
 
-# Ensure storage and cache write permissions
-chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
-chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
+# Ensure SQLite database and folder permissions
+mkdir -p /var/www/html/database
+if [ ! -f /var/www/html/database/database.sqlite ]; then
+    touch /var/www/html/database/database.sqlite
+fi
+
+# Ensure storage, cache, and database write permissions for Apache
+chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache /var/www/html/database
+chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache /var/www/html/database
 
 # Clear and optimize config
 php artisan config:clear
