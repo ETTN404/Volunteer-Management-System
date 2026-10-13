@@ -77,7 +77,7 @@ export class ApiClient {
 
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
+      const timeoutId = setTimeout(() => controller.abort(), 45000); // 45s timeout to allow Render free tier wake-up
 
       const res = await fetch(url, {
         method,
@@ -116,7 +116,11 @@ export class ApiClient {
       return {
         status: 503,
         data: null as any,
-        error: `Live Backend Connection Error: ${err?.name === 'AbortError' ? 'Request timed out after 15s' : err?.message || 'Failed to connect to http://localhost:8000'}`,
+        error: `Live Backend Connection Error: ${
+          err?.name === 'AbortError'
+            ? `Request to ${url} timed out after 45s (Render free tier may still be spinning up, please retry)`
+            : err?.message || `Failed to connect to ${url}`
+        }`,
         durationMs,
       } as ApiResponse<T>;
     }

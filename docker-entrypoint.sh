@@ -30,7 +30,8 @@ chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache /var/www/html/d
 php artisan config:clear
 php artisan route:clear
 
-# Auto-migrate database tables on startup
+# Auto-migrate and auto-seed database tables on startup
 php artisan migrate --force || true
+php artisan db:seed --force || true
 
 exec "$@"
