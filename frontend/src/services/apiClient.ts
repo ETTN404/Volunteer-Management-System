@@ -24,7 +24,7 @@ export class ApiClient {
     const token = localStorage.getItem('voluntrack_sanctum_token') || '';
     return {
       mode: 'live',
-      liveBaseUrl: 'http://localhost:8000/api',
+      liveBaseUrl: (import.meta as any).env?.VITE_API_URL || 'http://localhost:8000/api',
       authToken: token,
     };
   }
