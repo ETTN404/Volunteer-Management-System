@@ -1,0 +1,233 @@
+@import 'tailwindcss';
+@import './fonts.css';
+@import './tokens.css';
+
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
+
+/* Map runtime CSS variables to Tailwind utilities (bg-surface, text-muted, border-line, …). */
+@theme inline {
+  --color-bg: var(--bg);
+  --color-sunken: var(--sunken);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-raised: var(--raised);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-text: var(--text);
+  --color-muted: var(--text-muted);
+  --color-faint: var(--text-faint);
+  --color-accent: var(--accent);
+  --color-accent-fg: var(--accent-fg);
+  --color-accent-text: var(--accent-text);
+  --color-accent-strong: var(--accent-strong);
+  --color-gold: var(--gold);
+  --color-gold-soft: var(--gold-soft);
+  --color-coral: var(--coral);
+  --color-coral-soft: var(--coral-soft);
+  --color-accent-soft: var(--accent-soft);
+  --color-success: var(--success);
+  --color-success-text: var(--success-text);
+  --color-success-soft: var(--success-soft);
+  --color-danger: var(--danger);
+  --color-danger-text: var(--danger-text);
+  --color-danger-soft: var(--danger-soft);
+  --color-warning: var(--warning);
+  --color-warning-text: var(--warning-text);
+  --color-warning-soft: var(--warning-soft);
+  --color-info: var(--info);
+  --color-info-text: var(--info-text);
+  --color-info-soft: var(--info-soft);
+  --color-focus: var(--focus);
+
+  --font-display: 'Inter Tight Variable', 'Geist Variable', system-ui, sans-serif;
+  --font-sans: 'Geist Variable', 'Noto Sans Ethiopic Variable', system-ui, sans-serif;
+  --font-mono: 'Geist Mono Variable', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-ethiopic: 'Noto Sans Ethiopic Variable', 'Onest Variable', sans-serif;
+
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-xl: 22px;
+  --radius-2xl: 30px;
+
+  --shadow-card: var(--elev-1);
+  --shadow-pop: var(--elev-2);
+  --shadow-modal: var(--elev-3);
+
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out-quart: cubic-bezier(0.76, 0, 0.24, 1);
+
+  --animate-ping-ring: ping-ring 2.4s var(--ease-out-expo) infinite;
+  --animate-shimmer: shimmer 1.8s linear infinite;
+  --animate-blink: blink 1.1s steps(2, start) infinite;
+}
+
+@keyframes ping-ring {
+  0% { transform: scale(0.4); opacity: 0.9; }
+  80%, 100% { transform: scale(2.4); opacity: 0; }
+}
+@keyframes shimmer {
+  from { background-position: -200% 0; }
+  to { background-position: 200% 0; }
+}
+@keyframes blink {
+  to { visibility: hidden; }
+}
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes fade-out { from { opacity: 1; } to { opacity: 0; } }
+@keyframes pop-in {
+  from { opacity: 0; transform: translateY(4px) scale(0.97); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes dialog-in {
+  from { opacity: 0; translate: -50% calc(-50% + 12px); scale: 0.97; }
+  to { opacity: 1; translate: -50% -50%; scale: 1; }
+}
+@keyframes sheet-right { from { transform: translateX(100%); } to { transform: none; } }
+@keyframes sheet-left { from { transform: translateX(-100%); } to { transform: none; } }
+@keyframes sheet-up { from { transform: translateY(100%); } to { transform: none; } }
+@keyframes scan {
+  0%, 100% { top: 18%; }
+  50% { top: 82%; }
+}
+@keyframes marquee {
+  to { transform: translateX(-50%); }
+}
+@keyframes rise {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: none; }
+}
+
+@layer base {
+  html {
+    color-scheme: light dark;
+    -webkit-text-size-adjust: 100%;
+    text-rendering: optimizeLegibility;
+    scroll-padding-top: 5rem;
+  }
+  html[data-theme='dark'] { color-scheme: dark; }
+  html[data-theme='light'] { color-scheme: light; }
+
+  body {
+    @apply bg-bg text-text font-sans antialiased;
+    font-feature-settings: 'ss01';
+    min-height: 100dvh;
+  }
+
+  ::selection {
+    background: var(--accent);
+    color: var(--accent-fg);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  [lang='am'], .font-ethiopic { font-family: var(--font-ethiopic); }
+
+  input[type='number']::-webkit-inner-spin-button { opacity: 0.4; }
+
+  * { scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
+}
+
+@layer components {
+  /* Display type: Inter Tight, tightly tracked. */
+  .type-display {
+    font-family: var(--font-display);
+    font-weight: 800;
+    letter-spacing: -0.044em;
+    word-spacing: 0.04em;
+    line-height: 0.95;
+  }
+  .type-headline {
+    font-family: var(--font-display);
+    font-weight: 750;
+    letter-spacing: -0.042em;
+    line-height: 1.02;
+  }
+  .type-title {
+    font-family: var(--font-display);
+    font-weight: 650;
+    letter-spacing: -0.022em;
+    line-height: 1.2;
+  }
+  .type-label {
+    font-family: var(--font-sans);
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  .type-eyebrow {
+    font-family: var(--font-sans);
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+  .type-eyebrow-sm {
+    font-family: var(--font-sans);
+    font-size: 0.64rem;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+  .type-data {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+  }
+
+  /* Faint topographic texture used on empty states and auth backdrops. */
+  .bg-contours {
+    background-image: var(--contour-texture);
+    background-size: 22px 22px;
+  }
+  .bg-grid {
+    background-image: linear-gradient(var(--grid-line) 1px, transparent 1px), linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+    background-size: 56px 56px;
+  }
+  .text-sunrise {
+    background: var(--sunrise);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .bg-sunrise { background: var(--sunrise); }
+
+  .skeleton {
+    background: linear-gradient(90deg, var(--surface-2) 0%, var(--raised) 50%, var(--surface-2) 100%);
+    background-size: 200% 100%;
+    @apply animate-shimmer rounded-md;
+  }
+
+  .hairline { box-shadow: inset 0 0 0 1px var(--line); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* View-transition crossfade for theme switching. */
+::view-transition-old(root), ::view-transition-new(root) {
+  animation-duration: 420ms;
+  animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Leaflet: dark basemap via filter so OSM tiles match Highland Night. */
+[data-map-theme='dark'] .leaflet-tile-pane {
+  filter: invert(1) hue-rotate(180deg) brightness(0.82) contrast(0.92) saturate(0.45) sepia(0.12);
+}
+[data-map-theme='light'] .leaflet-tile-pane {
+  filter: saturate(0.55) contrast(0.95);
+}
+.leaflet-container { font-family: var(--font-sans); }

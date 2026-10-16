@@ -1,0 +1,110 @@
+/*
+ * VolunTrack design tokens — "Highland Sunrise".
+ * Light-first. Forest green carries actions; coral + sunrise gold carry warmth and highlights.
+ * Feature code never uses raw hex: only these semantic tokens via Tailwind utilities.
+ */
+
+:root,
+[data-theme='light'] {
+  --bg: #f6f8f6;
+  --sunken: #eef2ef;
+  --surface: #ffffff;
+  --surface-2: #f3f6f4;
+  --raised: #ffffff;
+  --line: #e1e8e4;
+  --line-strong: #c9d4ce;
+
+  --text: #0b1f1a;
+  --text-muted: #4a5d57;
+  --text-faint: #5b6e68;
+
+  --accent: #105e45;
+  --accent-fg: #ffffff;
+  --accent-text: #0d5a41;
+  --accent-soft: rgba(16, 94, 69, 0.08);
+  --accent-strong: #105e45;
+
+  --gold: #f2a93b;
+  --gold-soft: rgba(242, 169, 59, 0.14);
+  --coral: #ef6a4c;
+  --coral-soft: rgba(239, 106, 76, 0.12);
+  --sunrise: linear-gradient(95deg, #d9452f 0%, #ec6a3c 45%, #f2a12c 100%);
+
+  --success: #17a172;
+  --success-text: #086b47;
+  --success-soft: rgba(23, 161, 114, 0.1);
+  --danger: #d9452f;
+  --danger-text: #a8241b;
+  --danger-soft: rgba(217, 69, 47, 0.09);
+  --warning: #e59a1a;
+  --warning-text: #7a4e00;
+  --warning-soft: rgba(229, 154, 26, 0.13);
+  --info: #2f7fd0;
+  --info-text: #155d93;
+  --info-soft: rgba(47, 127, 208, 0.09);
+
+  --focus: #105e45;
+
+  --elev-1: 0 1px 2px rgba(11, 31, 26, 0.04), 0 1px 1px rgba(11, 31, 26, 0.02);
+  --elev-2: 0 12px 32px -12px rgba(11, 31, 26, 0.14), 0 2px 6px rgba(11, 31, 26, 0.04);
+  --elev-3: 0 40px 80px -24px rgba(11, 31, 26, 0.24), 0 10px 24px -8px rgba(11, 31, 26, 0.08);
+
+  --map-contour: rgba(11, 31, 26, 0.09);
+  --map-contour-strong: rgba(11, 31, 26, 0.18);
+  --map-bg: #eef3f0;
+  --grid-line: rgba(11, 31, 26, 0.045);
+
+  --contour-texture: radial-gradient(circle at 1px 1px, rgba(11, 31, 26, 0.07) 1px, transparent 0);
+}
+
+[data-theme='dark'] {
+  --bg: #07110e;
+  --sunken: #050d0a;
+  --surface: #0c1814;
+  --surface-2: #11201b;
+  --raised: #142721;
+  --line: rgba(196, 222, 211, 0.1);
+  --line-strong: rgba(196, 222, 211, 0.2);
+
+  --text: #ecf4f0;
+  --text-muted: #a3b7af;
+  --text-faint: #87a097;
+
+  --accent: #5fd3a4;
+  --accent-fg: #03140d;
+  --accent-text: #7fe0b9;
+  --accent-soft: rgba(95, 211, 164, 0.1);
+  --accent-strong: #7fe0b9;
+
+  --gold: #f5b955;
+  --gold-soft: rgba(245, 185, 85, 0.12);
+  --coral: #ff8466;
+  --coral-soft: rgba(255, 132, 102, 0.12);
+  --sunrise: linear-gradient(95deg, #ff7a5e 0%, #ff9a5a 45%, #f5c060 100%);
+
+  --success: #5fd3a4;
+  --success-text: #7fe0b9;
+  --success-soft: rgba(95, 211, 164, 0.1);
+  --danger: #ff6a55;
+  --danger-text: #ff8f7f;
+  --danger-soft: rgba(255, 106, 85, 0.12);
+  --warning: #f5b955;
+  --warning-text: #ffd089;
+  --warning-soft: rgba(245, 185, 85, 0.12);
+  --info: #7cb8ff;
+  --info-text: #a6cfff;
+  --info-soft: rgba(124, 184, 255, 0.1);
+
+  --focus: #7fe0b9;
+
+  --elev-1: inset 0 1px 0 rgba(236, 244, 240, 0.03), 0 1px 2px rgba(0, 0, 0, 0.35);
+  --elev-2: inset 0 1px 0 rgba(236, 244, 240, 0.04), 0 16px 40px -12px rgba(0, 0, 0, 0.6);
+  --elev-3: inset 0 1px 0 rgba(236, 244, 240, 0.05), 0 40px 90px -20px rgba(0, 0, 0, 0.75);
+
+  --map-contour: rgba(196, 222, 211, 0.08);
+  --map-contour-strong: rgba(196, 222, 211, 0.16);
+  --map-bg: #06100d;
+  --grid-line: rgba(196, 222, 211, 0.04);
+
+  --contour-texture: radial-gradient(circle at 1px 1px, rgba(196, 222, 211, 0.08) 1px, transparent 0);
+}
