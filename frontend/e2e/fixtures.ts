@@ -20,7 +20,7 @@ export async function signIn(page: Page, email: string) {
 export async function expectAccessible(page: Page, opts: { exclude?: string[] } = {}) {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.waitForTimeout(400);
-  let builder = new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa']);
+  let builder = new AxeBuilder({ page: page as unknown as ConstructorParameters<typeof AxeBuilder>[0]["page"] }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa']);
   for (const sel of opts.exclude ?? []) builder = builder.exclude(sel);
   const results = await builder.analyze();
   const serious = results.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical');
