@@ -52,6 +52,16 @@ class AuthController extends Controller
      */
     public function login(LoginRequest $request)
     {
+        // Self-heal: If database has no users (e.g. freshly deployed container), auto-seed default accounts
+        try {
+            if (User::count() === 0) {
+                \Illuminate\Support\Facades\Artisan::call('migrate', ['--force' => true]);
+                \Illuminate\Support\Facades\Artisan::call('db:seed', ['--force' => true]);
+            }
+        } catch (\Throwable $e) {
+            // Fail safely if migrations already active
+        }
+
         $loginInput = trim($request->input('email'));
         $password = $request->input('password');
 
