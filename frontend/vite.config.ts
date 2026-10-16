@@ -1,22 +1,45 @@
+/// <reference types="vitest/config" />
+import path from 'node:path';
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
-import path from 'path';
-import {defineConfig} from 'vite';
+import { defineConfig } from 'vite';
 
-export default defineConfig(() => {
-  return {
-    plugins: [react(), tailwindcss()],
-    resolve: {
-      alias: {
-        '@': path.resolve(__dirname, '.'),
+export default defineConfig({
+  plugins: [react(), tailwindcss()],
+  resolve: {
+    alias: { '@': path.resolve(__dirname, 'src') },
+  },
+  server: { port: 5173, host: true },
+  preview: { port: 4173 },
+  build: {
+    target: 'es2022',
+    sourcemap: true,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          react: ['react', 'react-dom', 'react-router'],
+          query: ['@tanstack/react-query', 'zustand'],
+          motion: ['motion'],
+          charts: ['recharts'],
+          maps: ['leaflet', 'react-leaflet'],
+          forms: ['react-hook-form', 'zod', '@hookform/resolvers'],
+        },
       },
     },
-    server: {
-      // HMR is disabled in AI Studio via DISABLE_HMR env var.
-      // Do not modifyâfile watching is disabled to prevent flickering during agent edits.
-      hmr: process.env.DISABLE_HMR !== 'true',
-      // Disable file watching when DISABLE_HMR is true to save CPU during agent edits.
-      watch: process.env.DISABLE_HMR === 'true' ? null : {},
+  },
+  test: {
+    environment: 'jsdom',
+    globals: true,
+    setupFiles: ['./src/test/setup.ts'],
+    include: ['src/**/*.test.{ts,tsx}'],
+    css: false,
+    testTimeout: 15_000,
+    env: { VITE_MOCK_MODE: 'all', VITE_API_URL: 'http://api.test/api' },
+    coverage: {
+      provider: 'v8',
+      include: ['src/features/**', 'src/shared/**', 'src/app/**'],
+      exclude: ['**/*.test.*', 'src/shared/ui/__design/**'],
+      thresholds: { lines: 75, branches: 70, functions: 70, statements: 75 },
     },
-  };
+  },
 });

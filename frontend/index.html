@@ -1,21 +1,40 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="light">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>VolunTrack VMS - Volunteer Management System</title>
-    <meta name="description" content="Enterprise multi-tenant volunteer management platform with RBAC, AI-powered volunteer assistant, geofenced QR check-in, certificates, reporting, and comprehensive API phase tester." />
-    <meta property="og:title" content="VolunTrack VMS - Volunteer Management System" />
-    <meta property="og:description" content="Enterprise multi-tenant volunteer management platform with RBAC, AI-powered volunteer assistant, geofenced QR check-in, certificates, reporting, and comprehensive API phase tester." />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>VolunTrack — Every shift filled. Every hour proven.</title>
+    <meta
+      name="description"
+      content="VolunTrack runs your volunteer program end to end: shifts, skill matching, GPS and QR verified check-in, hours, and certificates — for every NGO on one secure platform."
+    />
+    <meta name="theme-color" content="#07110E" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#F6F8F6" media="(prefers-color-scheme: light)" />
+    <meta property="og:title" content="VolunTrack — Every shift filled. Every hour proven." />
+    <meta
+      property="og:description"
+      content="Volunteer operations for NGOs: verified check-in, hours that count, certificates anyone can verify."
+    />
     <meta property="og:type" content="website" />
+    <meta property="og:image" content="/og-image.svg" />
+    <meta name="twitter:title" content="VolunTrack — Every shift filled. Every hour proven." />
     <meta name="twitter:card" content="summary_large_image" />
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <script>
+      // Apply the saved theme before first paint to avoid a flash.
+      (function () {
+        try {
+          var raw = localStorage.getItem('vt-ui');
+          var pref = raw ? JSON.parse(raw).state.theme : 'light';
+          var dark = pref === 'dark' || (pref === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
+          document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+        } catch (e) {}
+      })();
+    </script>
   </head>
-  <body class="bg-slate-950 text-slate-100 antialiased font-sans min-h-screen">
+  <body>
     <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
+    <script type="module" src="/src/app/main.tsx"></script>
   </body>
 </html>
-

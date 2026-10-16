@@ -1,0 +1,10 @@
+{
+  "name": "VolunTrack",
+  "short_name": "VolunTrack",
+  "description": "Volunteer operations for NGOs — verified check-in, hours that count, certificates anyone can verify.",
+  "start_url": "/app",
+  "display": "standalone",
+  "background_color": "#f6f8f6",
+  "theme_color": "#105e45",
+  "icons": [{ "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
+}

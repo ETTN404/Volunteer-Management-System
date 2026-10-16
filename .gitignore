@@ -22,3 +22,6 @@
 Homestead.json
 Homestead.yaml
 Thumbs.db
+
+# Local frontend rebuild checklist (not versioned)
+FRONTEND_REBUILD_PLAN.md
