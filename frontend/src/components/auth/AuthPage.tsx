@@ -156,15 +156,15 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthenticated, theme }) =>
           {tab === 'login' && (
             <form onSubmit={handleLogin} className="space-y-4">
               <div>
-                <label className={labelCls}>Email Address</label>
+                <label className={labelCls}>Email Address or Full Name</label>
                 <div className="relative">
                   <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                   <input
-                    type="email"
+                    type="text"
                     required
                     value={loginEmail}
                     onChange={(e) => setLoginEmail(e.target.value)}
-                    placeholder="admin@redcross.org"
+                    placeholder="superadmin@vms.com or Full Name"
                     className={`${inputCls} pl-9`}
                   />
                 </div>
@@ -191,8 +191,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthenticated, theme }) =>
               {/* Quick-fill hints */}
               <div className={`rounded p-3 text-[10px] space-y-1 ${isDark ? 'bg-slate-800/60 text-slate-400' : 'bg-slate-50 text-slate-500'}`}>
                 <div className="flex items-center justify-between mb-1.5">
-                  <span className="font-bold uppercase tracking-wider text-emerald-400 font-bold">🟢 Live MySQL Seeded Credentials:</span>
-                  <span className="text-[9px] font-mono text-indigo-400">PORT 8000</span>
+                  <span className="font-bold uppercase tracking-wider text-emerald-400 font-bold">🟢 Live Backend Seeded Accounts:</span>
+                  <span className="text-[9px] font-mono text-emerald-400">ONLINE</span>
                 </div>
                 <div className="grid grid-cols-2 gap-x-3 gap-y-0.5">
                   {[

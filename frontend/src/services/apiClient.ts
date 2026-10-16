@@ -22,9 +22,14 @@ export class ApiClient {
 
   private static loadConfig(): ApiConfig {
     const token = localStorage.getItem('voluntrack_sanctum_token') || '';
+    const isDeployed = typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
+    const defaultUrl = isDeployed
+      ? 'https://volunteer-management-system-4vvg.onrender.com/api'
+      : 'http://localhost:8000/api';
+
     return {
       mode: 'live',
-      liveBaseUrl: (import.meta as any).env?.VITE_API_URL || 'http://localhost:8000/api',
+      liveBaseUrl: (import.meta as any).env?.VITE_API_URL || defaultUrl,
       authToken: token,
     };
   }

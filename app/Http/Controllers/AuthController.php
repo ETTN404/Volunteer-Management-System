@@ -20,8 +20,8 @@ class AuthController extends Controller
     {
         $user = User::create([
             'org_id'    => $request->org_id,
-            'full_name' => $request->full_name,
-            'email'     => $request->email,
+            'full_name' => trim($request->full_name),
+            'email'     => strtolower(trim($request->email)),
             'password'  => Hash::make($request->password),
             'role'      => 'Volunteer',
         ]);
@@ -48,16 +48,26 @@ class AuthController extends Controller
 
     /**
      * Authenticate and login users of any role.
+     * Supports login via email address OR full name / username.
      */
     public function login(LoginRequest $request)
     {
-        if (!Auth::attempt($request->only('email', 'password'))) {
+        $loginInput = trim($request->input('email'));
+        $password = $request->input('password');
+
+        // Look up by email (exact or lower) or full_name
+        $user = User::where('email', strtolower($loginInput))
+            ->orWhere('email', $loginInput)
+            ->orWhere('full_name', $loginInput)
+            ->first();
+
+        if (!$user || !Hash::check($password, $user->password)) {
             throw ValidationException::withMessages([
-                'email' => ['Invalid login credentials.'],
+                'email' => ['Invalid login credentials. Please check your email/username and password.'],
             ]);
         }
 
-        $user = User::where('email', $request->email)->firstOrFail();
+        Auth::login($user);
         $user->update(['last_login' => now()]);
 
         $token = $user->createToken('auth_token')->plainTextToken;
