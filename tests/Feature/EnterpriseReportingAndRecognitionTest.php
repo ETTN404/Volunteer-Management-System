@@ -106,16 +106,25 @@ class EnterpriseReportingAndRecognitionTest extends TestCase
      */
     public function test_donor_impact_reporting_compilation()
     {
+        // Only verified hours on this organization's shifts count toward the report.
+        $event = Event::create(['org_id' => $this->org->id, 'title' => 'Drill', 'location' => 'Addis', 'latitude' => 9.01, 'longitude' => 38.74, 'start_date' => '2027-02-01', 'end_date' => '2027-02-02']);
+        $shift = Shift::create(['event_id' => $event->id, 'start_time' => '2027-02-01 08:00:00', 'end_time' => '2027-02-02 09:00:00', 'capacity' => 3]);
+        \App\Models\Attendance::create([
+            'shift_id' => $shift->id, 'volunteer_id' => $this->volunteer->id,
+            'check_in_time' => '2027-02-01 08:00:00', 'check_out_time' => '2027-02-02 09:00:00',
+            'hours_status' => 'verified', 'verified_hours' => 25,
+        ]);
+
         $response = $this->actingAs($this->coord, 'sanctum')
                          ->postJson('/api/coordinator/reports', [
-                             'period' => 'Q1 2026',
+                             'period' => 'Q1 2027',
                          ]);
 
         $response->assertStatus(201)
                  ->assertJsonPath('status', 'success');
 
         $this->assertDatabaseHas('reports', [
-            'period' => 'Q1 2026',
+            'period' => 'Q1 2027',
             'total_volunteers' => 1,
             'total_hours' => 25.00,
         ]);
@@ -135,14 +144,14 @@ class EnterpriseReportingAndRecognitionTest extends TestCase
             'org_id' => $this->org->id,
             'title' => 'Crisis Response',
             'location' => 'Bole',
-            'start_date' => '2026-06-15',
-            'end_date' => '2026-06-20',
+            'start_date' => '2027-06-15',
+            'end_date' => '2027-06-20',
         ]);
 
         $shift = Shift::create([
             'event_id' => $event->id,
-            'start_time' => '2026-06-16 09:00:00',
-            'end_time' => '2026-06-16 12:00:00',
+            'start_time' => '2027-06-16 09:00:00',
+            'end_time' => '2027-06-16 12:00:00',
             'required_skills' => ['first_aid'],
             'capacity' => 5,
         ]);

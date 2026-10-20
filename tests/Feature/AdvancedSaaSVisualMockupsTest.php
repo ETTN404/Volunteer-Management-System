@@ -62,14 +62,14 @@ class AdvancedSaaSVisualMockupsTest extends TestCase
             'org_id' => $this->org->id,
             'title' => 'Crisis Response',
             'location' => 'Addis',
-            'start_date' => '2026-06-15',
-            'end_date' => '2026-06-20',
+            'start_date' => '2027-06-15',
+            'end_date' => '2027-06-20',
         ]);
 
         $shift = Shift::create([
             'event_id' => $event->id,
-            'start_time' => '2026-06-16 09:00:00',
-            'end_time' => '2026-06-16 12:00:00',
+            'start_time' => '2027-06-16 09:00:00',
+            'end_time' => '2027-06-16 12:00:00',
             'capacity' => 5,
         ]);
 
@@ -82,8 +82,8 @@ class AdvancedSaaSVisualMockupsTest extends TestCase
 
         $shift2 = Shift::create([
             'event_id' => $event->id,
-            'start_time' => '2026-06-17 09:00:00',
-            'end_time' => '2026-06-17 12:00:00',
+            'start_time' => '2027-06-17 09:00:00',
+            'end_time' => '2027-06-17 12:00:00',
             'capacity' => 5,
         ]);
 
@@ -97,7 +97,7 @@ class AdvancedSaaSVisualMockupsTest extends TestCase
         Attendance::create([
             'shift_id' => $shift->id,
             'volunteer_id' => $this->volunteer->id,
-            'check_in_time' => '2026-06-16 08:55:00', // On-time (before 09:00 AM)
+            'check_in_time' => '2027-06-16 08:55:00', // On-time (before 09:00 AM)
             'qr_verified' => true,
         ]);
 
@@ -122,15 +122,15 @@ class AdvancedSaaSVisualMockupsTest extends TestCase
             'org_id' => $this->org->id,
             'title' => 'Crisis Response',
             'location' => 'Addis',
-            'start_date' => '2026-06-15',
-            'end_date' => '2026-06-20',
+            'start_date' => '2027-06-15',
+            'end_date' => '2027-06-20',
         ]);
 
         // Shift requires first_aid and teaching
         $shift = Shift::create([
             'event_id' => $event->id,
-            'start_time' => '2026-06-16 09:00:00',
-            'end_time' => '2026-06-16 12:00:00',
+            'start_time' => '2027-06-16 09:00:00',
+            'end_time' => '2027-06-16 12:00:00',
             'required_skills' => ['first_aid', 'teaching'],
             'capacity' => 5,
         ]);
@@ -165,14 +165,14 @@ class AdvancedSaaSVisualMockupsTest extends TestCase
             'org_id' => $this->org->id,
             'title' => 'Crisis Response',
             'location' => 'Addis',
-            'start_date' => '2026-06-15',
-            'end_date' => '2026-06-20',
+            'start_date' => '2027-06-15',
+            'end_date' => '2027-06-20',
         ]);
 
         $shift = Shift::create([
             'event_id' => $event->id,
-            'start_time' => '2026-06-16 09:00:00',
-            'end_time' => '2026-06-16 12:00:00',
+            'start_time' => now()->subMinutes(10)->toDateTimeString(),
+            'end_time' => now()->addHours(3)->toDateTimeString(),
             'capacity' => 5,
         ]);
 

@@ -83,10 +83,12 @@ class TenantAuthAndOnboardingTest extends TestCase
                          ->postJson('/api/superadmin/onboard-tenant', [
                              'org_name' => 'Greenpeace Ethiopia',
                              'org_email' => 'info@greenpeace.et',
-                             'org_address' => 'Bole, Addis Ababa',
-                             'admin_full_name' => 'Abebe Kebede',
+                             'org_country' => 'ET',
+                             'org_city' => 'Addis Ababa',
+                             'org_phone' => '+251911223344',
+                             'admin_first_name' => 'Abebe',
+                             'admin_last_name' => 'Kebede',
                              'admin_email' => 'abebe@greenpeace.et',
-                             'admin_password' => 'securepassword123',
                          ]);
 
         $response->assertStatus(201)
@@ -96,6 +98,7 @@ class TenantAuthAndOnboardingTest extends TestCase
                      'data' => [
                          'organization',
                          'admin',
+                         'invitation' => ['invite_url', 'email_sent', 'expires_at'],
                      ]
                  ]);
 
@@ -104,10 +107,15 @@ class TenantAuthAndOnboardingTest extends TestCase
             'email' => 'info@greenpeace.et',
         ]);
 
+        // No typed password: the admin is invited and must choose a password on first sign-in.
         $this->assertDatabaseHas('users', [
             'email' => 'abebe@greenpeace.et',
             'role' => 'OrgAdmin',
+            'first_name' => 'Abebe',
+            'full_name' => 'Abebe Kebede',
+            'must_change_password' => true,
         ]);
+        $this->assertDatabaseCount('invitations', 1);
     }
 
     /**

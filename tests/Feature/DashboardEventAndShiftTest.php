@@ -116,15 +116,15 @@ class DashboardEventAndShiftTest extends TestCase
             'org_id' => $this->org->id,
             'title' => 'Disaster Response',
             'location' => 'Addis Ababa',
-            'start_date' => '2026-06-15',
-            'end_date' => '2026-06-20',
+            'start_date' => '2027-06-15',
+            'end_date' => '2027-06-20',
         ]);
 
         // Shift 1: 100% Match (first_aid is owned by volunteer)
         $shift1 = Shift::create([
             'event_id' => $event->id,
-            'start_time' => '2026-06-16 09:00:00',
-            'end_time' => '2026-06-16 12:00:00',
+            'start_time' => '2027-06-16 09:00:00',
+            'end_time' => '2027-06-16 12:00:00',
             'required_skills' => ['first_aid'],
             'capacity' => 5,
         ]);
@@ -132,8 +132,8 @@ class DashboardEventAndShiftTest extends TestCase
         // Shift 2: 50% Match (disaster_response is matched, teaching is not)
         $shift2 = Shift::create([
             'event_id' => $event->id,
-            'start_time' => '2026-06-16 13:00:00',
-            'end_time' => '2026-06-16 15:00:00',
+            'start_time' => '2027-06-16 13:00:00',
+            'end_time' => '2027-06-16 15:00:00',
             'required_skills' => ['disaster_response', 'teaching'],
             'capacity' => 5,
         ]);
@@ -159,23 +159,23 @@ class DashboardEventAndShiftTest extends TestCase
             'org_id' => $this->org->id,
             'title' => 'Disaster Response',
             'location' => 'Addis Ababa',
-            'start_date' => '2026-06-15',
-            'end_date' => '2026-06-20',
+            'start_date' => '2027-06-15',
+            'end_date' => '2027-06-20',
         ]);
 
         // Shift A: 09:00 to 12:00
         $shiftA = Shift::create([
             'event_id' => $event->id,
-            'start_time' => '2026-06-16 09:00:00',
-            'end_time' => '2026-06-16 12:00:00',
+            'start_time' => '2027-06-16 09:00:00',
+            'end_time' => '2027-06-16 12:00:00',
             'capacity' => 5,
         ]);
 
         // Shift B (Overlapping): 10:00 to 11:30
         $shiftB = Shift::create([
             'event_id' => $event->id,
-            'start_time' => '2026-06-16 10:00:00',
-            'end_time' => '2026-06-16 11:30:00',
+            'start_time' => '2027-06-16 10:00:00',
+            'end_time' => '2027-06-16 11:30:00',
             'capacity' => 5,
         ]);
 
@@ -203,15 +203,15 @@ class DashboardEventAndShiftTest extends TestCase
             'org_id' => $this->org->id,
             'title' => 'Disaster Response',
             'location' => 'Addis Ababa',
-            'start_date' => '2026-06-15',
-            'end_date' => '2026-06-20',
+            'start_date' => '2027-06-15',
+            'end_date' => '2027-06-20',
         ]);
 
         // Shift capacity = 1
         $shift = Shift::create([
             'event_id' => $event->id,
-            'start_time' => '2026-06-16 09:00:00',
-            'end_time' => '2026-06-16 12:00:00',
+            'start_time' => '2027-06-16 09:00:00',
+            'end_time' => '2027-06-16 12:00:00',
             'capacity' => 1,
         ]);
 

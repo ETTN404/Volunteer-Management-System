@@ -202,6 +202,7 @@ class AttendanceVerificationTest extends TestCase
         $response = $this->actingAs($this->volUser, 'sanctum')
                          ->postJson('/api/volunteer/check-out', [
                              'shift_id' => $this->shift->id,
+                             'reason'   => 'Family emergency',
                          ]);
 
         $response->assertStatus(200)
@@ -213,7 +214,16 @@ class AttendanceVerificationTest extends TestCase
         // Assert duration is logged as ~2 hours
         $this->assertEquals(2.0, $response->json('data.hours_logged'));
 
-        // Volunteer cumulative stats should have increased:
+        // Hours wait for the coordinator: nothing is credited at check-out.
+        $this->assertEquals('pending', $response->json('data.hours_status'));
+        $this->assertContains('left_early', $response->json('data.flags'));
+        $this->assertDatabaseHas('volunteers', ['id' => $this->volunteer->id, 'total_hours' => 5.00]);
+
+        // Coordinator verifies -> hours are credited once.
+        $this->actingAs($this->coord, 'sanctum')
+             ->patchJson("/api/coordinator/attendance/{$attendance->id}/verify", ['status' => 'verified'])
+             ->assertStatus(200);
+
         $this->assertDatabaseHas('volunteers', [
             'id'          => $this->volunteer->id,
             'total_hours' => 7.00,
