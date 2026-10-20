@@ -1,4 +1,5 @@
 import type { ApiError } from '@/shared/api/http';
+import { t } from '@/shared/i18n';
 
 export type CheckInProblem =
   | 'drift'
@@ -25,7 +26,7 @@ export interface CheckInGuidance {
 /** Maps AttendanceService::checkIn failures (by `code`) to plain guidance: what happened + how to fix it. */
 export function explainCheckInError(e: ApiError): CheckInGuidance {
   const m = e.message;
-  const g = (kind: CheckInProblem, title: string, fix: string): CheckInGuidance => ({ kind, title, fix, detail: m });
+  const g = (kind: CheckInProblem, title: string, fix: string): CheckInGuidance => ({ kind, title: t(title), fix: t(fix), detail: m });
 
   if (e.status === 429) return g('rate', 'Too many attempts', 'Wait a minute, then try once more. If it keeps failing, ask your coordinator to check you in.');
   switch (e.code) {
@@ -45,7 +46,7 @@ export function explainCheckInError(e: ApiError): CheckInGuidance {
       return g('gps', 'Your GPS signal is too weak', 'Step outside or away from tall buildings for a few seconds until the accuracy improves, then try again.');
     case 'outside_geofence': {
       const meters = Number((e.body.distance_m as number | undefined) ?? /You are ([\d.]+) meters/i.exec(m)?.[1] ?? 0);
-      return g('location', `You’re ${Math.round(meters)} m from the venue`, 'Move inside the check-in area shown on the map and try again.');
+      return g('location', t('You’re {n} m from the venue', { n: Math.round(meters) }), 'Move inside the check-in area shown on the map and try again.');
     }
     case 'organization_inactive':
     case 'event_cancelled':

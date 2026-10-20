@@ -5,6 +5,7 @@ import { cn } from '@/shared/lib/cn';
 import { Avatar, Badge, LogoMark, Tooltip } from '@/shared/ui';
 import type { Organization, Role, User } from '@/shared/types/api';
 import { ROLE_LABEL } from '@/features/auth/session-store';
+import { useT } from '@/shared/i18n';
 import { NAV, type NavItem } from '../navigation';
 
 export type NavBadges = Partial<Record<NonNullable<NavItem['badgeKey']>, number>>;
@@ -29,6 +30,7 @@ export function Sidebar({
   mobile?: boolean;
 }) {
   const c = collapsed && !mobile;
+  const t = useT();
   return (
     <nav aria-label="Workspace" className={cn('flex h-full flex-col bg-sunken', !mobile && 'border-r border-line')}>
       {/* Workspace identity */}
@@ -36,8 +38,8 @@ export function Sidebar({
         <LogoMark className="size-8 shrink-0" />
         {!c && (
           <div className="min-w-0">
-            <div className="truncate text-[13.5px] font-semibold text-text">{org?.name ?? 'VolunTrack Platform'}</div>
-            <div className="type-eyebrow-sm">{ROLE_LABEL[role]}</div>
+            <div className="truncate text-[13.5px] font-semibold text-text">{org?.name ?? t('VolunTrack Platform')}</div>
+            <div className="type-eyebrow-sm">{t(ROLE_LABEL[role])}</div>
           </div>
         )}
       </div>
@@ -45,7 +47,7 @@ export function Sidebar({
       <div className="flex-1 space-y-6 overflow-y-auto px-3 py-5">
         {NAV[role].map((section, si) => (
           <div key={si}>
-            {section.label && !c && <div className="type-eyebrow mb-2 px-2.5 !text-[10px]">{section.label}</div>}
+            {section.label && !c && <div className="type-eyebrow mb-2 px-2.5 !text-[10px]">{t(section.label)}</div>}
             {section.label && c && <div className="mx-auto mb-2 h-px w-6 bg-line" />}
             <ul className="space-y-0.5">
               {section.items.map((item) => {
@@ -74,7 +76,7 @@ export function Sidebar({
                         )}
                         {isActive && <span className="absolute -left-3 top-2 bottom-2 w-[3px] rounded-r-full bg-accent" />}
                         <item.icon className={cn('relative size-[18px] shrink-0', isActive ? 'text-accent-text' : 'text-faint group-hover:text-muted')} />
-                        {!c && <span className="relative flex-1 truncate">{item.label}</span>}
+                        {!c && <span className="relative flex-1 truncate">{t(item.label)}</span>}
                         {!c && count ? (
                           <Badge tone="accent" size="sm" className="relative type-data">
                             {count}
@@ -88,7 +90,7 @@ export function Sidebar({
                 return (
                   <li key={item.to}>
                     {c ? (
-                      <Tooltip content={item.label} side="right">
+                      <Tooltip content={t(item.label)} side="right">
                         {link}
                       </Tooltip>
                     ) : (
@@ -121,10 +123,10 @@ export function Sidebar({
           <button
             onClick={onToggle}
             className={cn('mt-2 flex h-8 w-full items-center gap-2 rounded-md px-2.5 text-xs text-faint transition-colors hover:bg-surface-2 hover:text-muted', c && 'justify-center px-0')}
-            aria-label={c ? 'Expand sidebar' : 'Collapse sidebar'}
+            aria-label={c ? t('Expand sidebar') : t('Collapse sidebar')}
           >
             {c ? <ChevronsRight className="size-4" /> : <ChevronsLeft className="size-4" />}
-            {!c && <span>Collapse</span>}
+            {!c && <span>{t('Collapse')}</span>}
           </button>
         )}
       </div>

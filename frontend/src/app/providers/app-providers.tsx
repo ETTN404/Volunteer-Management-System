@@ -4,6 +4,7 @@ import { createQueryClient } from '@/shared/api/query-client';
 import { Toaster, TooltipProvider } from '@/shared/ui';
 import { env } from '@/shared/config/env';
 import { ThemeSync, useResolvedTheme } from './theme';
+import { LocaleSync } from '../layouts/language-toggle';
 
 const Devtools = env.isDev
   ? lazy(() => import('@tanstack/react-query-devtools').then((m) => ({ default: m.ReactQueryDevtools })))
@@ -19,6 +20,7 @@ export function AppProviders({ children }: { children: ReactNode }) {
     <QueryClientProvider client={client}>
       <TooltipProvider delayDuration={250}>
         <ThemeSync />
+        <LocaleSync />
         {children}
         <ThemedToaster />
       </TooltipProvider>

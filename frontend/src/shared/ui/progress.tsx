@@ -1,4 +1,5 @@
 import { motion, useReducedMotion } from 'motion/react';
+import { useT } from '@/shared/i18n';
 import type { ReactNode } from 'react';
 import { cn } from '@/shared/lib/cn';
 
@@ -51,8 +52,9 @@ export function ProgressBar({
 
 /** Capacity meter: confirmed/total with tone shifting as the shift fills. */
 export function CapacityMeter({ confirmed, capacity, className, showLabel = true }: { confirmed: number | undefined; capacity: number; className?: string; showLabel?: boolean }) {
+  const t = useT();
   if (confirmed === undefined) {
-    return <div className={cn('text-xs text-muted', className)}>Up to {capacity} volunteers</div>;
+    return <div className={cn('text-xs text-muted', className)}>{t('Up to {n} volunteers', { n: capacity })}</div>;
   }
   const ratio = capacity ? confirmed / capacity : 0;
   const tone: Tone = ratio >= 1 ? 'danger' : ratio >= 0.75 ? 'warning' : 'success';
@@ -66,11 +68,11 @@ export function CapacityMeter({ confirmed, capacity, className, showLabel = true
             <span className="text-faint">/{capacity}</span>
           </span>
           <span className={cn('font-medium', ratio >= 1 ? 'text-danger-text' : ratio >= 0.75 ? 'text-warning-text' : 'text-muted')}>
-            {ratio >= 1 ? 'Full' : `${left} ${left === 1 ? 'spot' : 'spots'} left`}
+            {ratio >= 1 ? t('Full') : left === 1 ? t('1 spot left') : t('{n} spots left', { n: left })}
           </span>
         </div>
       )}
-      <ProgressBar value={confirmed} max={capacity} tone={tone} size="sm" label="Shift capacity" />
+      <ProgressBar value={confirmed} max={capacity} tone={tone} size="sm" label={t('Shift capacity')} />
     </div>
   );
 }

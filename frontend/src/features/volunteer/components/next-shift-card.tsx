@@ -5,12 +5,14 @@ import { countdownTo, formatDay, formatTimeRange } from '@/shared/lib/time';
 import { useNow } from '@/shared/hooks/use-now';
 import { Badge, Button, Card, EmptyState } from '@/shared/ui';
 import { shiftPhase, type ScheduledShift } from '../derived';
+import { useT } from '@/shared/i18n';
 
 function Digits({ value, label }: { value: number; label: string }) {
+  const t = useT();
   return (
     <div className="flex min-w-[2.6rem] flex-col items-center">
       <span className="type-data text-[clamp(1.6rem,7vw,2.6rem)] leading-none text-text tabular-nums">{String(value).padStart(2, '0')}</span>
-      <span className="type-eyebrow mt-1.5 !text-[9.5px]">{label}</span>
+      <span className="type-eyebrow mt-1.5 !text-[9.5px]">{t(label)}</span>
     </div>
   );
 }
@@ -20,18 +22,19 @@ const hhmm = (d: Date) => d.toLocaleTimeString([], { hour: '2-digit', minute: '2
 /** Next confirmed shift — or the one you're on right now. The button always matches your real state. */
 export function NextShiftCard({ next, className }: { next: ScheduledShift | undefined; className?: string }) {
   const now = useNow(1000);
+  const t = useT();
   if (!next) {
     return (
       <Card className={cn('p-0', className)}>
         <EmptyState
           className="h-full shadow-none"
           icon={<CalendarPlus />}
-          title="No confirmed shifts yet"
-          description="Apply for a shift that fits your skills — once a coordinator confirms you, it shows up here with a live countdown."
+          title={t('No confirmed shifts yet')}
+          description={t('Apply for a shift that fits your skills — once a coordinator confirms you, it shows up here with a live countdown.')}
           action={
             <Button asChild>
               <Link to="/v/opportunities">
-                Find a shift <ArrowRight />
+                {t('Find a shift')} <ArrowRight />
               </Link>
             </Button>
           }
@@ -55,10 +58,10 @@ export function NextShiftCard({ next, className }: { next: ScheduledShift | unde
       <div className="pointer-events-none absolute -top-4 -right-4 size-40 rounded-full border border-accent/20" aria-hidden />
 
       <div className="relative flex flex-wrap items-center gap-2">
-        <span className="type-eyebrow">{onShift ? 'You’re on shift' : open ? 'Check-in is open' : 'Your next shift'}</span>
+        <span className="type-eyebrow">{onShift ? t('You’re on shift') : open ? t('Check-in is open') : t('Your next shift')}</span>
         {(onShift || open) && (
           <Badge tone="success" size="sm" dot pulse>
-            {onShift ? 'Checked in' : 'Live now'}
+            {onShift ? t('Checked in') : t('Live now')}
           </Badge>
         )}
       </div>
@@ -80,11 +83,11 @@ export function NextShiftCard({ next, className }: { next: ScheduledShift | unde
               <div className="type-data text-[clamp(1.6rem,7vw,2.4rem)] leading-none text-text tabular-nums">
                 {Math.floor(elapsedMin / 60)}h {String(elapsedMin % 60).padStart(2, '0')}m
               </div>
-              <div className="mt-1 text-xs text-muted">since you checked in at {checkedInAt ? hhmm(checkedInAt) : '—'} · ends {hhmm(next.end)}</div>
+              <div className="mt-1 text-xs text-muted">{t('since you checked in at {time} · ends {end}', { time: checkedInAt ? hhmm(checkedInAt) : '—', end: hhmm(next.end) })}</div>
             </div>
           </div>
         ) : phase === 'too-early' ? (
-          <div className="flex items-end gap-3 sm:gap-6" aria-label={`Starts in ${c.days} days ${c.hours} hours ${c.minutes} minutes`}>
+          <div className="flex items-end gap-3 sm:gap-6" aria-label={t('Starts in {d} days {h} hours {m} minutes', { d: c.days, h: c.hours, m: c.minutes })}>
             {c.days > 0 && <Digits value={c.days} label="days" />}
             <Digits value={c.hours} label="hours" />
             <Digits value={c.minutes} label="min" />
@@ -92,43 +95,43 @@ export function NextShiftCard({ next, className }: { next: ScheduledShift | unde
           </div>
         ) : (
           <p className="text-sm text-text">
-            {now < next.start ? `Starts at ${hhmm(next.start)}` : `Started ${Math.round((now.getTime() - next.start.getTime()) / 60_000)} min ago`}
-            {open && ` · check-in closes at ${hhmm(closesAt)}`}
+            {now < next.start ? t('Starts at {time}', { time: hhmm(next.start) }) : t('Started {n} min ago', { n: Math.round((now.getTime() - next.start.getTime()) / 60_000) })}
+            {open && ` · ${t('check-in closes at {time}', { time: hhmm(closesAt) })}`}
           </p>
         )}
 
         {onShift ? (
           <Button asChild size="lg" variant="secondary" className="w-full sm:w-auto">
             <Link to={`/v/check-in/${next.shift.id}`}>
-              <LogOut /> Check out
+              <LogOut /> {t('Check out')}
             </Link>
           </Button>
         ) : open ? (
           <Button asChild size="lg" className="w-full sm:w-auto">
             <Link to={`/v/check-in/${next.shift.id}`}>
-              <QrCode /> Check in now
+              <QrCode /> {t('Check in now')}
             </Link>
           </Button>
         ) : phase === 'too-early' ? (
-          <p className="text-[13px] text-muted">Check-in opens at {hhmm(opensAt)}</p>
+          <p className="text-[13px] text-muted">{t('Check-in opens at {time}', { time: hhmm(opensAt) })}</p>
         ) : phase === 'missed' ? (
-          <p className="text-[13px] text-warning-text">Check-in closed. If you are at the venue, find the coordinator — they can check you in.</p>
+          <p className="text-[13px] text-warning-text">{t('Check-in closed. If you are at the venue, find the coordinator — they can check you in.')}</p>
         ) : (
           <Button asChild variant="secondary" className="w-full sm:w-auto">
-            <Link to="/v/schedule">View schedule</Link>
+            <Link to="/v/schedule">{t('View schedule')}</Link>
           </Button>
         )}
       </div>
 
       <ul className="relative mt-6 flex flex-wrap gap-2 border-t border-line pt-5 text-[12.5px] text-muted">
         <li className="inline-flex items-center gap-1.5 rounded-md bg-surface-2/70 px-2.5 py-1.5">
-          <MapPin className="size-3.5 text-accent-text" /> Within {next.event.geofence_radius} m of the venue
+          <MapPin className="size-3.5 text-accent-text" /> {t('Within {n} m of the venue', { n: next.event.geofence_radius })}
         </li>
         <li className="inline-flex items-center gap-1.5 rounded-md bg-surface-2/70 px-2.5 py-1.5">
-          <QrCode className="size-3.5 text-accent-text" /> Scan the coordinator’s QR
+          <QrCode className="size-3.5 text-accent-text" /> {t('Scan the coordinator’s QR')}
         </li>
         <li className="inline-flex items-center gap-1.5 rounded-md bg-surface-2/70 px-2.5 py-1.5">
-          <Clock className="size-3.5 text-accent-text" /> Opens 15 min before start
+          <Clock className="size-3.5 text-accent-text" /> {t('Opens 15 min before start')}
         </li>
       </ul>
     </Card>

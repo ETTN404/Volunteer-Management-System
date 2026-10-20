@@ -13,6 +13,7 @@ import { useRegister } from '@/features/auth/api';
 import { usePublicOrganizations } from '@/features/public/api';
 import { EASE_OUT_EXPO } from '@/shared/motion';
 import { AuthLayout } from './auth-layout';
+import { useT } from '@/shared/i18n';
 
 // Mirrors App\Http\Requests\RegisterVolunteerRequest.
 const schema = z.object({
@@ -56,10 +57,11 @@ export default function RegisterPage() {
   });
   const { register, control, handleSubmit, trigger, formState, watch, setError } = form;
   const age = ageFrom(watch('date_of_birth'));
+  const t = useT();
 
   useEffect(() => {
-    document.title = 'Join as a volunteer · VolunTrack';
-  }, []);
+    document.title = `${t('Join as a volunteer')} · VolunTrack`;
+  }, [t]);
 
   const next = async () => {
     const ok = await trigger(STEPS[step]!.fields as unknown as (keyof Values)[]);
@@ -84,24 +86,24 @@ export default function RegisterPage() {
     <AuthLayout
       aside={
         <div className="max-w-md space-y-4">
-          {['Shifts ranked by how well they fit your skills', 'Check in from the venue — no paper sign-in sheets', 'A certificate at every milestone: 10, 25, 50, 100+ hours'].map((t) => (
-            <div key={t} className="flex items-center gap-3 rounded-2xl bg-white/[0.07] px-4 py-3.5 text-[15px] text-white backdrop-blur [box-shadow:inset_0_0_0_1px_rgba(255,255,255,0.1)]">
-              <Check className="size-4 text-[#a9b2ff]" /> {t}
+          {['Shifts ranked by how well they fit your skills', 'Check in from the venue — no paper sign-in sheets', 'A certificate at every milestone: 10, 25, 50, 100+ hours'].map((line) => (
+            <div key={line} className="flex items-center gap-3 rounded-2xl bg-white/[0.07] px-4 py-3.5 text-[15px] text-white backdrop-blur [box-shadow:inset_0_0_0_1px_rgba(255,255,255,0.1)]">
+              <Check className="size-4 text-[#a9b2ff]" /> {t(line)}
             </div>
           ))}
         </div>
       }
     >
-      <p className="type-eyebrow mb-4">Join as a volunteer</p>
-      <h1 className="type-headline text-[32px] text-text">Create your volunteer account</h1>
+      <p className="type-eyebrow mb-4">{t('Join as a volunteer')}</p>
+      <h1 className="type-headline text-[32px] text-text">{t('Create your volunteer account')}</h1>
 
       {/* Step indicator */}
-      <ol className="mt-7 flex items-center gap-2" aria-label="Progress">
+      <ol className="mt-7 flex items-center gap-2" aria-label={t('Progress')}>
         {STEPS.map((s, i) => (
           <li key={s.title} className="flex flex-1 flex-col gap-2">
             <span className={cn('h-1 rounded-full transition-colors duration-500', i <= step ? 'bg-accent' : 'bg-line')} />
             <span className={cn('text-[12px] font-medium', i === step ? 'text-text' : 'text-faint')} aria-current={i === step ? 'step' : undefined}>
-              {i + 1}. {s.title}
+              {i + 1}. {t(s.title)}
             </span>
           </li>
         ))}
@@ -122,26 +124,26 @@ export default function RegisterPage() {
             {step === 0 && (
               <>
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <Field label="First name" error={formState.errors.first_name?.message}>
+                  <Field label={t('First name')} error={formState.errors.first_name?.message && t(formState.errors.first_name.message)}>
                     <Input inputSize="lg" autoComplete="given-name" autoFocus placeholder="Hana" {...register('first_name')} />
                   </Field>
-                  <Field label="Last name" error={formState.errors.last_name?.message}>
+                  <Field label={t('Last name')} error={formState.errors.last_name?.message && t(formState.errors.last_name.message)}>
                     <Input inputSize="lg" autoComplete="family-name" placeholder="Tesfaye" {...register('last_name')} />
                   </Field>
                 </div>
-                <Field label="Email" error={formState.errors.email?.message}>
+                <Field label={t('Email')} error={formState.errors.email?.message && t(formState.errors.email.message)}>
                   <Input inputSize="lg" type="email" autoComplete="email" placeholder="you@example.com" {...register('email')} />
                 </Field>
-                <Field label="Phone" optional hint="So coordinators can reach you about a shift." error={formState.errors.phone?.message}>
+                <Field label={t('Phone')} optional hint={t('So coordinators can reach you about a shift.')} error={formState.errors.phone?.message && t(formState.errors.phone.message)}>
                   <Controller control={control} name="phone" render={({ field }) => <PhoneInput country="ET" value={field.value} onChange={field.onChange} />} />
                 </Field>
-                <Field label="Password" hint="At least 8 characters." error={formState.errors.password?.message}>
+                <Field label={t('Password')} hint={t('At least 8 characters.')} error={formState.errors.password?.message && t(formState.errors.password.message)}>
                   <Input
                     inputSize="lg"
                     type={show ? 'text' : 'password'}
                     autoComplete="new-password"
                     trailing={
-                      <button type="button" onClick={() => setShow((s) => !s)} className="grid size-8 place-items-center rounded-md text-faint hover:text-text" aria-label={show ? 'Hide password' : 'Show password'}>
+                      <button type="button" onClick={() => setShow((s) => !s)} className="grid size-8 place-items-center rounded-md text-faint hover:text-text" aria-label={show ? t('Hide password') : t('Show password')}>
                         {show ? <EyeOff /> : <Eye />}
                       </button>
                     }
@@ -157,7 +159,7 @@ export default function RegisterPage() {
                 name="org_id"
                 render={({ field, fieldState }) => (
                   <fieldset>
-                    <legend className="mb-3 text-[13px] font-medium text-text">Which organization do you volunteer with?</legend>
+                    <legend className="mb-3 text-[13px] font-medium text-text">{t('Which organization do you volunteer with?')}</legend>
                     <div className="space-y-2" role="radiogroup">
                       {orgs.isLoading && Array.from({ length: 3 }, (_, i) => <Skeleton key={i} className="h-[68px] rounded-xl" />)}
                       {orgs.data?.map((o) => {
@@ -180,7 +182,7 @@ export default function RegisterPage() {
                             <span className="min-w-0 flex-1">
                               <span className="block truncate text-[14.5px] font-medium text-text">{o.name}</span>
                               <span className="block truncate text-[12.5px] text-faint">
-                                {o.address} · {o.volunteer_count} volunteers
+                                {o.address} · {t('{n} volunteers', { n: o.volunteer_count })}
                               </span>
                             </span>
                             <span className={cn('grid size-5 place-items-center rounded-full transition-colors', selected ? 'bg-accent text-accent-fg' : 'shadow-[inset_0_0_0_1.5px_var(--line-strong)]')}>
@@ -192,11 +194,11 @@ export default function RegisterPage() {
                     </div>
                     {orgs.data?.length === 0 && (
                       <p className="rounded-xl bg-surface-2 px-4 py-3 text-[13.5px] text-muted [box-shadow:inset_0_0_0_1px_var(--line)]">
-                        You can continue without choosing — your organization’s coordinator will add you to their programme.
+                        {t('You can continue without choosing — your organization’s coordinator will add you to their programme.')}
                       </p>
                     )}
                     {fieldState.error && <p className="mt-2 text-[12.5px] text-danger-text">{fieldState.error.message}</p>}
-                    <p className="mt-4 text-[12.5px] text-faint">Organizations onboard volunteers only after they join VolunTrack. Don’t see yours? Ask them to contact us.</p>
+                    <p className="mt-4 text-[12.5px] text-faint">{t('Organizations onboard volunteers only after they join VolunTrack. Don’t see yours? Ask them to contact us.')}</p>
                   </fieldset>
                 )}
               />
@@ -208,8 +210,8 @@ export default function RegisterPage() {
                   control={control}
                   name="skills"
                   render={({ field, fieldState }) => (
-                    <Field label="Skills" hint="These decide which shifts you see first. Add your own if it’s missing." error={fieldState.error?.message}>
-                      <TagInput value={field.value} onChange={field.onChange} suggestions={SKILL_CATALOGUE} normalize={normalizeSkill} max={15} placeholder="First aid, logistics, teaching…" />
+                    <Field label={t('Skills')} hint={t('These decide which shifts you see first. Add your own if it’s missing.')} error={fieldState.error?.message && t(fieldState.error.message)}>
+                      <TagInput value={field.value} onChange={field.onChange} suggestions={SKILL_CATALOGUE} normalize={normalizeSkill} max={15} placeholder={t('First aid, logistics, teaching…')} />
                     </Field>
                   )}
                 />
@@ -218,7 +220,7 @@ export default function RegisterPage() {
                   name="availability"
                   render={({ field }) => (
                     <fieldset>
-                      <legend className="mb-2 text-[13px] font-medium text-text">When can you usually help?</legend>
+                      <legend className="mb-2 text-[13px] font-medium text-text">{t('When can you usually help?')}</legend>
                       <div className="grid grid-cols-2 gap-2">
                         {AVAILABILITY_SLOTS.map((slot) => {
                           const on = field.value.includes(slot.key);
@@ -231,7 +233,7 @@ export default function RegisterPage() {
                               className={cn('flex h-10 items-center gap-2 rounded-lg px-3 text-[13px] font-medium transition-colors', on ? 'bg-accent-soft text-accent-text [box-shadow:inset_0_0_0_1px_var(--accent)]' : 'bg-sunken text-muted [box-shadow:inset_0_0_0_1px_var(--line)] hover:text-text')}
                             >
                               <span className={cn('grid size-4 place-items-center rounded-[4px]', on ? 'bg-accent text-accent-fg' : 'shadow-[inset_0_0_0_1.5px_var(--line-strong)]')}>{on && <Check className="size-2.5" strokeWidth={4} />}</span>
-                              {slot.label}
+                              {t(slot.label)}
                             </button>
                           );
                         })}
@@ -239,16 +241,16 @@ export default function RegisterPage() {
                     </fieldset>
                   )}
                 />
-                <Field label="Date of birth" optional hint="Volunteers under 18 need a parental consent form before joining shifts." error={formState.errors.date_of_birth?.message}>
-                  <Controller control={control} name="date_of_birth" render={({ field }) => <DatePicker value={field.value} onChange={field.onChange} max={new Date().toISOString().slice(0, 10)} placeholder="Select your birthday" />} />
+                <Field label={t('Date of birth')} optional hint={t('Volunteers under 18 need a parental consent form before joining shifts.')} error={formState.errors.date_of_birth?.message && t(formState.errors.date_of_birth.message)}>
+                  <Controller control={control} name="date_of_birth" render={({ field }) => <DatePicker value={field.value} onChange={field.onChange} max={new Date().toISOString().slice(0, 10)} placeholder={t('Select your birthday')} />} />
                 </Field>
                 {age != null && age < 18 && (
-                  <InlineAlert tone="warning" title="Parental consent needed">
-                    After signing up, upload a signed consent form under Documents. You can browse shifts now and apply once a coordinator verifies it.
+                  <InlineAlert tone="warning" title={t('Parental consent needed')}>
+                    {t('After signing up, upload a signed consent form under Documents. You can browse shifts now and apply once a coordinator verifies it.')}
                   </InlineAlert>
                 )}
-                <Field label="About you" optional error={formState.errors.bio?.message}>
-                  <Textarea rows={3} placeholder="What you do, languages you speak, why you volunteer…" {...register('bio')} />
+                <Field label={t('About you')} optional error={formState.errors.bio?.message && t(formState.errors.bio.message)}>
+                  <Textarea rows={3} placeholder={t('What you do, languages you speak, why you volunteer…')} {...register('bio')} />
                 </Field>
               </>
             )}
@@ -258,25 +260,25 @@ export default function RegisterPage() {
         <div className="mt-8 flex items-center gap-3">
           {step > 0 && (
             <Button type="button" variant="ghost" size="lg" onClick={() => setStep((s) => s - 1)}>
-              <ArrowLeft /> Back
+              <ArrowLeft /> {t('Back')}
             </Button>
           )}
           <Button type="submit" size="lg" className="flex-1" loading={registerMut.isPending}>
             {step < STEPS.length - 1 ? (
               <>
-                Continue <ArrowRight />
+                {t('Continue')} <ArrowRight />
               </>
             ) : (
-              'Create my account'
+              t('Create my account')
             )}
           </Button>
         </div>
       </form>
 
       <p className="mt-6 text-center text-sm text-muted">
-        Already have an account?{' '}
+        {t('Already have an account?')}{' '}
         <Link to="/login" className="font-medium text-accent-text hover:underline">
-          Sign in
+          {t('Sign in')}
         </Link>
       </p>
     </AuthLayout>

@@ -13,13 +13,15 @@ import { NextShiftCard } from '@/features/volunteer/components/next-shift-card';
 import { OpportunityCard, bestMatch } from '@/features/volunteer/components/opportunity-card';
 import { useAnnouncements } from '@/features/announcements/api';
 import { formatDay } from '@/shared/lib/time';
+import { useT, useLocale } from '@/shared/i18n';
 
 function Stat({ icon, label, value, suffix, decimals = 0, hint }: { icon: React.ReactNode; label: string; value: number | undefined; suffix?: string; decimals?: number; hint?: string }) {
+  const t = useT();
   return (
     <Card className="min-w-0 p-4 sm:p-5">
       <div className="flex min-w-0 items-center gap-2 text-muted [&_svg]:size-4 [&_svg]:shrink-0">
         {icon}
-        <span className="type-eyebrow-sm truncate">{label}</span>
+        <span className="type-eyebrow-sm truncate">{t(label)}</span>
       </div>
       <div className="type-data mt-3 text-[clamp(1.4rem,6vw,1.75rem)] leading-none text-text">
         {value == null ? <Skeleton className="h-7 w-16" /> : <CountUp value={value} decimals={decimals} />}
@@ -37,10 +39,12 @@ export default function VolunteerHomePage() {
   const shifts = useMyShifts();
   const events = useOpportunities({ per_page: 12 });
   const announcements = useAnnouncements();
+  const t = useT();
+  const locale = useLocale();
 
   useEffect(() => {
-    document.title = 'Home · VolunTrack';
-  }, []);
+    document.title = `${t('Home')} · VolunTrack`;
+  }, [t]);
 
   const hours = impact.data?.total_hours ?? profile.data?.volunteer.total_hours ?? 0;
   const next = nextMilestone(hours);
@@ -61,25 +65,25 @@ export default function VolunteerHomePage() {
   return (
     <div className="min-w-0">
       <PageHeader
-        eyebrow={new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}
-        title={`${greeting()}, ${firstName(user?.full_name)}`}
+        eyebrow={new Date().toLocaleDateString(locale === 'am' ? 'am-ET' : 'en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}
+        title={`${t(greeting())}, ${firstName(user?.full_name)}`}
         description={
           shifts.nextConfirmed
-            ? `Your next shift is ${formatDay(shifts.nextConfirmed.start).toLowerCase()} at ${shifts.nextConfirmed.event.location.split(',')[0]}.`
-            : 'Here’s your volunteering at a glance.'
+            ? t('Your next shift is {when} at {place}.', { when: t(formatDay(shifts.nextConfirmed.start)).toLowerCase(), place: shifts.nextConfirmed.event.location.split(',')[0] ?? '' })
+            : t('Here’s your volunteering at a glance.')
         }
         actions={
           <Button asChild variant="secondary">
             <Link to="/v/opportunities">
-              <Sparkles /> Find shifts
+              <Sparkles /> {t('Find shifts')}
             </Link>
           </Button>
         }
       />
 
       {needsConsent && (
-        <InlineAlert tone="warning" className="mb-6" title="Parental consent needed before you can join shifts" action={<Button asChild size="sm" variant="secondary"><Link to="/v/documents">Upload form</Link></Button>}>
-          Volunteers under 18 need a signed consent form verified by a coordinator.
+        <InlineAlert tone="warning" className="mb-6" title={t('Parental consent needed before you can join shifts')} action={<Button asChild size="sm" variant="secondary"><Link to="/v/documents">{t('Upload form')}</Link></Button>}>
+          {t('Volunteers under 18 need a signed consent form verified by a coordinator.')}
         </InlineAlert>
       )}
 
@@ -93,28 +97,28 @@ export default function VolunteerHomePage() {
         )}
 
         <Card className="flex flex-col items-center justify-center p-6 text-center">
-          <ProgressRing value={hours - prev} max={(next ?? hours) - prev || 1} size={152} thickness={9} ticks={30} label={`${hours} verified hours`}>
+          <ProgressRing value={hours - prev} max={(next ?? hours) - prev || 1} size={152} thickness={9} ticks={30} label={t('{h} verified hours', { h: hours })}>
             <div>
               <div className="type-display text-[40px] leading-none text-text">
                 <CountUp value={hours} decimals={hours % 1 ? 1 : 0} />
               </div>
-              <div className="type-eyebrow mt-1.5 !text-[10px]">verified hours</div>
+              <div className="type-eyebrow mt-1.5 !text-[10px]">{t('verified hours')}</div>
             </div>
           </ProgressRing>
           <p className="mt-5 text-sm text-muted">
             {next ? (
               <>
-                <span className="font-semibold text-text">{formatHours(next - hours)}</span> to your {next}-hour certificate
+                <span className="font-semibold text-text">{formatHours(next - hours)}</span> {t('to your {n}-hour certificate', { n: next })}
               </>
             ) : (
-              'Every milestone reached. Remarkable.'
+              t('Every milestone reached. Remarkable.')
             )}
           </p>
           {Boolean(impact.data?.pending_hours) && (
-            <p className="mt-1 text-xs text-faint">+{formatHours(impact.data!.pending_hours!)} waiting for coordinator review</p>
+            <p className="mt-1 text-xs text-faint">{t('+{h} waiting for coordinator review', { h: formatHours(impact.data!.pending_hours!) })}</p>
           )}
           <Button asChild variant="link" size="sm" className="mt-2">
-            <Link to="/v/impact">See your impact</Link>
+            <Link to="/v/impact">{t('See your impact')}</Link>
           </Button>
         </Card>
       </div>
@@ -124,7 +128,7 @@ export default function VolunteerHomePage() {
           <Stat icon={<Gauge />} label="Impact score" value={impact.data?.impact_score} decimals={1} suffix="/100" />
         </StaggerItem>
         <StaggerItem>
-          <Stat icon={<ShieldCheck />} label="Attendance" value={profile.data?.reliability.attendance_rate} suffix="%" hint={profile.data ? `${profile.data.reliability.on_time_rate}% on time` : undefined} />
+          <Stat icon={<ShieldCheck />} label="Attendance" value={profile.data?.reliability.attendance_rate} suffix="%" hint={profile.data ? t('{n}% on time', { n: profile.data.reliability.on_time_rate }) : undefined} />
         </StaggerItem>
         <StaggerItem>
           <Stat icon={<CalendarCheck2 />} label="Shifts completed" value={impact.data?.completed_shifts_count} />
@@ -139,12 +143,12 @@ export default function VolunteerHomePage() {
           <div className="mb-4 flex flex-wrap items-end justify-between gap-2">
             <div>
               <h2 id="matched-title" className="type-title text-lg text-text">
-                Matched to your skills
+                {t('Matched to your skills')}
               </h2>
-              <p className="mt-0.5 text-sm text-muted">Shifts you haven’t applied for, best fit first.</p>
+              <p className="mt-0.5 text-sm text-muted">{t('Shifts you haven’t applied for, best fit first.')}</p>
             </div>
             <Link to="/v/opportunities" className="inline-flex items-center gap-1 text-sm font-medium text-accent-text hover:underline">
-              All opportunities <ArrowRight className="size-4" />
+              {t('All opportunities')} <ArrowRight className="size-4" />
             </Link>
           </div>
           {events.isLoading ? (
@@ -160,18 +164,18 @@ export default function VolunteerHomePage() {
               ))}
             </div>
           ) : (
-            <Card className="p-8 text-center text-sm text-muted">You’ve applied to everything open right now. New shifts appear here as coordinators post them.</Card>
+            <Card className="p-8 text-center text-sm text-muted">{t('You’ve applied to everything open right now. New shifts appear here as coordinators post them.')}</Card>
           )}
         </section>
 
         <Card>
-          <CardHeader title="Announcements" eyebrow={<span className="inline-flex items-center gap-1.5"><Megaphone className="size-3.5" /> From your organizations</span>} />
+          <CardHeader title={t('Announcements')} eyebrow={<span className="inline-flex items-center gap-1.5"><Megaphone className="size-3.5" /> {t('From your organizations')}</span>} />
           <div className="divide-y divide-line px-5 pb-2 pt-3">
             {announcements.isLoading && <Skeleton className="my-3 h-16" />}
             {announcements.data?.items.slice(0, 3).map((a) => (
               <article key={a.id} className="min-w-0 py-3.5">
                 <h3 className="flex items-center gap-2 text-[14px] font-medium text-text">
-                  {!a.is_read && <span className="size-1.5 shrink-0 rounded-full bg-accent" aria-label="Unread" />}
+                  {!a.is_read && <span className="size-1.5 shrink-0 rounded-full bg-accent" aria-label={t('Unread')} />}
                   <span className="min-w-0 wrap-anywhere">{a.title}</span>
                 </h3>
                 <p className="mt-1 line-clamp-2 text-[13px] text-muted wrap-anywhere">{a.message}</p>
@@ -181,11 +185,11 @@ export default function VolunteerHomePage() {
                 </p>
               </article>
             ))}
-            {announcements.data?.items.length === 0 && <p className="py-6 text-center text-sm text-faint">No announcements yet.</p>}
+            {announcements.data?.items.length === 0 && <p className="py-6 text-center text-sm text-faint">{t('No announcements yet.')}</p>}
           </div>
           <div className="px-5 pb-4">
             <Button asChild variant="ghost" size="sm" className="w-full">
-              <Link to="/v/announcements">See all</Link>
+              <Link to="/v/announcements">{t('See all')}</Link>
             </Button>
           </div>
         </Card>

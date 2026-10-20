@@ -7,6 +7,7 @@ import type { CheckOutResult } from '@/shared/types/api';
 import { useMyShifts } from '../derived';
 import { usePresencePings } from '../presence';
 import { CheckOutDialog, CheckOutResultDialog } from './check-out-flow';
+import { useT } from '@/shared/i18n';
 
 function Elapsed({ since }: { since: string }) {
   const now = useNow(1000);
@@ -20,6 +21,7 @@ function Elapsed({ since }: { since: string }) {
 /** App-wide strip for a volunteer currently on shift: elapsed time, presence pings and check-out. */
 export function ActiveShiftBanner() {
   const { active } = useMyShifts();
+  const t = useT();
   const [confirm, setConfirm] = useState(false);
   const [result, setResult] = useState<CheckOutResult | null>(null);
   usePresencePings(active?.shift.id);
@@ -35,10 +37,10 @@ export function ActiveShiftBanner() {
                 <span className="relative size-2.5 rounded-full bg-success" />
               </span>
               <span className="min-w-0 flex-1 truncate text-[13.5px] text-text">
-                On shift · <span className="font-semibold">{active.event.title}</span> · <Elapsed since={active.attendance!.check_in_time} />
+                {t('On shift')} · <span className="font-semibold">{active.event.title}</span> · <Elapsed since={active.attendance!.check_in_time} />
               </span>
               <Button size="xs" variant="success" className="shrink-0" onClick={() => setConfirm(true)}>
-                <LogOut /> Check out
+                <LogOut /> {t('Check out')}
               </Button>
             </div>
           </motion.div>

@@ -6,6 +6,7 @@ import { Stagger, StaggerItem } from '@/shared/motion';
 import { useOpportunities, useVolunteerProfile } from '@/features/volunteer/api';
 import { useMyShifts } from '@/features/volunteer/derived';
 import { OpportunityCard, bestMatch } from '@/features/volunteer/components/opportunity-card';
+import { useT } from '@/shared/i18n';
 
 type Sort = 'match' | 'soonest' | 'open';
 type When = 'upcoming' | 'past';
@@ -21,13 +22,14 @@ export default function OpportunitiesPage() {
   const events = useOpportunities({ page, q: debounced || undefined, when, per_page: 12 });
   const profile = useVolunteerProfile();
   const shifts = useMyShifts();
+  const t = useT();
 
   useEffect(() => {
-    document.title = 'Opportunities · VolunTrack';
-  }, []);
+    document.title = `${t('Opportunities')} · VolunTrack`;
+  }, [t]);
   useEffect(() => {
-    const t = setTimeout(() => setDebounced(q.trim()), 350);
-    return () => clearTimeout(t);
+    const id = setTimeout(() => setDebounced(q.trim()), 350);
+    return () => clearTimeout(id);
   }, [q]);
 
   const applied = useMemo(() => new Set(shifts.rows.map((r) => r.shift.id)), [shifts.rows]);
@@ -52,9 +54,9 @@ export default function OpportunitiesPage() {
   return (
     <div className="min-w-0">
       <PageHeader
-        eyebrow="Opportunities"
-        title="Find a shift that fits you"
-        description={mySkills.length ? 'Every verified organization on VolunTrack, ranked by how well each shift matches your skills.' : 'Add skills to your profile and we’ll rank shifts by fit.'}
+        eyebrow={t('Opportunities')}
+        title={t('Find a shift that fits you')}
+        description={mySkills.length ? t('Every verified organization on VolunTrack, ranked by how well each shift matches your skills.') : t('Add skills to your profile and we’ll rank shifts by fit.')}
       />
 
       <div className="mb-6 flex min-w-0 flex-col gap-3 lg:flex-row lg:items-center">
@@ -64,10 +66,10 @@ export default function OpportunitiesPage() {
             setQ(e.target.value);
             if (page !== 1) go(1);
           }}
-          placeholder="Search events, places or descriptions"
+          placeholder={t('Search events, places or descriptions')}
           leading={<Search />}
           className="lg:w-80"
-          aria-label="Search opportunities"
+          aria-label={t('Search opportunities')}
         />
         <div className="-mx-1 flex min-w-0 flex-wrap items-center gap-2 px-1 lg:ml-auto">
           <Segmented
@@ -77,10 +79,10 @@ export default function OpportunitiesPage() {
               go(1);
             }}
             size="sm"
-            aria-label="Which events"
+            aria-label={t('Which events')}
             options={[
-              { value: 'upcoming', label: 'Open' },
-              { value: 'past', label: 'Past' },
+              { value: 'upcoming', label: t('Open') },
+              { value: 'past', label: t('Past') },
             ]}
           />
           <Segmented
@@ -93,15 +95,15 @@ export default function OpportunitiesPage() {
               });
             }}
             size="sm"
-            aria-label="Sort by"
+            aria-label={t('Sort by')}
             options={[
-              { value: 'match', label: 'Best match' },
-              { value: 'soonest', label: 'Soonest' },
-              { value: 'open', label: 'Most spots' },
+              { value: 'match', label: t('Best match') },
+              { value: 'soonest', label: t('Soonest') },
+              { value: 'open', label: t('Most spots') },
             ]}
           />
           <Button variant={mineOnly ? 'primary' : 'secondary'} size="sm" onClick={() => setMineOnly((m) => !m)} aria-pressed={mineOnly}>
-            <SlidersHorizontal /> 50%+ match
+            <SlidersHorizontal /> {t('50%+ match')}
           </Button>
         </div>
       </div>
@@ -117,8 +119,8 @@ export default function OpportunitiesPage() {
       ) : list.length === 0 ? (
         <EmptyState
           icon={<SearchX />}
-          title={debounced || mineOnly ? 'No shifts match these filters' : when === 'upcoming' ? 'No open events right now' : 'No past events'}
-          description={debounced || mineOnly ? 'Clear the search or the match filter to see more.' : 'New events appear here as soon as organizations publish them.'}
+          title={debounced || mineOnly ? t('No shifts match these filters') : when === 'upcoming' ? t('No open events right now') : t('No past events')}
+          description={debounced || mineOnly ? t('Clear the search or the match filter to see more.') : t('New events appear here as soon as organizations publish them.')}
           action={
             debounced || mineOnly ? (
               <Button
@@ -128,7 +130,7 @@ export default function OpportunitiesPage() {
                   setMineOnly(false);
                 }}
               >
-                Clear filters
+                {t('Clear filters')}
               </Button>
             ) : undefined
           }
@@ -144,15 +146,15 @@ export default function OpportunitiesPage() {
       )}
 
       {pagination && pagination.last_page > 1 && (
-        <nav className="mt-8 flex items-center justify-center gap-3" aria-label="Pagination">
+        <nav className="mt-8 flex items-center justify-center gap-3" aria-label={t('Pagination')}>
           <Button variant="secondary" size="sm" disabled={page <= 1} onClick={() => go(page - 1)}>
-            <ChevronLeft /> Previous
+            <ChevronLeft /> {t('Previous')}
           </Button>
           <span className="type-data text-sm text-muted">
             {pagination.current_page} / {pagination.last_page}
           </span>
           <Button variant="secondary" size="sm" disabled={page >= pagination.last_page} onClick={() => go(page + 1)}>
-            Next <ChevronRight />
+            {t('Next')} <ChevronRight />
           </Button>
         </nav>
       )}

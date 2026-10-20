@@ -38,6 +38,8 @@ export interface NavItem {
   end?: boolean;
   /** Shown in the mobile bottom bar (volunteer). */
   mobile?: boolean;
+  /** One-word label for the mobile bottom bar. */
+  short?: string;
   badgeKey?: 'applications' | 'documents' | 'hours';
 }
 
@@ -50,10 +52,10 @@ export const NAV: Record<Role, NavSection[]> = {
   Volunteer: [
     {
       items: [
-        { to: '/v', label: 'Home', icon: LayoutGrid, end: true, mobile: true },
-        { to: '/v/opportunities', label: 'Opportunities', icon: Sparkles, mobile: true },
-        { to: '/v/schedule', label: 'My schedule', icon: CalendarDays, mobile: true },
-        { to: '/v/assistant', label: 'VolunBot', icon: Bot, mobile: true },
+        { to: '/v', label: 'Home', icon: LayoutGrid, end: true, mobile: true, short: 'Home' },
+        { to: '/v/opportunities', label: 'Opportunities', icon: Sparkles, mobile: true, short: 'Explore' },
+        { to: '/v/schedule', label: 'My schedule', icon: CalendarDays, mobile: true, short: 'Schedule' },
+        { to: '/v/assistant', label: 'VolunBot', icon: Bot, mobile: true, short: 'VolunBot' },
       ],
     },
     {
@@ -68,7 +70,7 @@ export const NAV: Record<Role, NavSection[]> = {
       label: 'Account',
       items: [
         { to: '/v/announcements', label: 'Announcements', icon: Megaphone },
-        { to: '/v/profile', label: 'Profile & skills', icon: UserCircle2, mobile: true },
+        { to: '/v/profile', label: 'Profile & skills', icon: UserCircle2, mobile: true, short: 'Profile' },
       ],
     },
   ],

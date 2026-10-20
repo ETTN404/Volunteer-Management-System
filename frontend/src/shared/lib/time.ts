@@ -1,3 +1,4 @@
+import { t as tr } from '@/shared/i18n';
 import {
   differenceInMinutes,
   format,
@@ -34,8 +35,8 @@ export function toApiDate(date: Date): string {
 export function formatDay(value: string | Date | null | undefined): string {
   const d = typeof value === 'string' ? parseApiDate(value) : value;
   if (!d) return '—';
-  if (isToday(d)) return 'Today';
-  if (isTomorrow(d)) return 'Tomorrow';
+  if (isToday(d)) return tr('Today');
+  if (isTomorrow(d)) return tr('Tomorrow');
   return format(d, 'EEE, d MMM');
 }
 

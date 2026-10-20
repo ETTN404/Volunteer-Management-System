@@ -39,7 +39,7 @@
   --color-info-soft: var(--info-soft);
   --color-focus: var(--focus);
 
-  --font-display: 'Inter Tight Variable', 'Geist Variable', system-ui, sans-serif;
+  --font-display: 'Inter Tight Variable', 'Geist Variable', 'Noto Sans Ethiopic Variable', system-ui, sans-serif;
   --font-sans: 'Geist Variable', 'Noto Sans Ethiopic Variable', system-ui, sans-serif;
   --font-mono: 'Geist Mono Variable', ui-monospace, SFMono-Regular, Menlo, monospace;
   --font-ethiopic: 'Noto Sans Ethiopic Variable', 'Onest Variable', sans-serif;
@@ -126,7 +126,7 @@
     border-radius: 4px;
   }
 
-  [lang='am'], .font-ethiopic { font-family: var(--font-ethiopic); }
+  .font-ethiopic { font-family: var(--font-ethiopic); }
 
   input[type='number']::-webkit-inner-spin-button { opacity: 0.4; }
 

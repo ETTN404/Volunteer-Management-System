@@ -17,6 +17,8 @@ import { Sidebar, type NavBadges } from './sidebar';
 import { CommandPalette } from './command-palette';
 import { NotificationsPanel } from './notifications-panel';
 import { ThemeToggle } from './theme-toggle';
+import { LanguageToggle } from './language-toggle';
+import { useT } from '@/shared/i18n';
 import { ColdStartBanner } from './cold-start-banner';
 import { ActiveShiftBanner } from '@/features/volunteer/components/active-shift-banner';
 import { applyBrand } from '@/shared/lib/color';
@@ -51,6 +53,7 @@ export function WorkspaceLayout({ slot }: { slot?: ReactNode }) {
   const location = useLocation();
   // Captured per render so the exiting page keeps its own content during the transition.
   const outlet = useOutlet();
+  const t = useT();
 
   const theme = useResolvedTheme();
   // Tenant branding (G20): the organization's color becomes the workspace accent.
@@ -88,13 +91,13 @@ export function WorkspaceLayout({ slot }: { slot?: ReactNode }) {
   return (
     <div className="min-h-dvh bg-bg">
       <a href="#main" className="sr-only z-[70] rounded-md bg-accent px-3 py-2 text-accent-fg focus:not-sr-only focus:fixed focus:left-3 focus:top-3">
-        Skip to content
+        {t('Skip to content')}
       </a>
 
       {role === 'Coordinator' || role === 'OrgAdmin' ? <CoordinatorBadges>{(b) => sidebar(b)}</CoordinatorBadges> : sidebar({})}
 
       <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
-        <SheetContent title="Menu" side="left" width="sm" className="!p-0 lg:hidden">
+        <SheetContent title={t('Menu')} side="left" width="sm" className="!p-0 lg:hidden">
           <div className="-mx-6 -my-5 h-[calc(100dvh-81px)]">
             <Sidebar role={role} user={user} org={org} collapsed={false} mobile onNavigate={() => setMobileOpen(false)} />
           </div>
@@ -105,7 +108,7 @@ export function WorkspaceLayout({ slot }: { slot?: ReactNode }) {
         <ColdStartBanner />
         {/* Top bar */}
         <header className="sticky top-0 z-20 flex h-16 shrink-0 items-center gap-3 border-b border-line bg-bg/80 px-4 backdrop-blur-xl sm:px-6">
-          <Button variant="ghost" size="icon" className="lg:hidden" aria-label="Open menu" onClick={() => setMobileOpen(true)}>
+          <Button variant="ghost" size="icon" className="lg:hidden" aria-label={t('Open menu')} onClick={() => setMobileOpen(true)}>
             <MenuIcon />
           </Button>
 
@@ -114,7 +117,7 @@ export function WorkspaceLayout({ slot }: { slot?: ReactNode }) {
             className="group flex h-9 w-full max-w-sm items-center gap-2.5 rounded-md bg-sunken px-3 text-left text-[13px] text-faint shadow-[inset_0_0_0_1px_var(--line)] transition-shadow hover:shadow-[inset_0_0_0_1px_var(--line-strong)]"
           >
             <Search className="size-4" />
-            <span className="flex-1 truncate">Search or jump to…</span>
+            <span className="flex-1 truncate">{t('Search or jump to…')}</span>
             <span className="hidden items-center gap-1 sm:flex">
               <Kbd>Ctrl</Kbd>
               <Kbd>K</Kbd>
@@ -122,8 +125,9 @@ export function WorkspaceLayout({ slot }: { slot?: ReactNode }) {
           </button>
 
           <div className="ml-auto flex items-center gap-1">
+            <LanguageToggle className="mr-1 hidden sm:flex" />
             <ThemeToggle />
-            <Button variant="ghost" size="icon" aria-label={unread ? `Notifications, ${unread} unread` : 'Notifications'} onClick={() => setNotifOpen(true)} className="relative">
+            <Button variant="ghost" size="icon" aria-label={unread ? t('Notifications, {n} unread', { n: unread }) : t('Notifications')} onClick={() => setNotifOpen(true)} className="relative">
               <Bell />
               {unread > 0 && (
                 <span className="type-data absolute right-1 top-1 grid min-w-4 place-items-center rounded-full bg-accent px-1 text-[9.5px] font-bold leading-4 text-accent-fg">
@@ -133,7 +137,7 @@ export function WorkspaceLayout({ slot }: { slot?: ReactNode }) {
             </Button>
             <Menu>
               <MenuTrigger asChild>
-                <button className="ml-1 rounded-full focus-visible:outline-2 focus-visible:outline-focus" aria-label="Account menu">
+                <button className="ml-1 rounded-full focus-visible:outline-2 focus-visible:outline-focus" aria-label={t('Account menu')}>
                   <Avatar name={user.full_name} src={user.profile_photo_url} size="sm" />
                 </button>
               </MenuTrigger>
@@ -142,13 +146,13 @@ export function WorkspaceLayout({ slot }: { slot?: ReactNode }) {
                   <div className="truncate text-sm font-semibold text-text">{user.full_name}</div>
                   <div className="truncate text-xs text-faint">{user.email}</div>
                 </div>
-                <MenuLabel>{ROLE_LABEL[role]}</MenuLabel>
+                <MenuLabel>{t(ROLE_LABEL[role])}</MenuLabel>
                 <MenuItem onSelect={() => navigate('/account')}>
-                  <UserCircle2 /> Account & security
+                  <UserCircle2 /> {t('Account & security')}
                 </MenuItem>
                 <MenuSeparator />
                 <MenuItem danger onSelect={() => logout.mutate()}>
-                  <LogOut /> Sign out
+                  <LogOut /> {t('Sign out')}
                 </MenuItem>
               </MenuContent>
             </Menu>
@@ -191,7 +195,7 @@ export function WorkspaceLayout({ slot }: { slot?: ReactNode }) {
                   <>
                     {isActive && <motion.span layoutId="mobile-tab" className="absolute inset-0 rounded-xl bg-accent-soft" transition={{ type: 'spring', stiffness: 500, damping: 40 }} />}
                     <i.icon className="relative size-5" />
-                    <span className="relative">{i.label.split(' ')[0]}</span>
+                    <span className="relative">{t(i.short ?? i.label)}</span>
                   </>
                 )}
               </NavLink>

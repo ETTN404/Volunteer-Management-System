@@ -52,7 +52,7 @@ export const authApi = {
     http.post('/reset-password', input, { skipAuthRedirect: true }),
   changePassword: (input: { current_password: string; password: string; password_confirmation: string }) =>
     http.patch('/account/password', input),
-  updateAccount: async (input: { first_name?: string; last_name?: string; phone?: string | null }) =>
+  updateAccount: async (input: { first_name?: string; last_name?: string; phone?: string | null; sms_opt_in?: boolean; locale?: 'en' | 'am' }) =>
     (await http.patch<User>('/account', input)).data,
   invitation: async (token: string) => (await http.get<InvitationInfo>(`/invitations/${token}`, { skipAuthRedirect: true })).data,
   acceptInvitation: async (token: string, password: string) => {
@@ -61,6 +61,8 @@ export const authApi = {
   },
   resendInvitation: (email: string) => http.post('/invitations/resend', { email }, { skipAuthRedirect: true }),
   deletePhoto: () => http.delete('/account/photo'),
+  telegramLink: async () => (await http.post<{ url: string }>('/account/telegram')).data,
+  telegramUnlink: () => http.delete('/account/telegram'),
   uploadPhoto: async (file: File) => {
     const form = new FormData();
     form.append('photo', file);
@@ -186,4 +188,21 @@ export function useForgotPassword() {
 
 export function useResetPassword() {
   return useMutation({ mutationFn: authApi.resetPassword });
+}
+
+export function useTelegramLink() {
+  return useMutation({ mutationFn: authApi.telegramLink });
+}
+
+export function useTelegramUnlink() {
+  const qc = useQueryClient();
+  const user = useSessionStore((s) => s.user);
+  const setUser = useSessionStore((s) => s.setUser);
+  return useMutation({
+    mutationFn: authApi.telegramUnlink,
+    onSuccess: () => {
+      if (user) setUser({ ...user, telegram_linked: false });
+      qc.invalidateQueries({ queryKey: authKeys.me });
+    },
+  });
 }

@@ -6,12 +6,14 @@ import { humanizeSkill } from '@/shared/lib/format';
 import { Card, EventStatusBadge } from '@/shared/ui';
 import { MatchBadge } from './match-badge';
 import { OrgChip } from './org-chip';
+import { useT } from '@/shared/i18n';
 
 export function bestMatch(event: VmsEvent) {
   return Math.max(0, ...(event.shifts ?? []).map((s) => s.match_score ?? 0));
 }
 
 export function OpportunityCard({ event, appliedShiftIds, showOrg = true }: { event: VmsEvent; appliedShiftIds: Set<number>; showOrg?: boolean }) {
+  const t = useT();
   const shifts = event.shifts ?? [];
   const skills = [...new Set(shifts.flatMap((s) => s.required_skills))];
   const capacity = shifts.reduce((n, s) => n + s.capacity, 0);
@@ -21,7 +23,7 @@ export function OpportunityCard({ event, appliedShiftIds, showOrg = true }: { ev
 
   return (
     <Card interactive className="group relative flex h-full min-w-0 flex-col p-5">
-      <Link to={`/v/opportunities/${event.id}`} className="absolute inset-0 z-10 rounded-lg" aria-label={`Open ${event.title}`} />
+      <Link to={`/v/opportunities/${event.id}`} className="absolute inset-0 z-10 rounded-lg" aria-label={t('Open {title}', { title: event.title })} />
       <div className="flex items-start justify-between gap-3">
         <EventStatusBadge status={event.status} size="sm" />
         <MatchBadge score={bestMatch(event)} />
@@ -34,7 +36,7 @@ export function OpportunityCard({ event, appliedShiftIds, showOrg = true }: { ev
           <CalendarDays className="size-3.5 shrink-0 text-faint" />
           <span className="truncate">
             {formatDate(event.start_date, 'd MMM')}
-            {event.end_date !== event.start_date && ` – ${formatDate(event.end_date, 'd MMM')}`} · {shifts.length} {shifts.length === 1 ? 'shift' : 'shifts'}
+            {event.end_date !== event.start_date && ` – ${formatDate(event.end_date, 'd MMM')}`} · {shifts.length === 1 ? t('1 shift') : t('{n} shifts', { n: shifts.length })}
           </span>
         </div>
         <div className="flex min-w-0 items-center gap-2">
@@ -52,11 +54,11 @@ export function OpportunityCard({ event, appliedShiftIds, showOrg = true }: { ev
         <span className="ml-auto inline-flex items-center gap-1.5 text-[12px] text-muted">
           {appliedCount ? (
             <span className="font-medium text-accent-text">
-              Applied to {appliedCount} of {shifts.length}
+              {t('Applied to {a} of {n}', { a: appliedCount, n: shifts.length })}
             </span>
           ) : (
             <>
-              <Users className="size-3.5 text-faint" /> {open} open
+              <Users className="size-3.5 text-faint" /> {t('{n} open', { n: open })}
             </>
           )}
         </span>

@@ -2,6 +2,7 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import type { HTMLAttributes } from 'react';
 import { cn } from '@/shared/lib/cn';
 import type { AssignmentStatus, EventStatus } from '@/shared/types/api';
+import { useT } from '@/shared/i18n';
 
 export const badgeVariants = cva(
   'inline-flex items-center gap-1.5 whitespace-nowrap rounded-full font-medium leading-none [&_svg]:size-3',
@@ -47,6 +48,7 @@ export function Badge({ className, tone, size, dot, pulse, children, ...props }:
 const ASSIGNMENT: Record<AssignmentStatus, { tone: BadgeProps['tone']; label: string }> = {
   pending: { tone: 'warning', label: 'Awaiting review' },
   confirmed: { tone: 'success', label: 'Confirmed' },
+  waitlisted: { tone: 'info', label: 'On waitlist' },
   rejected: { tone: 'neutral', label: 'Not selected' },
   cancelled: { tone: 'neutral', label: 'Cancelled' },
   removed: { tone: 'danger', label: 'Removed from shift' },
@@ -60,19 +62,21 @@ const EVENT: Record<EventStatus, { tone: BadgeProps['tone']; label: string; puls
 };
 
 export function AssignmentBadge({ status, size }: { status: AssignmentStatus; size?: 'sm' | 'md' }) {
+  const t = useT();
   const s = ASSIGNMENT[status] ?? ASSIGNMENT.pending;
   return (
     <Badge tone={s.tone} size={size} dot>
-      {s.label}
+      {t(s.label)}
     </Badge>
   );
 }
 
 export function EventStatusBadge({ status, size }: { status: EventStatus; size?: 'sm' | 'md' }) {
+  const t = useT();
   const s = EVENT[status] ?? EVENT.upcoming;
   return (
     <Badge tone={s.tone} size={size} dot pulse={s.pulse}>
-      {s.label}
+      {t(s.label)}
     </Badge>
   );
 }
