@@ -28,7 +28,10 @@ class Event extends Model
         'start_date',
         'end_date',
         'status',
+        'geofence_radius',
     ];
+
+    public const STATUSES = ['upcoming', 'ongoing', 'completed', 'cancelled'];
 
     /**
      * Get the attributes that should be cast.

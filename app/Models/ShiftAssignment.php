@@ -22,7 +22,12 @@ class ShiftAssignment extends Model
         'status',
         'staff_notes',
         'assigned_at',
+        'coordinator_feedback',
+        'match_score',
     ];
+
+    /** pending → confirmed | rejected (coordinator) | cancelled (volunteer withdrew or shift removed) | removed (taken off a running shift). */
+    public const STATUSES = ['pending', 'confirmed', 'rejected', 'cancelled', 'removed'];
 
     /**
      * Get the attributes that should be cast.

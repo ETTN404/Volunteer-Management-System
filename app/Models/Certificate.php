@@ -18,6 +18,7 @@ class Certificate extends Model
      * @var list<string>
      */
     protected $fillable = [
+        'certificate_number',
         'volunteer_id',
         'org_id',
         'issued_date',

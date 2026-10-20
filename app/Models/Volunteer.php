@@ -20,6 +20,9 @@ class Volunteer extends Model
     protected $fillable = [
         'user_id',
         'skills',
+        'skills_verification',
+        'date_of_birth',
+        'parental_consent_verified',
         'availability',
         'total_hours',
         'impact_score',
@@ -35,6 +38,9 @@ class Volunteer extends Model
     {
         return [
             'skills' => 'array',
+            'skills_verification' => 'array',
+            'date_of_birth' => 'date',
+            'parental_consent_verified' => 'boolean',
             'availability' => 'array',
             'total_hours' => 'decimal:2',
             'impact_score' => 'decimal:2',
@@ -47,7 +53,51 @@ class Volunteer extends Model
      */
     public function user(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'user_id');
+        // Volunteers work across organizations — never hide their account behind the viewer's tenant scope.
+        return $this->belongsTo(User::class, 'user_id')->withoutGlobalScope(Scopes\TenantScope::class);
+    }
+
+    public function isMinor(): bool
+    {
+        return $this->date_of_birth !== null && $this->date_of_birth->age < 18;
+    }
+
+    /**
+     * Organizations this volunteer is connected to: their home org plus every org
+     * whose shifts they applied to or worked.
+     *
+     * @return array<int>
+     */
+    public function engagedOrgIds(): array
+    {
+        $fromShifts = ShiftAssignment::where('volunteer_id', $this->id)
+            ->join('shifts', 'shift_assignments.shift_id', '=', 'shifts.id')
+            ->join('events', 'shifts.event_id', '=', 'events.id')
+            ->distinct()
+            ->pluck('events.org_id')
+            ->all();
+
+        $home = $this->user?->org_id;
+
+        return array_values(array_unique(array_filter(array_merge($fromShifts, [$home]))));
+    }
+
+    /** Volunteers an organization may see: members, or anyone who applied to its shifts. */
+    public function scopeEngagedWith($query, int $orgId)
+    {
+        return $query->where(function ($q) use ($orgId) {
+            $q->whereIn('volunteers.user_id', User::withoutGlobalScopes()->where('org_id', $orgId)->select('id'))
+              ->orWhereIn('volunteers.id', ShiftAssignment::query()
+                  ->join('shifts', 'shift_assignments.shift_id', '=', 'shifts.id')
+                  ->join('events', 'shifts.event_id', '=', 'events.id')
+                  ->where('events.org_id', $orgId)
+                  ->select('shift_assignments.volunteer_id'));
+        });
+    }
+
+    public function documents(): HasMany
+    {
+        return $this->hasMany(VolunteerDocument::class, 'volunteer_id');
     }
 
     /**

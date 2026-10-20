@@ -17,15 +17,51 @@ class User extends Authenticatable
     use HasApiTokens, HasFactory, Notifiable, SoftDeletes, BelongsToTenant;
 
     /**
+     * Keep full_name and first/last name in sync whichever one was written.
+     */
+    protected static function booted(): void
+    {
+        static::saving(function (User $user) {
+            if ($user->isDirty(['first_name', 'last_name']) && ($user->first_name || $user->last_name)) {
+                $user->full_name = trim(($user->first_name ?? '') . ' ' . ($user->last_name ?? ''));
+            } elseif ($user->isDirty('full_name')) {
+                $parts = preg_split('/\s+/', trim((string) $user->full_name), 2);
+                $user->first_name = $parts[0] ?? null;
+                $user->last_name  = $parts[1] ?? null;
+            }
+        });
+    }
+
+    public function organization(): BelongsTo
+    {
+        return $this->belongsTo(Organization::class, 'org_id');
+    }
+
+    /** True when the user's organization blocks access (suspended or inactive). */
+    public function organizationBlocked(): ?string
+    {
+        if ($this->org_id === null) {
+            return null;
+        }
+        $status = Organization::whereKey($this->org_id)->value('status');
+        return in_array($status, ['suspended', 'inactive'], true) ? $status : null;
+    }
+
+    /**
      * The attributes that are mass assignable.
      *
      * @var list<string>
      */
     protected $fillable = [
         'org_id',
+        'first_name',
+        'last_name',
         'full_name',
         'email',
+        'phone',
+        'email_verified_at',
         'password',
+        'must_change_password',
         'role',
         'last_login',
         'profile_photo_path',
@@ -51,17 +87,13 @@ class User extends Authenticatable
     {
         return [
             'last_login' => 'datetime',
+            'email_verified_at' => 'datetime',
+            'must_change_password' => 'boolean',
+            'is_active' => 'boolean',
             'password' => 'hashed',
         ];
     }
 
-    /**
-     * Get the organization that owns the user.
-     */
-    public function organization(): BelongsTo
-    {
-        return $this->belongsTo(Organization::class, 'org_id');
-    }
 
     /**
      * Get the volunteer profile associated with the user.

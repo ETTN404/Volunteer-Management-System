@@ -23,8 +23,10 @@ class Announcement extends Model
         'title',
         'message',
         'target_audience',
+        'kind',
+        'shift_id',
+        'recipients_count',
     ];
-
     /**
      * Get the organization that owns the announcement.
      */
@@ -38,6 +40,6 @@ class Announcement extends Model
      */
     public function author(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'posted_by');
+        return $this->belongsTo(User::class, 'posted_by')->withoutGlobalScopes();
     }
 }

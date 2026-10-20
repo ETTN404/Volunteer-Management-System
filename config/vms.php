@@ -68,4 +68,41 @@ return [
     'events_per_page' => 15,
     'report_per_page' => 50,
 
+    /*
+    |--------------------------------------------------------------------------
+    | Frontend, invitations & notifications
+    |--------------------------------------------------------------------------
+    */
+    'frontend_url'          => env('FRONTEND_URL') ? rtrim(env('FRONTEND_URL'), '/') : null,
+    'invitation_hours'      => (int) env('VMS_INVITATION_HOURS', 72),
+    'notify_mail'           => (bool) env('VMS_NOTIFY_MAIL', false),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Attendance policy defaults (each organization can override in settings)
+    |--------------------------------------------------------------------------
+    |
+    | qr_window_seconds      — rotating QR tokens change every N seconds; the
+    |                          current and previous token are accepted.
+    | early_checkout_minutes — leaving more than N minutes before the shift
+    |                          ends needs a reason and alerts coordinators.
+    | undo_checkout_minutes  — a volunteer can resume a mistaken check-out.
+    | auto_checkout_grace    — open check-ins are closed at shift end once
+    |                          this many minutes have passed after the end.
+    | max_gps_accuracy       — readings less precise than this are refused.
+    | ping_interval_minutes  — presence pings while on shift.
+    */
+    'attendance' => [
+        'checkin_before_minutes' => 15,
+        'checkin_after_minutes'  => 30,
+        'qr_window_seconds'      => 30,
+        'early_checkout_minutes' => 15,
+        'undo_checkout_minutes'  => 10,
+        'auto_checkout_grace'    => 30,
+        'max_gps_accuracy'       => 150,
+        'ping_interval_minutes'  => 5,
+        'require_qr'             => true,
+        'auto_verify_hours'      => false,
+    ],
+
 ];

@@ -21,6 +21,9 @@ class Report extends Model
         'org_id',
         'generated_by',
         'period',
+        'period_start',
+        'period_end',
+        'summary',
         'total_volunteers',
         'total_hours',
         'file_path',
@@ -37,6 +40,7 @@ class Report extends Model
         return [
             'total_volunteers' => 'integer',
             'total_hours' => 'decimal:2',
+            'summary' => 'array',
         ];
     }
 
