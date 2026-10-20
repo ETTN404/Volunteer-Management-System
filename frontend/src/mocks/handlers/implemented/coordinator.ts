@@ -22,11 +22,12 @@ export const coordinatorHandlers = [
         title: { required: true, type: 'string', max: 150 },
         description: { type: 'string', max: 5000, nullable: true },
         location: { required: true, type: 'string', max: 255 },
-        latitude: { type: 'number', min: -90, max: 90, nullable: true },
-        longitude: { type: 'number', min: -180, max: 180, nullable: true },
+        latitude: { required: true, type: 'number', min: -90, max: 90 },
+        longitude: { required: true, type: 'number', min: -180, max: 180 },
         start_date: { required: true, type: 'date', custom: (v) => (new Date(String(v)) < today() ? 'The start date field must be a date after or equal to today.' : null) },
         end_date: { required: true, type: 'date', custom: (v, all) => (String(v) < String(all.start_date) ? 'The end date field must be a date after or equal to start date.' : null) },
-        geofence_radius: { type: 'integer', min: 50, max: 5000, nullable: true },
+        geofence_radius: { type: 'integer', min: 30, max: 5000, nullable: true },
+        shifts: { type: 'array', nullable: true },
       });
       if (invalid) return invalid;
       const row: EventRow = {
@@ -44,7 +45,21 @@ export const coordinatorHandlers = [
         created_at: nowIso(),
       };
       db.t.events.push(row);
-      return ok(res.event(row), 'Event created successfully.', 201);
+      for (const sh of (b.shifts as Record<string, unknown>[] | undefined) ?? []) {
+        const utc = (x: string) => `${x.replace(' ', 'T')}.000Z`;
+        db.t.shifts.push({
+          id: nextId(db.t.shifts),
+          event_id: row.id,
+          start_time: utc(String(sh.start_time)),
+          end_time: utc(String(sh.end_time)),
+          required_skills: (sh.required_skills as string[]) ?? [],
+          capacity: Number(sh.capacity),
+          qr_code_signature: Math.random().toString(16).slice(2),
+          qr_expires_at: null,
+          created_at: nowIso(),
+        } as ShiftRow);
+      }
+      return ok(res.event(row, { shifts: true }), 'Event created successfully.', 201);
     }),
   ),
 
@@ -178,15 +193,16 @@ export const coordinatorHandlers = [
       if (!a) return fail('Target database resource not found.', 404);
       if (find.eventOfShift(a.shift_id)?.org_id !== ctx.actor.user.org_id) return fail('Unauthorized action.', 403);
       const b = await body(ctx.request);
-      const invalid = validate(b, { status: { required: true, in: ['confirmed', 'cancelled'] } });
+      const invalid = validate(b, { status: { required: true, in: ['confirmed', 'rejected', 'cancelled'] } });
+      if (b.status === 'cancelled') b.status = 'rejected';
       if (invalid) return invalid;
       if (b.status === 'confirmed') {
         const shift = find.shift(a.shift_id)!;
         if (confirmedCount(shift.id) >= shift.capacity) return fail('Shift capacity has already been reached.');
       }
-      a.status = b.status as 'confirmed' | 'cancelled';
+      a.status = b.status as 'confirmed' | 'rejected';
       a.assigned_at = a.status === 'confirmed' ? nowIso() : null;
-      a.decline_reason = a.status === 'cancelled' ? ((b.reason as string) ?? null) : null; // PENDING-BE G15
+      a.decline_reason = a.status === 'rejected' ? ((b.reason as string) ?? null) : null;
       const v = find.volunteer(a.volunteer_id);
       if (v && a.status === 'confirmed') {
         const e = find.eventOfShift(a.shift_id)!;
@@ -224,8 +240,9 @@ export const coordinatorHandlers = [
       if (!a) return fail('Target database resource not found.', 404);
       if (find.eventOfShift(a.shift_id)?.org_id !== ctx.actor.user.org_id) return fail('Unauthorized action.', 403);
       const b = await body(ctx.request);
-      const invalid = validate(b, { signature_data: { required: true, type: 'string' } });
-      if (invalid) return invalid;
+      if (!b.signature_data && !b.id_verified) {
+        return json({ message: 'The signature data field is required when id verified is not present.', errors: { signature_data: ['The signature data field is required when id verified is not present.'] } }, 422);
+      }
       if (db.t.attendances.some((x) => x.shift_id === a.shift_id && x.volunteer_id === a.volunteer_id && !x.check_out_time)) {
         return fail('Volunteer is already checked in to this shift.');
       }
@@ -238,14 +255,83 @@ export const coordinatorHandlers = [
         qr_verified: false,
         latitude: null,
         longitude: null,
-        signature_data: String(b.signature_data),
+        signature_data: b.signature_data ? String(b.signature_data) : null,
         hours_status: 'pending' as const,
         verified_hours: null,
         created_at: nowIso(),
+        check_in_method: 'manual' as const,
+        flags: ['manual_check_in', ...(b.id_verified ? ['id_checked'] : [])],
       };
       db.t.attendances.push(row);
       audit('attendance.force_checkin', ctx.actor.user, { type: 'Attendance', id: row.id }, null, { reason: (b.reason as string) ?? 'Coordinator override' });
-      return ok(row, 'Coordinator Override Check-in completed. Hand-drawn signature captured.', 201);
+      return ok(res.attendance(row), 'Coordinator check-in recorded.', 201);
+    }),
+  ),
+
+  http.post(
+    api('/coordinator/attendance/:attendanceId/check-out'),
+    authed(staff, async (ctx) => {
+      const a = db.t.attendances.find((x) => x.id === param(ctx, 'attendanceId'));
+      if (!a || find.eventOfShift(a.shift_id)?.org_id !== ctx.actor.user.org_id) return fail('Target database resource not found.', 404);
+      if (a.check_out_time) return fail('This volunteer is already checked out.', 422, { code: 'already_checked_out' });
+      const b = await body(ctx.request);
+      a.check_out_time = nowIso();
+      a.check_out_method = 'manual';
+      a.check_out_reason = (b.reason as string) ?? null;
+      return ok(res.attendance(a), 'Volunteer checked out.');
+    }),
+  ),
+
+  http.get(
+    api('/coordinator/shifts/:shiftId/qrcode'),
+    authed(staff, (ctx) => {
+      const s = find.shift(param(ctx, 'shiftId'));
+      if (!s) return fail('Target database resource not found.', 404);
+      const win = Math.floor(Date.now() / 30_000);
+      const token = `VT1.${s.id}.${win}.${(s.qr_code_signature ?? 'x').slice(0, 20)}`;
+      s.qr_code_signature = s.qr_code_signature ?? Math.random().toString(16).slice(2);
+      return json({
+        status: 'success',
+        qr_code_signature: s.qr_code_signature,
+        expires_at: dateTimeString(new Date((win + 2) * 30_000).toISOString()),
+        data: { token: s.qr_code_signature, period_seconds: 30, rotates_at: new Date((win + 1) * 30_000).toISOString(), valid_until: new Date((win + 2) * 30_000).toISOString(), _demo: token },
+      });
+    }),
+  ),
+
+  http.get(
+    api('/coordinator/shifts/:shiftId/candidates'),
+    authed(staff, (ctx) => {
+      const s = find.shift(param(ctx, 'shiftId'));
+      if (!s) return fail('Target database resource not found.', 404);
+      const taken = new Set(db.t.assignments.filter((a) => a.shift_id === s.id && a.status === 'confirmed').map((a) => a.volunteer_id));
+      const vols = db.t.volunteers.filter((v) => find.user(v.user_id)?.org_id === ctx.actor.user.org_id && !taken.has(v.id));
+      return ok(vols.map((v) => ({ volunteer: res.volunteer(v, { user: true }), match_score: 100, applied: null })));
+    }),
+  ),
+
+  http.post(
+    api('/coordinator/shifts/:shiftId/assign'),
+    authed(staff, async (ctx) => {
+      const s = find.shift(param(ctx, 'shiftId'));
+      if (!s) return fail('Target database resource not found.', 404);
+      const b = await body(ctx.request);
+      const existing = db.t.assignments.find((a) => a.shift_id === s.id && a.volunteer_id === Number(b.volunteer_id));
+      if (existing) existing.status = 'confirmed';
+      else db.t.assignments.push({ id: nextId(db.t.assignments), shift_id: s.id, volunteer_id: Number(b.volunteer_id), status: 'confirmed', assigned_at: nowIso(), created_at: nowIso(), decline_reason: null } as never);
+      return ok({}, 'Volunteer added to the shift.', 201);
+    }),
+  ),
+
+  http.post(
+    api('/coordinator/applications/:assignmentId/remove'),
+    authed(staff, async (ctx) => {
+      const a = find.assignment(param(ctx, 'assignmentId'));
+      if (!a) return fail('Target database resource not found.', 404);
+      const b = await body(ctx.request);
+      a.status = 'removed' as never;
+      a.decline_reason = (b.reason as string) ?? null;
+      return ok({}, 'Volunteer removed from the shift.');
     }),
   ),
 
@@ -267,9 +353,32 @@ export const coordinatorHandlers = [
     api('/coordinator/volunteers'),
     authed(staff, ({ actor, url }) => {
       const page = Number(url.searchParams.get('page') ?? 1);
-      const vols = db.t.volunteers.filter((v) => find.user(v.user_id)?.org_id === actor.user.org_id);
-      const { items, pagination } = paginate(vols, page, 15);
-      return ok(items.map((v) => res.volunteer(v, { user: true })), undefined, 200, { pagination });
+      const orgShiftIds = db.t.shifts.filter((sh) => find.event(sh.event_id)?.org_id === actor.user.org_id).map((sh) => sh.id);
+      const applied = new Set(db.t.assignments.filter((a) => orgShiftIds.includes(a.shift_id)).map((a) => a.volunteer_id));
+      const vols = db.t.volunteers.filter((v) => find.user(v.user_id)?.org_id === actor.user.org_id || applied.has(v.id));
+      const { items, pagination } = paginate(vols, page, Number(url.searchParams.get('per_page') ?? 25));
+      return ok(
+        items.map((v) => {
+          const mine = db.t.assignments.filter((a) => a.volunteer_id === v.id && orgShiftIds.includes(a.shift_id));
+          const att = db.t.attendances.filter((a) => a.volunteer_id === v.id && orgShiftIds.includes(a.shift_id));
+          return {
+            ...res.volunteer(v, { user: true }),
+            relationship: find.user(v.user_id)?.org_id === actor.user.org_id ? 'member' : 'applicant',
+            org_stats: {
+              pending_applications: mine.filter((a) => a.status === 'pending').length,
+              upcoming_shifts: mine.filter((a) => a.status === 'confirmed' && new Date(find.shift(a.shift_id)!.end_time) > new Date()).length,
+              shifts_worked: att.filter((a) => a.check_out_time).length,
+              hours_here: Math.round(att.reduce((n, a) => n + (a.verified_hours ?? 0), 0) * 100) / 100,
+              hours_pending: Math.round(att.filter((a) => a.check_out_time && a.hours_status === 'pending').reduce((n, a) => n + (new Date(a.check_out_time!).getTime() - new Date(a.check_in_time).getTime()) / 3_600_000, 0) * 100) / 100,
+              last_shift_at: att.map((a) => a.check_in_time).sort().at(-1) ?? null,
+              on_shift_now: att.some((a) => !a.check_out_time),
+            },
+          };
+        }),
+        undefined,
+        200,
+        { pagination },
+      );
     }),
   ),
 
@@ -278,7 +387,7 @@ export const coordinatorHandlers = [
     authed(staff, (ctx) => {
       const v = find.volunteer(param(ctx, 'volunteerId'));
       if (!v || find.user(v.user_id)?.org_id !== ctx.actor.user.org_id) return fail('Target database resource not found.', 404);
-      return ok(profilePayload(v.id));
+      return ok({ ...profilePayload(v.id), relationship: 'member', history: [] });
     }),
   ),
 
@@ -308,7 +417,7 @@ export const coordinatorHandlers = [
     api('/coordinator/reports'),
     authed(staff, async ({ request, actor }) => {
       const b = await body(request);
-      const invalid = validate(b, { period: { required: true, type: 'string', max: 50 }, async: { type: 'boolean' } });
+      const invalid = validate(b, { period: { required: true, type: 'string', max: 50 }, async: { type: 'boolean' }, from: { type: 'date', nullable: true }, to: { type: 'date', nullable: true } });
       if (invalid) return invalid;
       if (b.async) return json({ status: 'success', message: 'Impact report compilation queued in background worker. PII will be anonymized.' }, 202);
       const orgVolIds = db.t.volunteers.filter((v) => find.user(v.user_id)?.org_id === actor.user.org_id).map((v) => v.id);
@@ -350,7 +459,8 @@ export const coordinatorHandlers = [
       const row = { id: nextId(db.t.announcements), org_id: actor.user.org_id!, posted_by: actor.user.id, title: String(b.title), message: String(b.message), target_audience: b.target_audience as 'all', created_at: nowIso() };
       db.t.announcements.unshift(row);
       audit('announcement.created', actor.user, { type: 'Announcement', id: row.id }, null, { title: row.title });
-      return ok(res.announcement(row, false), 'Announcement posted successfully.', 201);
+      const recipients = db.t.users.filter((u) => u.org_id === actor.user.org_id && u.id !== actor.user.id).length;
+      return ok({ ...res.announcement(row, false), recipients_count: recipients }, `Announcement posted and delivered to ${recipients} people.`, 201);
     }),
   ),
 
@@ -369,7 +479,7 @@ export const coordinatorHandlers = [
         db.t.notifications.unshift({ id: `n-${Date.now()}-${v.id}`, user_id: v.user_id, type: 'shift_broadcast', title: `Urgent: ${e.title} needs you`, body: `A shift on ${dateTimeString(s.start_time).slice(0, 16)} matches your skills.`, action_url: `/v/opportunities/${e.id}`, read_at: null, created_at: nowIso() });
       }
       audit('shift.urgent_broadcast', ctx.actor.user, { type: 'Shift', id: s.id });
-      return json({ status: 'success', message: 'Urgent shift broadcast queued successfully in background queue.', data: { shift_id: s.id, event: e.title, start_time: s.start_time } }, 202);
+      return json({ status: 'success', message: `Urgent alert sent to ${matches.length} volunteer(s).`, data: { shift_id: s.id, event: e.title, start_time: s.start_time, notified: matches.length } }, 202);
     }),
   ),
 
@@ -379,8 +489,8 @@ export const coordinatorHandlers = [
       const page = Number(url.searchParams.get('page') ?? 1);
       // Controller returns every announcement of the org (no audience filter).
       const rows = db.t.announcements.filter((a) => a.org_id === actor.user.org_id).sort((a, b) => b.created_at.localeCompare(a.created_at));
-      const { items, pagination } = paginate(rows, page, 15);
-      return ok(items.map((a) => res.announcement(a, false)), undefined, 200, { pagination });
+      const { items, pagination } = paginate(rows, page, Number(url.searchParams.get('per_page') ?? 20));
+      return ok(items.map((a) => ({ ...res.announcement(a, false), is_read: false, kind: 'general' })), undefined, 200, { pagination, unread_count: rows.length });
     }),
   ),
 ];

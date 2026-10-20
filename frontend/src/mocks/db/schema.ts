@@ -74,7 +74,7 @@ export interface AssignmentRow {
   id: number;
   shift_id: number;
   volunteer_id: number;
-  status: 'pending' | 'confirmed' | 'cancelled';
+  status: 'pending' | 'confirmed' | 'rejected' | 'cancelled' | 'removed';
   assigned_at: string | null;
   decline_reason: string | null;
   created_at: string;
@@ -93,6 +93,11 @@ export interface AttendanceRow {
   hours_status: 'pending' | 'verified' | 'adjusted' | 'rejected';
   verified_hours: number | null;
   created_at: string;
+  check_in_method?: 'self' | 'manual';
+  check_out_method?: 'self' | 'manual' | 'auto' | null;
+  check_out_reason?: string | null;
+  verification_note?: string | null;
+  flags?: string[];
 }
 
 export interface CertificateRow {

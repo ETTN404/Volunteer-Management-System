@@ -152,7 +152,10 @@ export const volunteerHandlers = [
       const rows = db.t.assignments
         .filter((a) => a.volunteer_id === actor.volunteer!.id)
         .sort((a, b) => b.created_at.localeCompare(a.created_at))
-        .map((a) => res.assignment(a, { shift: true, shiftEvent: true }));
+        .map((a) => {
+          const att = db.t.attendances.filter((x) => x.shift_id === a.shift_id && x.volunteer_id === a.volunteer_id).at(-1);
+          return { ...res.assignment(a, { shift: true, shiftEvent: true }), attendance: att ? res.attendance(att) : null };
+        });
       return ok(rows);
     }),
   ),
@@ -164,6 +167,7 @@ export const volunteerHandlers = [
       const invalid = validate(b, {
         shift_id: { required: true, custom: (v) => (find.shift(Number(v)) ? null : 'The selected shift id is invalid.') },
         qr_code_signature: { required: true, type: 'string' },
+        accuracy: { type: 'number', min: 0 },
         latitude: { required: true, type: 'number', min: -90, max: 90 },
         longitude: { required: true, type: 'number', min: -180, max: 180 },
         client_timestamp: { required: true, type: 'date' },
@@ -172,24 +176,24 @@ export const volunteerHandlers = [
 
       const clientTime = new Date(String(b.client_timestamp));
       if (Math.abs(Date.now() - clientTime.getTime()) / 60_000 > 2) {
-        return fail('Security Error: High time-drift detected. Ensure your device clock is synced accurately to the network.');
+        return fail('Security Error: High time-drift detected. Ensure your device clock is synced accurately to the network.', 422, { code: 'clock_drift' });
       }
       const shift = find.shift(Number(b.shift_id))!;
       const v = actor.volunteer!;
       const assignment = db.t.assignments.find((a) => a.shift_id === shift.id && a.volunteer_id === v.id && a.status === 'confirmed');
-      if (!assignment) return fail('Security Gate: You are not scheduled or approved for this shift.', 403);
-      if (db.t.attendances.some((a) => a.shift_id === shift.id && a.volunteer_id === v.id && !a.check_out_time)) {
-        return fail('You are already checked in to this shift.');
-      }
+      if (!assignment) return fail('Security Gate: You are not scheduled or approved for this shift.', 403, { code: 'not_confirmed' });
+      const existing = db.t.attendances.find((a) => a.shift_id === shift.id && a.volunteer_id === v.id);
+      if (existing && !existing.check_out_time) return fail('You are already checked in to this shift.', 409, { code: 'already_checked_in', attendance: res.attendance(existing) });
+      if (existing) return fail('You already checked out of this shift. Use "Resume shift" within 10 minutes, or ask the coordinator to check you back in.', 409, { code: 'already_checked_out' });
       const start = new Date(shift.start_time).getTime();
       const opens = start - 15 * 60_000;
       const closes = start + 30 * 60_000;
       if (Date.now() < opens || Date.now() > closes) {
         const t = (ms: number) => dateTimeString(new Date(ms).toISOString()).slice(11);
-        return fail(`Check-in is unavailable. Check-in window is open between ${t(opens)} and ${t(closes)}.`);
+        return fail(`Check-in is unavailable. Check-in window is open between ${t(opens)} and ${t(closes)}.`, 422, { code: 'outside_window' });
       }
       if (shift.qr_code_signature !== b.qr_code_signature || (shift.qr_expires_at && new Date(shift.qr_expires_at) < new Date())) {
-        return fail('Validation Failed: Scanned QR code signature is invalid or has expired.');
+        return fail('Validation Failed: Scanned QR code signature is invalid or has expired.', 422, { code: 'qr_invalid' });
       }
       const event = find.event(shift.event_id)!;
       if (event.latitude != null && event.longitude != null) {
@@ -198,9 +202,14 @@ export const volunteerHandlers = [
           { latitude: event.latitude, longitude: event.longitude },
           event.geofence_radius,
         );
+        if (b.accuracy != null && Number(b.accuracy) > Math.max(150, event.geofence_radius)) {
+          return fail(`Your GPS signal is too weak (±${Math.round(Number(b.accuracy))} m). Step outside and try again.`, 422, { code: 'gps_inaccurate' });
+        }
         if (!g.inside) {
           return fail(
             `Location Blocked: You must be present at the physical venue to check in. You are ${g.distance.toFixed(1)} meters away (Geofence limit: ${event.geofence_radius} meters).`,
+            422,
+            { code: 'outside_geofence', distance_m: Math.round(g.distance * 10) / 10 },
           );
         }
       }
@@ -217,6 +226,8 @@ export const volunteerHandlers = [
         hours_status: 'pending',
         verified_hours: null,
         created_at: nowIso(),
+        check_in_method: 'self',
+        flags: [],
       };
       db.t.attendances.push(row);
       return ok(res.attendance(row), 'Check-in verified successfully. Welcome to your shift!', 201);
@@ -231,39 +242,51 @@ export const volunteerHandlers = [
       if (invalid) return invalid;
       const v = actor.volunteer!;
       const att = db.t.attendances.find((a) => a.shift_id === Number(b.shift_id) && a.volunteer_id === v.id && !a.check_out_time);
-      if (!att) return fail('No active check-in record found for this shift.', 404);
-      const out = new Date();
-      att.check_out_time = out.toISOString();
-      const hours = Math.round(((out.getTime() - new Date(att.check_in_time).getTime()) / 3_600_000) * 100) / 100;
+      if (!att) return fail('No active check-in record found for this shift.', 404, { code: 'not_checked_in' });
       const shift = find.shift(att.shift_id)!;
-
-      let multiplier = 1;
-      if (shift.required_skills.length >= 3) multiplier += 0.2;
-      if (att.check_in_time <= shift.start_time) multiplier += 0.15;
-      const r = reliability(v.id);
-      if (r.attendance_rate >= 90) multiplier += 0.1;
-      const increment = Math.min(Math.round(hours * 0.1 * multiplier * 100) / 100, Math.max(0, 100 - v.impact_score));
-
-      const prev = v.total_hours;
-      v.total_hours = Math.round((prev + hours) * 100) / 100;
-      v.impact_score = Math.min(100, Math.round((v.impact_score + increment) * 100) / 100);
-      const milestones = CERTIFICATE_MILESTONES.filter((m) => prev < m && v.total_hours >= m);
-      for (const m of milestones) {
-        const id = nextId(db.t.certificates);
-        db.t.certificates.push({ id, volunteer_id: v.id, org_id: actor.user.org_id ?? 1, issued_date: nowIso().slice(0, 10), milestone_hours: m, file_path: `storage/certificates/VMS-${String(id).padStart(5, '0')}.pdf`, created_at: nowIso() });
+      const out = new Date();
+      const minutesEarly = Math.round((new Date(shift.end_time).getTime() - out.getTime()) / 60_000);
+      const reason = String(b.reason ?? '').trim();
+      if (minutesEarly > 15 && !reason) {
+        return fail(`You are leaving before the shift ends. Tell your coordinator why.`, 422, { code: 'reason_required', minutes_early: minutesEarly });
       }
+      att.check_out_time = out.toISOString();
+      att.check_out_method = 'self';
+      att.check_out_reason = reason || null;
+      if (minutesEarly > 15) att.flags = [...new Set([...(att.flags ?? []), 'left_early'])];
+      const hours = Math.round(((out.getTime() - new Date(att.check_in_time).getTime()) / 3_600_000) * 100) / 100;
+      // Hours are credited when a coordinator verifies them.
       return ok(
         {
+          ...res.attendance(att),
           check_in: dateTimeString(att.check_in_time),
           check_out: dateTimeString(att.check_out_time),
           hours_logged: hours,
           cumulative_hours: v.total_hours,
           impact_score: v.impact_score,
-          milestones_reached: milestones,
         },
         'Check-out completed. Thank you for your service!',
       );
     }),
+  ),
+
+  http.post(
+    api('/volunteer/check-out/undo'),
+    authed(['Volunteer'], async ({ request, actor }) => {
+      const b = await body(request);
+      const att = db.t.attendances.filter((a) => a.shift_id === Number(b.shift_id) && a.volunteer_id === actor.volunteer!.id && a.check_out_time).at(-1);
+      if (!att || !res.attendance(att).can_resume) return fail('It is too late to resume this shift yourself. Ask the coordinator to check you back in.', 422, { code: 'resume_expired' });
+      att.check_out_time = null;
+      att.check_out_method = null;
+      att.check_out_reason = null;
+      att.flags = [...new Set([...(att.flags ?? []).filter((f) => f !== 'left_early'), 'resumed'])];
+      return ok(res.attendance(att), 'You are back on shift.');
+    }),
+  ),
+
+  http.post(
+    api('/volunteer/attendance/ping'),
+    authed(['Volunteer'], () => ok({ inside: true, distance_m: 0, stored: true })),
   ),
 
   http.get(

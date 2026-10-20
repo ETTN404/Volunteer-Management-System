@@ -18,6 +18,7 @@ import type {
   Attendance,
   Certificate,
   Organization,
+  PlanKey,
   Report,
   Shift,
   ShiftAssignment,
@@ -123,7 +124,7 @@ export const res = {
       phone: o.phone,
       website: o.website,
       status: o.status,
-      subscription_plan: o.subscription_plan,
+      subscription_plan: o.subscription_plan as PlanKey | null,
       logo_url: o.logo_path,
       created_at: dateTimeString(o.created_at),
       primary_color: o.primary_color,
@@ -250,6 +251,19 @@ export const res = {
       created_at: dateTimeString(a.created_at),
       hours_status: a.hours_status,
       verified_hours: a.verified_hours,
+      hours: Math.round(((new Date(a.check_out_time ?? Date.now()).getTime() - new Date(a.check_in_time).getTime()) / 3_600_000) * 100) / 100,
+      check_in_method: a.check_in_method ?? (a.qr_verified ? 'self' : 'manual'),
+      check_out_method: a.check_out_method ?? (a.check_out_time ? 'self' : null),
+      check_out_reason: a.check_out_reason ?? null,
+      verification_note: a.verification_note ?? null,
+      flags: (a.flags ?? []) as Attendance['flags'],
+      presence: { pings: 0, inside: 0, last_ping_at: null },
+      can_resume:
+        Boolean(a.check_out_time) &&
+        (a.check_out_method ?? 'self') === 'self' &&
+        a.hours_status === 'pending' &&
+        Date.now() - new Date(a.check_out_time!).getTime() < 10 * 60_000 &&
+        (find.shift(a.shift_id) ? new Date(find.shift(a.shift_id)!.end_time).getTime() > Date.now() : false),
     };
     if (load.shift) {
       const s = find.shift(a.shift_id);

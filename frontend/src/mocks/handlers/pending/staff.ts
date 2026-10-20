@@ -14,6 +14,50 @@ const orgShift = (shiftId: number, orgId: number | null) => {
 const hoursOf = (a: { check_in_time: string; check_out_time: string | null }) =>
   a.check_out_time ? (new Date(a.check_out_time).getTime() - new Date(a.check_in_time).getTime()) / 3_600_000 : 0;
 
+const page = <T,>(rows: T[], url: URL, per = 50) => {
+  const perPage = Number(url.searchParams.get('per_page') ?? per);
+  const current = Math.max(1, Number(url.searchParams.get('page') ?? 1));
+  const last = Math.max(1, Math.ceil(rows.length / perPage));
+  return { data: rows.slice((current - 1) * perPage, current * perPage), pagination: { current_page: current, last_page: last, per_page: perPage, total: rows.length } };
+};
+
+/** Same readable shape as App\Services\AuditPresenter. */
+const presentLog = (l: (typeof db.t.audit)[number]) => {
+  const actor = l.user_id ? find.user(l.user_id) : undefined;
+  const old = (l.old_values ?? {}) as Record<string, unknown>;
+  const nw = (l.new_values ?? {}) as Record<string, unknown>;
+  const keys = [...new Set([...Object.keys(old), ...Object.keys(nw)])].filter((k) => k !== 'org_name');
+  return {
+    ...l,
+    created_at: dateTimeString(l.created_at),
+    action_label: l.action.replace(/[._]/g, ' ').replace(/^\w/, (c) => c.toUpperCase()),
+    actor: actor ? { id: actor.id, name: actor.full_name, email: actor.email, role: actor.role } : null,
+    organization: l.org_id ? (find.org(l.org_id)?.name ?? null) : null,
+    target_type: l.model_type ? String(l.model_type).split('\\').pop() : null,
+    target_label: (nw.org_name ?? old.org_name ?? nw.title ?? nw.full_name ?? null) as string | null,
+    changes: keys.filter((k) => JSON.stringify(old[k]) !== JSON.stringify(nw[k])).map((k) => ({ field: k.replace(/_/g, ' ').replace(/^\w/, (c) => c.toUpperCase()), from: old[k] == null ? '—' : String(old[k]), to: nw[k] == null ? '—' : String(nw[k]) })),
+  };
+};
+
+const auditCsv = (rows: ReturnType<typeof presentLog>[]) =>
+  '\uFEFFDate (UTC),Action,Done by,Organization,Changes\n' +
+  rows.map((r) => [r.created_at, r.action_label, r.actor?.name ?? 'System', r.organization ?? 'Platform', r.changes.map((c) => `${c.field}: ${c.from} → ${c.to}`).join('; ')].map((v) => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
+
+const filterLogs = (url: URL, orgId?: number | null) =>
+  db.t.audit.filter((l) => {
+    const action = url.searchParams.get('action');
+    const from = url.searchParams.get('from');
+    const to = url.searchParams.get('to');
+    const org = url.searchParams.get('org_id');
+    return (
+      (orgId === undefined || l.org_id === orgId) &&
+      (!action || l.action.startsWith(action)) &&
+      (!org || l.org_id === Number(org)) &&
+      (!from || l.created_at.slice(0, 10) >= from) &&
+      (!to || l.created_at.slice(0, 10) <= to)
+    );
+  });
+
 export const staffPending = [
   // G17 — coordinator dashboard counters
   http.get(
@@ -66,11 +110,12 @@ export const staffPending = [
     authed(STAFF, (ctx) => {
       const s = orgShift(param(ctx, 'shiftId'), ctx.actor.user.org_id);
       if (!s) return fail('Target database resource not found.', 404);
-      if (db.t.attendances.some((a) => a.shift_id === s.id)) return fail('This shift has attendance records and cannot be deleted.');
+      if (db.t.attendances.some((a) => a.shift_id === s.id)) return fail('Volunteers already checked in to this shift, so it cannot be deleted.');
+      const affected = db.t.assignments.filter((a) => a.shift_id === s.id && (a.status === 'pending' || a.status === 'confirmed'));
+      affected.forEach((a) => (a.status = 'cancelled'));
       db.t.shifts = db.t.shifts.filter((x) => x.id !== s.id);
-      db.t.assignments = db.t.assignments.filter((a) => a.shift_id !== s.id);
       audit('shift.deleted', ctx.actor.user, null, { shift_id: s.id }, {});
-      return json({ status: 'success', message: 'Shift deleted successfully.' });
+      return ok({ volunteers_notified: affected.length }, affected.length ? `Shift deleted. ${affected.length} volunteer(s) were notified.` : 'Shift deleted.');
     }),
   ),
 
@@ -81,12 +126,26 @@ export const staffPending = [
       const s = orgShift(param(ctx, 'shiftId'), ctx.actor.user.org_id);
       if (!s) return fail('Target database resource not found.', 404);
       const rows = db.t.assignments
-        .filter((a) => a.shift_id === s.id && a.status !== 'cancelled')
+        .filter((a) => a.shift_id === s.id && (a.status === 'confirmed' || a.status === 'pending' || a.status === 'removed'))
         .map((a) => {
           const att = db.t.attendances.filter((x) => x.shift_id === s.id && x.volunteer_id === a.volunteer_id).sort((x, y) => y.check_in_time.localeCompare(x.check_in_time))[0];
           return { assignment_id: a.id, status: a.status, volunteer: res.volunteer(find.volunteer(a.volunteer_id)!, { user: true }), attendance: att ? res.attendance(att) : null };
         });
-      return ok(rows);
+      const ev = find.event(s.event_id)!;
+      const atts = db.t.attendances.filter((x) => x.shift_id === s.id);
+      const confirmed = rows.filter((r) => r.status === 'confirmed').length;
+      return ok(rows, undefined, 200, {
+        meta: {
+          shift: { ...res.shift(s), event: { id: ev.id, title: ev.title, location: ev.location, geofence_radius: ev.geofence_radius } },
+          capacity: s.capacity,
+          confirmed,
+          checked_in: atts.filter((x) => !x.check_out_time).length,
+          checked_out: atts.filter((x) => x.check_out_time).length,
+          left_early: atts.filter((x) => (x.flags ?? []).includes('left_early')).length,
+          open_places: Math.max(0, s.capacity - confirmed),
+          policy: { checkin_before_minutes: 15, checkin_after_minutes: 30, qr_window_seconds: 30, early_checkout_minutes: 15, undo_checkout_minutes: 10, auto_checkout_grace: 30, max_gps_accuracy: 150, ping_interval_minutes: 5, require_qr: true, auto_verify_hours: false },
+        },
+      });
     }),
   ),
 
@@ -109,14 +168,23 @@ export const staffPending = [
   // G14 — hours verification (BR-06)
   http.get(
     api('/coordinator/attendance/pending'),
-    authed(STAFF, ({ actor }) => {
+    authed(STAFF, ({ actor, url }) => {
+      const status = url.searchParams.get('status') ?? 'pending';
       const eventIds = db.t.events.filter((e) => e.org_id === actor.user.org_id).map((e) => e.id);
       const shiftIds = db.t.shifts.filter((s) => eventIds.includes(s.event_id)).map((s) => s.id);
       return ok(
         db.t.attendances
-          .filter((a) => shiftIds.includes(a.shift_id) && a.check_out_time && a.hours_status === 'pending')
+          .filter((a) => shiftIds.includes(a.shift_id) && a.check_out_time && (status === 'all' || a.hours_status === status))
           .sort((a, b) => b.check_in_time.localeCompare(a.check_in_time))
-          .map((a) => ({ ...res.attendance(a, { shift: true }), volunteer: res.volunteer(find.volunteer(a.volunteer_id)!, { user: true }), hours: Math.round(hoursOf(a) * 100) / 100 })),
+          .map((a) => {
+            const sh = find.shift(a.shift_id)!;
+            return {
+              ...res.attendance(a, { shift: true }),
+              volunteer: res.volunteer(find.volunteer(a.volunteer_id)!, { user: true }),
+              hours: Math.round(hoursOf(a) * 100) / 100,
+              scheduled_hours: Math.round(((new Date(sh.end_time).getTime() - new Date(sh.start_time).getTime()) / 3_600_000) * 100) / 100,
+            };
+          }),
       );
     }),
   ),
@@ -129,8 +197,12 @@ export const staffPending = [
       const invalid = validate(b, { status: { required: true, in: ['verified', 'adjusted', 'rejected'] }, verified_hours: { type: 'number', min: 0, max: 24, nullable: true }, note: { type: 'string', max: 500, nullable: true } });
       if (invalid) return invalid;
       if (b.status === 'adjusted' && b.verified_hours == null) return json({ message: 'The verified hours field is required when status is adjusted.', errors: { verified_hours: ['The verified hours field is required when status is adjusted.'] } }, 422);
+      const before = a.hours_status === 'verified' || a.hours_status === 'adjusted' ? (a.verified_hours ?? 0) : 0;
       a.hours_status = b.status as 'verified';
-      a.verified_hours = b.status === 'adjusted' ? Number(b.verified_hours) : null;
+      a.verified_hours = b.status === 'adjusted' ? Number(b.verified_hours) : b.status === 'verified' ? Math.round(hoursOf(a) * 100) / 100 : 0;
+      a.verification_note = (b.note as string) ?? null;
+      const vol = find.volunteer(a.volunteer_id);
+      if (vol) vol.total_hours = Math.max(0, Math.round((vol.total_hours + (a.verified_hours ?? 0) - before) * 100) / 100);
       audit('attendance.hours_' + String(b.status), ctx.actor.user, { type: 'Attendance', id: a.id }, null, { verified_hours: a.verified_hours, note: b.note ?? null });
       return ok(res.attendance(a), 'Hours updated.');
     }),
@@ -236,11 +308,12 @@ export const staffPending = [
       if (!u) return fail('Target database resource not found.', 404);
       const b = await body(ctx.request);
       const invalid = validate(b, {
-        full_name: { sometimes: true, type: 'string', max: 100 },
+        first_name: { sometimes: true, type: 'string', max: 60 },
+        last_name: { sometimes: true, type: 'string', max: 60 },
         email: { sometimes: true, type: 'email', max: 100, custom: (v) => (db.t.users.some((x) => x.email === v && x.id !== u.id) ? 'The email has already been taken.' : null) },
       });
       if (invalid) return invalid;
-      if (b.full_name) u.full_name = String(b.full_name);
+      if (b.first_name || b.last_name) u.full_name = `${b.first_name ?? u.full_name.split(' ')[0]} ${b.last_name ?? u.full_name.split(' ').slice(1).join(' ')}`.trim();
       if (b.email) u.email = String(b.email);
       audit('user.coordinator_updated', ctx.actor.user, { type: 'User', id: u.id });
       return ok(res.user(u), 'Coordinator updated.');
@@ -279,13 +352,39 @@ export const staffPending = [
   // G21 — org-scoped audit trail
   http.get(
     api('/admin/audit-logs'),
-    authed(['OrgAdmin'], ({ actor }) => ok(db.t.audit.filter((l) => l.org_id === actor.user.org_id).slice(0, 100).map((l) => ({ ...l, created_at: dateTimeString(l.created_at) })))),
+    authed(['OrgAdmin'], ({ actor, url }) => {
+      const rows = filterLogs(url, actor.user.org_id).map(presentLog);
+      if (url.searchParams.get('format') === 'csv') return new HttpResponse(auditCsv(rows), { headers: { 'Content-Type': 'text/csv' } });
+      const p = page(rows, url);
+      return ok(p.data, undefined, 200, { pagination: p.pagination });
+    }),
   ),
 
   // G22 — org admin accounts across tenants
   http.get(
     api('/superadmin/admins'),
-    authed(['SuperAdmin'], () => ok(db.t.users.filter((u) => u.role === 'OrgAdmin').map((u) => res.user(u, { organization: true })))),
+    authed(['SuperAdmin'], ({ url }) => {
+      const p = page(db.t.users.filter((u) => u.role === 'OrgAdmin').map((u) => ({ ...res.user(u, { organization: true }), invitation_pending: false })), url);
+      return ok(p.data, undefined, 200, { pagination: p.pagination });
+    }),
+  ),
+  http.patch(
+    api('/superadmin/users/:id/status'),
+    authed(['SuperAdmin'], (ctx) => {
+      const u = db.t.users.find((x) => x.id === param(ctx, 'id') && x.role !== 'SuperAdmin');
+      if (!u) return fail('Target database resource not found.', 404);
+      u.is_active = !u.is_active;
+      return json({ status: 'success', message: u.is_active ? 'Account reactivated.' : 'Account deactivated.', is_active: u.is_active });
+    }),
+  ),
+  http.get(
+    api('/superadmin/audit-logs'),
+    authed(['SuperAdmin'], ({ url }) => {
+      const rows = filterLogs(url).map(presentLog);
+      if (url.searchParams.get('format') === 'csv') return new HttpResponse(auditCsv(rows), { headers: { 'Content-Type': 'text/csv' } });
+      const p = page(rows, url);
+      return ok(p.data, undefined, 200, { pagination: p.pagination });
+    }),
   ),
   http.patch(
     api('/superadmin/admins/:id/status'),
@@ -324,11 +423,11 @@ export const staffPending = [
     authed(['SuperAdmin'], ({ url }) => {
       const q = (url.searchParams.get('q') ?? '').toLowerCase();
       const role = url.searchParams.get('role');
-      return ok(
-        db.t.users
-          .filter((u) => (!q || u.full_name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q)) && (!role || u.role === role))
-          .map((u) => res.user(u, { organization: true })),
+      const p = page(
+        db.t.users.filter((u) => (!q || u.full_name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q)) && (!role || u.role === role)).map((u) => res.user(u, { organization: true })),
+        url,
       );
+      return ok(p.data, undefined, 200, { pagination: p.pagination });
     }),
   ),
 ];

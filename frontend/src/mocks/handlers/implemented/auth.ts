@@ -9,7 +9,8 @@ export const authHandlers = [
     const b = await body(request);
     const invalid = validate(b, {
       org_id: { type: 'integer', nullable: true, custom: (v) => (find.org(Number(v)) ? null : 'The selected org id is invalid.') },
-      full_name: { required: true, type: 'string', max: 100 },
+      first_name: { required: true, type: 'string', max: 60 },
+      last_name: { required: true, type: 'string', max: 60 },
       email: { required: true, type: 'email', max: 100, custom: (v) => (find.userByEmail(String(v)) ? 'The email has already been taken.' : null) },
       password: { required: true, type: 'string', min: 8 },
       skills: { type: 'array' },
@@ -21,7 +22,7 @@ export const authHandlers = [
     const user = {
       id: nextId(db.t.users),
       org_id: b.org_id ? Number(b.org_id) : null,
-      full_name: String(b.full_name).trim(),
+      full_name: `${String(b.first_name).trim()} ${String(b.last_name).trim()}`,
       email: String(b.email).trim().toLowerCase(),
       password: String(b.password),
       role: 'Volunteer' as const,

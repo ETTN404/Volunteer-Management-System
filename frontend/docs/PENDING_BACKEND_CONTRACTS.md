@@ -1,4 +1,7 @@
-# Pending backend contracts
+# Backend contracts (all shipped 2026-10-20)
+
+> Every endpoint below is now implemented in Laravel. The MSW handlers remain only as the offline demo / test backend.
+
 
 The React frontend already uses every endpoint below. Until Laravel implements one, it is served by a
 Mock Service Worker handler in `src/mocks/handlers/pending/` (active when `VITE_MOCK_MODE=pending` or `all`).
@@ -13,7 +16,7 @@ Conventions (same as the existing API):
 - Datetimes: Carbon casts (ISO `…Z`) or `toDateTimeString()` (UTC). Dates: `Y-m-d`.
 - Tenant isolation: every coordinator/admin route must scope by `auth()->user()->org_id` (BR-08).
 
-Status legend: ⏳ pending · ✅ shipped (handler removed)
+Status legend: ✅ pending · ✅ shipped (handler removed)
 
 ---
 
@@ -33,33 +36,33 @@ Skill keys are lowercase snake_case (`first_aid`, `disaster_response`, …).
 
 ---
 
-## G1 ⏳ Public organization list — **public**
+## G1 ✅ Public organization list — **public**
 `GET /api/public/organizations` — used by registration (org picker). Only `status = active`.
 ```json
 { "status": "success", "data": [ { "id": 1, "name": "Red Cross Ethiopia", "logo_url": null, "address": "Addis Ababa", "volunteer_count": 14 } ] }
 ```
 
-## G2 ⏳ Public platform stats — **public**
+## G2 ✅ Public platform stats — **public**
 `GET /api/public/stats` — landing page counters. Cache 10 min.
 ```json
 { "status": "success", "data": { "organizations": 4, "volunteers": 32, "verified_hours": 2950, "certificates_issued": 61, "shifts_completed": 140 } }
 ```
 
-## G3 ⏳ Forgot / reset password — **public**
+## G3 ✅ Forgot / reset password — **public**
 - `POST /api/forgot-password` `{ email }` → always `200 { status, message }` (never reveal if the email exists). Use Laravel `Password::sendResetLink`; the email link must point to `${FRONTEND_URL}/reset-password/{token}?email=…`.
 - `POST /api/reset-password` `{ token, email, password, password_confirmation }` → `200` or `422 { message: "This password reset token is invalid." }`.
 
-## G4 ⏳ Change password
+## G4 ✅ Change password
 `PATCH /api/account/password` `{ current_password, password (min 8), password_confirmation }` → `200`; `422` with `errors.current_password = ["The password is incorrect."]`.
 
-## G5 ⏳ Minor volunteers & parental consent (BR-02)
+## G5 ✅ Minor volunteers & parental consent (BR-02)
 - Migration on `volunteers`: `date_of_birth date null`, `parental_consent_verified bool default false`.
 - `VolunteerResource` adds `date_of_birth`, `is_minor` (computed, age < 18), `parental_consent_verified`.
 - `POST /register` and `PATCH /volunteer/profile` accept `date_of_birth` (`nullable|date|before:today`).
 - `POST /volunteer/apply/{shiftId}`: if minor and not verified → `422 { message: "Volunteers under 18 need a verified parental consent form before applying for shifts." }`.
 - Verifying a `parental_consent` document (G6) sets `parental_consent_verified = true`.
 
-## G6 ⏳ Documents (UC-7, UC-16)
+## G6 ✅ Documents (UC-7, UC-16)
 Table `volunteer_documents`: `id, org_id, volunteer_id, document_type (certification|id_proof|parental_consent|medical_clearance), title (150), file_path, mime_type, file_size_bytes, verification_status (pending|verified|rejected) default pending, coordinator_notes text null, verified_by null, verified_at null, timestamps`.
 
 Resource:
@@ -72,93 +75,93 @@ Resource:
 - `GET /api/coordinator/documents?status=pending|verified|rejected` (Coordinator, OrgAdmin) → org documents with `volunteer.user`.
 - `PATCH /api/coordinator/documents/{id}/verify` `{ status: verified|rejected, notes?: string(1000) }` → `200` document. Notify the volunteer.
 
-## G7 ⏳ Skill verification (BR-03)
+## G7 ✅ Skill verification (BR-03)
 - Column `volunteers.skills_verification json null` → map `{ "first_aid": "verified" }`, values `unverified|pending|verified|rejected`. Add to `VolunteerResource`.
 - `PATCH /api/coordinator/volunteers/{volunteerId}/skills/{skill}` `{ status }` → `200` VolunteerResource (with user). `422` if the volunteer does not list the skill.
 
-## G8 ⏳ Volunteer event detail
+## G8 ✅ Volunteer event detail
 `GET /api/volunteer/events/{id}` → `EventResource` with `shifts`, each shift with `match_score` and **`confirmed_count`** (also add `confirmed_count` to shifts in `GET /volunteer/events` and coordinator event endpoints — the UI draws capacity meters from it).
 
-## G9 ⏳ Volunteer attendance history
+## G9 ✅ Volunteer attendance history
 `GET /api/volunteer/attendance` → `AttendanceResource[]` with `shift.event`, newest first. Include `hours_status` and `verified_hours` once G14 exists.
 
-## G10 ⏳ Impact history
+## G10 ✅ Impact history
 `GET /api/volunteer/impact/history` → last 12 months:
 ```json
 { "status": "success", "data": [ { "month": "2026-10", "hours": 12.5, "shifts": 3, "impact_score": 38.2 } ] }
 ```
 
-## G11 ⏳ VolunBot history
+## G11 ✅ VolunBot history
 - `GET /api/volunteer/chat/history` → `[{ "role": "user"|"model", "content": "…", "created_at": "…" }]` (from the cached `chat_session_{id}`).
 - `DELETE /api/volunteer/chat/history` → clears it.
 
-## G12 ⏳ Shift edit / delete
+## G12 ✅ Shift edit / delete
 - `PATCH /api/coordinator/shifts/{id}` — any of `start_time`, `end_time` (`Y-m-d H:i:s`), `capacity` (not below confirmed count), `required_skills` → ShiftResource. Same event-boundary rule as create.
 - `DELETE /api/coordinator/shifts/{id}` → `422` if attendance exists.
 
-## G13 ⏳ Live roster
+## G13 ✅ Live roster
 `GET /api/coordinator/shifts/{id}/attendance` → non-cancelled assignments of the shift:
 ```json
 { "status": "success", "data": [ { "assignment_id": 12, "status": "confirmed", "volunteer": { …VolunteerResource with user }, "attendance": { …AttendanceResource } | null } ] }
 ```
 
-## G14 ⏳ Hours verification (BR-06)
+## G14 ✅ Hours verification (BR-06)
 - Columns on `attendances`: `hours_status (pending|verified|adjusted|rejected) default pending`, `verified_hours decimal(5,2) null`, `verified_by`, `verified_at`.
 - Reports must count only `verified`/`adjusted` hours.
 - `GET /api/coordinator/attendance/pending` → checked-out attendances with `hours_status=pending`, each with `shift.event`, `volunteer.user` and computed `hours`.
 - `PATCH /api/coordinator/attendance/{id}/verify` `{ status, verified_hours? (required if adjusted, 0–24), note? }`.
 
-## G15 ⏳ Decline reason
+## G15 ✅ Decline reason
 `POST /coordinator/applications/{id}/approve` accepts optional `reason` (string ≤ 500) when `status=cancelled`; store in `shift_assignments.coordinator_feedback` (column already exists) and expose as `decline_reason` in `ShiftAssignmentResource`.
 
-## G16 ⏳ Broadcast preview (BR-07)
+## G16 ✅ Broadcast preview (BR-07)
 `GET /api/coordinator/shifts/{id}/broadcast-preview` → who `SendShiftAlertJob` would notify:
 ```json
 { "status": "success", "data": { "matching_volunteers": 9, "remaining_slots": 4, "sample": [ { "id": 5, "full_name": "Hana Tesfaye", "skills": ["first_aid"] } ] } }
 ```
 
-## G17 ⏳ Coordinator dashboard
+## G17 ✅ Coordinator dashboard
 `GET /api/coordinator/dashboard` → `{ shifts_today, checked_in_now, pending_applications, underfilled_shifts (future shifts < 50% confirmed), hours_this_month, active_volunteers }`.
 
-## G18 ⏳ Organization analytics (OrgAdmin)
+## G18 ✅ Organization analytics (OrgAdmin)
 `GET /api/admin/analytics` → `{ volunteers, active_volunteers, coordinators, events, upcoming_events, total_hours, hours_by_month: [{month, hours}] (6 months), top_skills: [{skill, count}] (8) }`.
 
-## G19 ⏳ Coordinator management (OrgAdmin)
+## G19 ✅ Coordinator management (OrgAdmin)
 - `PATCH /api/admin/coordinators/{id}` `{ full_name?, email? (unique) }` → UserResource.
 - `PATCH /api/admin/coordinators/{id}/status` → toggles `is_active`, returns `{ status, message, is_active }` (same shape as volunteer toggle).
 - Login must reject inactive users (today `is_active=false` users can still sign in).
 
-## G20 ⏳ Branding (BR-08 §3.5.5)
+## G20 ✅ Branding (BR-08 §3.5.5)
 - Columns on `organizations`: `primary_color string(7) null` (hex), `subdomain string unique null`.
 - `PATCH /admin/organization` accepts `primary_color` (`nullable|regex:/^#[0-9A-Fa-f]{6}$/`) and `subdomain` (`nullable|alpha_dash|max:40|unique`). `OrganizationResource` exposes both.
 - `POST /api/admin/organization/logo` multipart `logo` (`image|max:1024`) → OrganizationResource.
 
-## G21 ⏳ Organization audit trail
+## G21 ✅ Organization audit trail
 `GET /api/admin/audit-logs` → same shape as `/superadmin/audit-logs`, filtered to the admin's `org_id`.
 
-## G22 ⏳ Org admin accounts (SuperAdmin)
+## G22 ✅ Org admin accounts (SuperAdmin)
 - `GET /api/superadmin/admins` → UserResource[] (role OrgAdmin) with `organization`.
 - `PATCH /api/superadmin/admins/{id}/status` → toggles `is_active`, `{ status, message, is_active }`.
 
-## G23 ⏳ Platform timeseries
+## G23 ✅ Platform timeseries
 `GET /api/superadmin/metrics/timeseries` → 12 monthly points `[{ "date": "2026-10", "organizations": 4, "users": 41, "hours": 420 }]` (cumulative orgs/users, hours logged that month).
 
-## G24 ⏳ Platform user directory
+## G24 ✅ Platform user directory
 `GET /api/superadmin/users?q=&role=` → UserResource[] with `organization` (paginate when large).
 
-## G25 ⏳ Notifications
+## G25 ✅ Notifications
 The `notifications` table and notification classes already exist. Expose:
 - `GET /api/notifications` → `{ data: [{ id, type, title, body, action_url, read_at, created_at }], unread_count }`. Map notification classes to `type`: `shift_approved`, `shift_broadcast`, `certificate_issued`, `organization_suspended`, `announcement`, `document_reviewed`. `action_url` is a frontend path (e.g. `/v/schedule`).
 - `POST /api/notifications/{id}/read`, `POST /api/notifications/read-all`.
 
-## G26 ⏳ Real certificate PDF (UC-19)
+## G26 ✅ Real certificate PDF (UC-19)
 `GET /volunteer/certificates/{id}/download` should stream a real PDF (DomPDF) with the public number (`VMS-00012`) and a QR code to `${FRONTEND_URL}/verify/VMS-00012`.
 
-## G27 ⏳ Report export
+## G27 ✅ Report export
 `GET /api/coordinator/reports/{id}/export?format=csv|pdf` → file download (`Content-Disposition: attachment`).
 
-## G28 ⏳ Profile photo
+## G28 ✅ Profile photo
 `POST /api/account/photo` multipart `photo` (`image|max:2048`) → `{ data: { profile_photo_url } }`.
 
-## G29 ⏳ Audit filters
+## G29 ✅ Audit filters
 `?action=&org_id=&from=&to=&page=` on both audit endpoints (frontend filters client-side today, over the latest 100).

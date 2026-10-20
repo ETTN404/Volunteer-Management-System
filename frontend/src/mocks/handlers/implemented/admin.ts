@@ -1,3 +1,4 @@
+import { billingSnapshot } from './business';
 import { http } from 'msw';
 import { db, find, nextId, nowIso, paginate, res, audit } from '../../db';
 import { api, authed, body, fail, json, ok, param, validate } from '../utils';
@@ -8,7 +9,14 @@ export const adminHandlers = [
   /* ---------------- Org admin ---------------- */
   http.get(
     api('/admin/organization'),
-    authed(['OrgAdmin'], ({ actor }) => ok(res.org(find.org(actor.user.org_id)!))),
+    authed(['OrgAdmin'], ({ actor }) =>
+      ok({
+        ...res.org(find.org(actor.user.org_id)!),
+        verification_status: 'verified',
+        billing: billingSnapshot(actor.user.org_id),
+        settings: { attendance: { checkin_before_minutes: 15, checkin_after_minutes: 30, qr_window_seconds: 30, early_checkout_minutes: 15, undo_checkout_minutes: 10, auto_checkout_grace: 30, max_gps_accuracy: 150, ping_interval_minutes: 5, require_qr: true, auto_verify_hours: false } },
+      }),
+    ),
   ),
 
   http.patch(
@@ -37,15 +45,16 @@ export const adminHandlers = [
     authed(['OrgAdmin'], async ({ request, actor }) => {
       const b = await body(request);
       const invalid = validate(b, {
-        full_name: { required: true, type: 'string', max: 100 },
+        first_name: { required: true, type: 'string', max: 60 },
+        last_name: { required: true, type: 'string', max: 60 },
         email: { required: true, type: 'email', max: 100, custom: (v) => (find.userByEmail(String(v)) ? 'The email has already been taken.' : null) },
-        password: { required: true, type: 'string', min: 8 },
       });
       if (invalid) return invalid;
-      const row = { id: nextId(db.t.users), org_id: actor.user.org_id, full_name: String(b.full_name), email: String(b.email), password: String(b.password), role: 'Coordinator' as const, is_active: true, profile_photo_path: null, last_login: null, created_at: nowIso() };
+      const row = { id: nextId(db.t.users), org_id: actor.user.org_id, full_name: `${b.first_name} ${b.last_name}`, email: String(b.email), password: 'invited', role: 'Coordinator' as const, is_active: true, profile_photo_path: null, last_login: null, created_at: nowIso() };
       db.t.users.push(row);
-      audit('user.coordinator_created', actor.user, { type: 'User', id: row.id });
-      return ok(res.user(row), 'Coordinator account created successfully.', 201);
+      audit('user.coordinator_created', actor.user, { type: 'User', id: row.id }, null, { full_name: row.full_name, email: row.email });
+      const invitation = { invite_url: `${location.origin}/invite/demo-${row.id}`, email_sent: true, expires_at: new Date(Date.now() + 72 * 3600_000).toISOString() };
+      return ok(res.user(row), `Invitation sent to ${row.email}.`, 201, { invitation });
     }),
   ),
 
@@ -57,7 +66,7 @@ export const adminHandlers = [
         .filter((u) => u.org_id === actor.user.org_id && u.role !== 'OrgAdmin')
         .sort((a, b) => b.created_at.localeCompare(a.created_at));
       const { items, pagination } = paginate(members, page, 20);
-      return ok(items.map((u) => res.user(u, { volunteer: true })), undefined, 200, { pagination });
+      return ok(items.map((u) => ({ ...res.user(u, { volunteer: true }), relationship: 'member', invitation_pending: u.password === 'invited' })), undefined, 200, { pagination });
     }),
   ),
 
@@ -98,24 +107,27 @@ export const adminHandlers = [
   http.post(
     api('/superadmin/onboard-tenant'),
     authed(['SuperAdmin'], async ({ request, actor }) => {
-      const b = await body(request);
+      const ct = request.headers.get('content-type') ?? '';
+      const b: Record<string, unknown> = ct.includes('multipart') ? Object.fromEntries([...(await request.formData()).entries()].filter(([, v]) => typeof v === 'string')) : await body(request);
       const invalid = validate(b, {
         org_name: { required: true, type: 'string', max: 150 },
-        org_email: { required: true, type: 'email', max: 100, custom: (v) => (db.t.organizations.some((o) => o.email === v) ? 'The org email has already been taken.' : null) },
-        org_address: { required: true, type: 'string', max: 255 },
-        org_phone: { type: 'string', max: 50, nullable: true },
+        org_email: { required: true, type: 'email', max: 100, custom: (v) => (db.t.organizations.some((o) => o.email === v) ? 'An organization with this email is already on VolunTrack.' : null) },
+        org_country: { required: true, type: 'string' },
+        org_city: { required: true, type: 'string', max: 100 },
+        org_phone: { required: true, type: 'string', custom: (v) => (/^\+[1-9]\d{6,14}$/.test(String(v)) ? null : 'Enter a valid phone number for the selected country.') },
         org_website: { type: 'url', nullable: true },
-        admin_full_name: { required: true, type: 'string', max: 100 },
-        admin_email: { required: true, type: 'email', max: 100, custom: (v) => (find.userByEmail(String(v)) ? 'The admin email has already been taken.' : null) },
-        admin_password: { required: true, type: 'string', min: 8 },
+        admin_first_name: { required: true, type: 'string', max: 60 },
+        admin_last_name: { required: true, type: 'string', max: 60 },
+        admin_email: { required: true, type: 'email', max: 100, custom: (v) => (find.userByEmail(String(v)) ? 'This email already has a VolunTrack account.' : null) },
       });
       if (invalid) return invalid;
-      const org = { id: nextId(db.t.organizations), name: String(b.org_name), email: String(b.org_email), address: String(b.org_address), phone: (b.org_phone as string) ?? null, website: (b.org_website as string) ?? null, logo_path: null, status: 'active' as const, subscription_plan: 'free', primary_color: null, subdomain: null, created_at: nowIso() };
+      const org = { id: nextId(db.t.organizations), name: String(b.org_name), email: String(b.org_email), address: `${b.org_city}, ${b.org_country}`, phone: String(b.org_phone), website: (b.org_website as string) ?? null, logo_path: null, status: 'active' as const, subscription_plan: String(b.plan ?? 'free'), primary_color: null, subdomain: null, created_at: nowIso() };
       db.t.organizations.push(org);
-      const admin = { id: nextId(db.t.users), org_id: org.id, full_name: String(b.admin_full_name), email: String(b.admin_email), password: String(b.admin_password), role: 'OrgAdmin' as const, is_active: true, profile_photo_path: null, last_login: null, created_at: nowIso() };
+      const admin = { id: nextId(db.t.users), org_id: org.id, full_name: `${b.admin_first_name} ${b.admin_last_name}`, email: String(b.admin_email), password: 'invited', role: 'OrgAdmin' as const, is_active: true, profile_photo_path: null, last_login: null, created_at: nowIso() };
       db.t.users.push(admin);
-      audit('tenant.onboarded', actor.user, { type: 'Organization', id: org.id }, null, { name: org.name, plan: org.subscription_plan });
-      return ok({ organization: res.org(org), admin: res.user(admin) }, 'Organization tenant onboarding completed successfully.', 201);
+      audit('tenant.onboarded', actor.user, { type: 'Organization', id: org.id }, null, { org_name: org.name, plan: org.subscription_plan });
+      const invitation = { invite_url: `${location.origin}/invite/demo-${admin.id}`, email_sent: true, expires_at: new Date(Date.now() + 72 * 3600_000).toISOString() };
+      return ok({ organization: res.org(org), admin: res.user(admin), invitation }, `Organization onboarded. An invitation was emailed to ${admin.email}.`, 201);
     }),
   ),
 
