@@ -123,9 +123,9 @@ export default function OrgOverviewPage() {
             }
           />
           <ul className="mt-2 divide-y divide-line px-5 pb-3">
-            {audit.data?.slice(0, 5).map((l) => (
+            {audit.data?.items.slice(0, 5).map((l) => (
               <li key={l.id} className="flex items-center justify-between gap-3 py-3 text-sm">
-                <span className="truncate text-text">{actionLabel(l.action)}</span>
+                <span className="truncate text-text">{l.action_label ?? actionLabel(l.action)}</span>
                 <span className="shrink-0 text-[12px] text-faint">{formatRelative(l.created_at)}</span>
               </li>
             ))}

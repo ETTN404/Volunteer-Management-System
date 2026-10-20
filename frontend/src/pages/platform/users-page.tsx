@@ -2,8 +2,8 @@ import { Search, Users } from 'lucide-react';
 import { useDeferredValue, useEffect, useState } from 'react';
 import type { Role } from '@/shared/types/api';
 import { formatRelative } from '@/shared/lib/time';
-import { Avatar, Badge, Card, EmptyState, ErrorState, Input, PageHeader, Segmented, Skeleton } from '@/shared/ui';
-import { usePlatformUsers } from '@/features/platform/api';
+import { Avatar, Badge, Button, Card, EmptyState, ErrorState, Input, PageHeader, Segmented, Skeleton, Switch, formatPhone, notify } from '@/shared/ui';
+import { usePlatformUsers, useToggleUser } from '@/features/platform/api';
 import { ROLE_LABEL } from '@/features/auth/session-store';
 
 const ROLE_TONE: Record<Role, 'accent' | 'info' | 'success' | 'neutral'> = { SuperAdmin: 'accent', OrgAdmin: 'info', Coordinator: 'success', Volunteer: 'neutral' };
@@ -11,8 +11,12 @@ const ROLE_TONE: Record<Role, 'accent' | 'info' | 'success' | 'neutral'> = { Sup
 export default function UsersPage() {
   const [q, setQ] = useState('');
   const [role, setRole] = useState<Role | ''>('');
+  const [page, setPage] = useState(1);
   const deferred = useDeferredValue(q);
-  const users = usePlatformUsers(deferred, role);
+  const users = usePlatformUsers(deferred, role, page);
+  const toggle = useToggleUser();
+  const rows = users.data?.items ?? [];
+  const pg = users.data?.pagination;
   useEffect(() => {
     document.title = 'All users · VolunTrack';
   }, []);
@@ -24,7 +28,10 @@ export default function UsersPage() {
         <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name or email" leading={<Search />} className="md:w-72" aria-label="Search users" />
         <Segmented
           value={role}
-          onValueChange={setRole}
+          onValueChange={(v) => {
+            setRole(v);
+            setPage(1);
+          }}
           aria-label="Role"
           options={[
             { value: '', label: 'Everyone' },
@@ -39,7 +46,7 @@ export default function UsersPage() {
         <Skeleton className="h-96 rounded-xl" />
       ) : users.error ? (
         <ErrorState error={users.error} onRetry={() => users.refetch()} />
-      ) : !users.data?.length ? (
+      ) : !rows.length ? (
         <EmptyState icon={<Users />} title="No users match" />
       ) : (
         <Card className="overflow-x-auto">
@@ -50,10 +57,11 @@ export default function UsersPage() {
                 <th className="px-5 py-3 font-medium">Role</th>
                 <th className="px-5 py-3 font-medium">Organization</th>
                 <th className="px-5 py-3 font-medium">Last sign-in</th>
+                <th className="px-5 py-3 text-right font-medium">Active</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-line">
-              {users.data.map((u) => (
+              {rows.map((u) => (
                 <tr key={u.id} className="hover:bg-surface-2/50">
                   <td className="px-5 py-3">
                     <div className="flex items-center gap-3">
@@ -62,7 +70,10 @@ export default function UsersPage() {
                         <span className="block font-medium text-text">
                           {u.full_name} {!u.is_active && <span className="ml-1 text-[11px] text-danger-text">inactive</span>}
                         </span>
-                        <span className="block text-[12px] text-faint">{u.email}</span>
+                        <span className="block text-[12px] text-faint">
+                          {u.email}
+                          {u.phone ? ` · ${formatPhone(u.phone)}` : ''}
+                        </span>
                       </span>
                     </div>
                   </td>
@@ -73,11 +84,33 @@ export default function UsersPage() {
                   </td>
                   <td className="px-5 py-3 text-muted">{u.organization?.name ?? 'Platform'}</td>
                   <td className="px-5 py-3 text-muted">{u.last_login ? formatRelative(u.last_login) : 'Never'}</td>
+                  <td className="px-5 py-3 text-right">
+                    {u.role !== 'SuperAdmin' && (
+                      <Switch
+                        checked={u.is_active !== false}
+                        aria-label={`${u.full_name} active`}
+                        onCheckedChange={() => toggle.mutate(u.id, { onSuccess: (r) => notify.success(r.message, u.full_name), onError: (e) => notify.error(e) })}
+                      />
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
-          <p className="border-t border-line px-5 py-3 text-[12px] text-faint">{users.data.length} users</p>
+          <div className="flex items-center justify-between border-t border-line px-5 py-3 text-[12px] text-faint">
+            <span>{pg?.total ?? rows.length} users</span>
+            {pg && pg.last_page > 1 && (
+              <span className="flex items-center gap-2">
+                <Button size="xs" variant="secondary" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
+                  Previous
+                </Button>
+                {pg.current_page} / {pg.last_page}
+                <Button size="xs" variant="secondary" disabled={page >= pg.last_page} onClick={() => setPage((p) => p + 1)}>
+                  Next
+                </Button>
+              </span>
+            )}
+          </div>
         </Card>
       )}
     </>

@@ -9,6 +9,8 @@ import { useMyShifts } from '@/features/volunteer/derived';
 import { ShiftRow } from '@/features/volunteer/components/shift-row';
 import { MatchBadge } from '@/features/volunteer/components/match-badge';
 import { bestMatch } from '@/features/volunteer/components/opportunity-card';
+import { OrgChip } from '@/features/volunteer/components/org-chip';
+import { ReportOrgDialog } from '@/features/volunteer/components/report-org-dialog';
 
 export default function OpportunityDetailPage() {
   const eventId = Number(useParams().eventId);
@@ -38,7 +40,7 @@ export default function OpportunityDetailPage() {
   const shifts = [...(e.shifts ?? [])].sort((a, b) => a.start_time.localeCompare(b.start_time));
 
   return (
-    <>
+    <div className="min-w-0">
       <Link to="/v/opportunities" className="mb-6 inline-flex items-center gap-1.5 text-sm text-muted hover:text-text">
         <ArrowLeft className="size-4" /> Opportunities
       </Link>
@@ -48,38 +50,55 @@ export default function OpportunityDetailPage() {
             <EventStatusBadge status={e.status} size="sm" /> <MatchBadge score={bestMatch(e)} />
           </>
         }
-        title={e.title}
+        title={<span className="wrap-anywhere">{e.title}</span>}
       >
+        {e.organization && (
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <OrgChip org={e.organization} size="md" />
+            <Link to={`/v/organizations/${e.organization.id}`} className="text-[13px] font-medium text-accent-text hover:underline">
+              See all their events
+            </Link>
+          </div>
+        )}
         <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1.5 text-sm text-muted">
           <span className="inline-flex items-center gap-1.5">
-            <CalendarDays className="size-4 text-faint" />
+            <CalendarDays className="size-4 shrink-0 text-faint" />
             {formatDate(e.start_date, 'EEE d MMM')}
             {e.end_date !== e.start_date && ` – ${formatDate(e.end_date, 'EEE d MMM')}`}
           </span>
-          <span className="inline-flex items-center gap-1.5">
-            <MapPin className="size-4 text-faint" /> {e.location}
+          <span className="inline-flex min-w-0 items-center gap-1.5">
+            <MapPin className="size-4 shrink-0 text-faint" /> <span className="break-words">{e.location}</span>
           </span>
           <span className="inline-flex items-center gap-1.5">
-            <Ruler className="size-4 text-faint" /> Check-in within {e.geofence_radius} m
+            <Ruler className="size-4 shrink-0 text-faint" /> Check-in within {e.geofence_radius} m
           </span>
         </div>
       </PageHeader>
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
-        <div className="space-y-6">
+      <div className="grid min-w-0 gap-6 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
+        <div className="min-w-0 space-y-6">
           {e.description && (
-            <Card className="p-6">
+            <Card className="min-w-0 p-5 sm:p-6">
               <h2 className="type-eyebrow mb-3">About this event</h2>
-              <p className="whitespace-pre-line text-[15px] leading-relaxed text-text">{e.description}</p>
+              <p className="text-[15px] leading-relaxed whitespace-pre-line text-text wrap-anywhere">{e.description}</p>
             </Card>
           )}
-          <section aria-labelledby="shifts-title">
+          <section aria-labelledby="shifts-title" className="min-w-0">
             <h2 id="shifts-title" className="type-title mb-1 text-lg text-text">
               Shifts
             </h2>
             <p className="mb-4 text-sm text-muted">Skills you have are marked in green. A coordinator reviews every application.</p>
             {blocked && (
-              <InlineAlert tone="warning" className="mb-4" title="You can’t apply yet" action={<Button asChild size="sm" variant="secondary"><Link to="/v/documents">Upload consent</Link></Button>}>
+              <InlineAlert
+                tone="warning"
+                className="mb-4"
+                title="You can’t apply yet"
+                action={
+                  <Button asChild size="sm" variant="secondary">
+                    <Link to="/v/documents">Upload consent</Link>
+                  </Button>
+                }
+              >
                 {blocked}
               </InlineAlert>
             )}
@@ -94,15 +113,26 @@ export default function OpportunityDetailPage() {
           </section>
         </div>
 
-        <div className="lg:sticky lg:top-24 lg:self-start">
+        <div className="min-w-0 lg:sticky lg:top-24 lg:self-start">
           {hasCoords ? (
-            <VenueMap venue={{ latitude: e.coordinates.latitude!, longitude: e.coordinates.longitude! }} radius={e.geofence_radius} className="h-[380px]" label={e.location.split(',')[0]} />
+            <VenueMap
+              venue={{ latitude: e.coordinates.latitude!, longitude: e.coordinates.longitude! }}
+              radius={e.geofence_radius}
+              className="h-72 sm:h-[380px]"
+              label={e.location.split(',')[0]}
+            />
           ) : (
-            <Card className="grid h-60 place-items-center p-6 text-center text-sm text-muted">This event has no map pin yet — check-in won’t need GPS.</Card>
+            <Card className="grid h-60 place-items-center p-6 text-center text-sm text-muted">This event has no map pin yet.</Card>
           )}
-          <p className="mt-3 text-[12.5px] text-faint">The dashed ring is the check-in geofence. Your phone must be inside it when you scan the QR code.</p>
+          <p className="mt-3 text-[12.5px] text-faint">The dashed ring is the check-in area. Your phone must be inside it when you scan the coordinator’s QR code.</p>
+          {e.organization && (
+            <div className="mt-4 flex items-center justify-between rounded-lg bg-surface-2 px-4 py-3 text-[13px] text-muted">
+              <span>Something wrong with this organization?</span>
+              <ReportOrgDialog orgId={e.organization.id} orgName={e.organization.name} eventId={e.id} />
+            </div>
+          )}
         </div>
       </div>
-    </>
+    </div>
   );
 }

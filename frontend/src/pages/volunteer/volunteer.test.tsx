@@ -9,9 +9,10 @@ import { ApiError } from '@/shared/api/http';
 const T = { timeout: 10_000 };
 
 describe('volunteer portal', () => {
-  it('redirects guests to sign in, keeping the destination', async () => {
+  it('redirects guests to sign in, keeping the destination', { timeout: 60_000 }, async () => {
     const { router, screen } = await renderApp('/v/impact');
-    expect(await screen.findByRole('heading', { name: /sign in to voluntrack/i }, T)).toBeInTheDocument();
+    // First route of the file: the lazy login chunk compiles cold, so allow longer.
+    expect(await screen.findByRole('heading', { name: /sign in to voluntrack/i }, { timeout: 40_000 })).toBeInTheDocument();
     expect(router.state.location.search).toContain('next=%2Fv%2Fimpact');
   });
 
@@ -44,7 +45,7 @@ describe('volunteer portal', () => {
     await user.click(await screen.findByRole('button', { name: /place me at the venue/i }, T));
     expect(await screen.findByText(/inside the check-in area/i, {}, T)).toBeInTheDocument();
     await user.click(screen.getByRole('radio', { name: /type/i }));
-    await user.click(await screen.findByRole('button', { name: /use today’s blood-drive code/i }, T));
+    await user.click(await screen.findByRole('button', { name: /use today’s code/i }, T));
     await user.click(screen.getByRole('button', { name: /^check in$/i }));
     expect(await screen.findByRole('heading', { name: /you’re checked in/i }, T)).toBeInTheDocument();
   });
@@ -78,21 +79,23 @@ describe('volunteer portal', () => {
 });
 
 describe('check-in error guidance', () => {
-  const err = (message: string, status = 422) => new ApiError({ message, status, kind: 'http' });
+  const err = (code: string, status = 422, extra: Record<string, unknown> = {}) => new ApiError({ message: 'server message', status, kind: 'http', body: { code, ...extra } });
   it.each([
-    ['Security Error: High time-drift detected. Ensure your device clock is synced accurately to the network.', 'drift'],
-    ['Security Gate: You are not scheduled or approved for this shift.', 'not-approved'],
-    ['You are already checked in to this shift.', 'already'],
-    ['Check-in is unavailable. Check-in window is open between 08:45:00 and 09:30:00.', 'window'],
-    ['Validation Failed: Scanned QR code signature is invalid or has expired.', 'qr'],
-    ['Location Blocked: You must be present at the physical venue to check in. You are 212.4 meters away (Geofence limit: 100 meters).', 'location'],
-  ])('maps "%s"', (message, kind) => {
-    expect(explainCheckInError(err(message)).kind).toBe(kind);
+    ['clock_drift', 'drift'],
+    ['not_confirmed', 'not-approved'],
+    ['already_checked_in', 'already'],
+    ['already_checked_out', 'checked-out'],
+    ['outside_window', 'window'],
+    ['qr_invalid', 'qr'],
+    ['gps_inaccurate', 'gps'],
+    ['outside_geofence', 'location'],
+  ])('maps code "%s"', (code, kind) => {
+    expect(explainCheckInError(err(code)).kind).toBe(kind);
   });
   it('rounds the distance into the title', () => {
-    expect(explainCheckInError(err('You are 212.4 meters away (Geofence limit: 100 meters).')).title).toBe('You’re 212 m from the venue');
+    expect(explainCheckInError(err('outside_geofence', 422, { distance_m: 212.4 })).title).toBe('You’re 212 m from the venue');
   });
   it('handles rate limiting', () => {
-    expect(explainCheckInError(err('Too many requests.', 429)).kind).toBe('rate');
+    expect(explainCheckInError(err('', 429)).kind).toBe('rate');
   });
 });

@@ -1,21 +1,24 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { BadgeCheck, Check, Clock4, ShieldQuestion, XCircle } from 'lucide-react';
-import { useEffect } from 'react';
+import { BadgeCheck, Camera, Check, Clock4, ShieldQuestion, XCircle } from 'lucide-react';
+import { useEffect, useRef } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { cn } from '@/shared/lib/cn';
 import { AVAILABILITY_SLOTS, SKILL_CATALOGUE, normalizeAvailability, normalizeSkill } from '@/shared/lib/skills';
 import { humanizeSkill } from '@/shared/lib/format';
 import { formatDate } from '@/shared/lib/time';
-import { isApiError } from '@/shared/api/http';
-import { Avatar, Button, Card, CardBody, CardHeader, ErrorState, Field, FormError, Input, PageHeader, Skeleton, TagInput, Textarea, notify } from '@/shared/ui';
+import { errorMessage, isApiError } from '@/shared/api/http';
+import { Avatar, Button, Card, CardBody, CardHeader, DatePicker, ErrorState, Field, FormError, Input, PageHeader, PhoneInput, Skeleton, TagInput, Textarea, isValidPhone, notify } from '@/shared/ui';
+import { useUploadPhoto } from '@/features/auth/api';
 import { useSession } from '@/features/auth/use-session';
 import { useUpdateProfile, useVolunteerProfile } from '@/features/volunteer/api';
 import type { SkillVerificationStatus } from '@/shared/types/api';
 
 // Mirrors App\Http\Requests\UpdateVolunteerProfileRequest
 const schema = z.object({
-  full_name: z.string().trim().min(1, 'Enter your name.').max(100),
+  first_name: z.string().trim().min(1, 'Enter your first name.').max(60),
+  last_name: z.string().trim().min(1, 'Enter your last name.').max(60),
+  phone: z.string().refine((v) => !v || isValidPhone(v), 'Enter a valid phone number.'),
   bio: z.string().max(1000, 'Keep your bio under 1,000 characters.'),
   skills: z.array(z.string().max(100)),
   availability: z.array(z.string().max(100)),
@@ -34,7 +37,9 @@ export default function ProfilePage() {
   const { user } = useSession();
   const profile = useVolunteerProfile();
   const update = useUpdateProfile();
-  const form = useForm<Values>({ resolver: zodResolver(schema), defaultValues: { full_name: '', bio: '', skills: [], availability: [], date_of_birth: '' } });
+  const form = useForm<Values>({ resolver: zodResolver(schema), defaultValues: { first_name: '', last_name: '', phone: '', bio: '', skills: [], availability: [], date_of_birth: '' } });
+  const photo = useUploadPhoto();
+  const fileRef = useRef<HTMLInputElement>(null);
   const { register, control, handleSubmit, reset, formState, setError } = form;
 
   useEffect(() => {
@@ -44,7 +49,9 @@ export default function ProfilePage() {
     const v = profile.data?.volunteer;
     if (v) {
       reset({
-        full_name: v.user?.full_name ?? user?.full_name ?? '',
+        first_name: v.user?.first_name ?? user?.first_name ?? (v.user?.full_name ?? '').split(' ')[0] ?? '',
+        last_name: v.user?.last_name ?? user?.last_name ?? (v.user?.full_name ?? '').split(' ').slice(1).join(' '),
+        phone: v.user?.phone ?? user?.phone ?? '',
         bio: v.bio ?? '',
         skills: v.skills,
         availability: normalizeAvailability(v.availability),
@@ -59,7 +66,7 @@ export default function ProfilePage() {
 
   const onSubmit = handleSubmit((values) =>
     update.mutate(
-      { ...values, date_of_birth: values.date_of_birth || null },
+      { ...values, phone: values.phone || null, date_of_birth: values.date_of_birth || null },
       {
         onSuccess: () => notify.success('Profile saved', 'Shift matches update with your new skills.'),
         onError: (e) => {
@@ -82,20 +89,58 @@ export default function ProfilePage() {
               ) : (
                 <>
                   <div className="flex items-center gap-4">
-                    <Avatar name={user?.full_name ?? ''} src={user?.profile_photo_url} size="lg" />
-                    <div className="text-sm text-muted">
-                      <div className="font-medium text-text">{user?.email}</div>
+                    <button
+                      type="button"
+                      onClick={() => fileRef.current?.click()}
+                      className="group relative shrink-0 rounded-full focus-visible:outline-2 focus-visible:outline-focus"
+                      aria-label="Change profile photo"
+                    >
+                      <Avatar name={user?.full_name ?? ''} src={user?.profile_photo_url} size="lg" />
+                      <span className="absolute inset-0 grid place-items-center rounded-full bg-black/45 text-white opacity-0 transition-opacity group-hover:opacity-100">
+                        <Camera className="size-5" />
+                      </span>
+                    </button>
+                    <input
+                      ref={fileRef}
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
+                      className="hidden"
+                      onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        e.target.value = '';
+                        if (!f) return;
+                        if (f.size > 2 * 1024 * 1024) return void notify.error('Photo is larger than 2 MB');
+                        photo.mutate(f, { onSuccess: () => notify.success('Photo updated'), onError: (err) => notify.error(errorMessage(err)) });
+                      }}
+                    />
+                    <div className="min-w-0 text-sm text-muted">
+                      <div className="truncate font-medium text-text">{user?.email}</div>
                       Member since {formatDate(v.created_at, 'MMMM yyyy')}
+                      <button type="button" onClick={() => fileRef.current?.click()} className="mt-1 block text-[12.5px] font-medium text-accent-text hover:underline">
+                        {photo.isPending ? 'Uploading…' : user?.profile_photo_url ? 'Change photo' : 'Add a photo'}
+                      </button>
                     </div>
                   </div>
-                  <Field label="Full name" error={formState.errors.full_name?.message}>
-                    <Input {...register('full_name')} autoComplete="name" />
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <Field label="First name" error={formState.errors.first_name?.message}>
+                      <Input {...register('first_name')} autoComplete="given-name" />
+                    </Field>
+                    <Field label="Last name" error={formState.errors.last_name?.message}>
+                      <Input {...register('last_name')} autoComplete="family-name" />
+                    </Field>
+                  </div>
+                  <Field label="Phone" optional hint="Coordinators use it to reach you about a shift." error={formState.errors.phone?.message}>
+                    <Controller control={control} name="phone" render={({ field }) => <PhoneInput country="ET" value={field.value} onChange={field.onChange} />} />
                   </Field>
                   <Field label="Bio" optional error={formState.errors.bio?.message}>
                     <Textarea rows={4} {...register('bio')} placeholder="Languages you speak, experience, what you love doing…" />
                   </Field>
                   <Field label="Date of birth" optional hint="Only used to check if parental consent is needed (under 18).">
-                    <Input type="date" max={new Date().toISOString().slice(0, 10)} {...register('date_of_birth')} />
+                    <Controller
+                      control={control}
+                      name="date_of_birth"
+                      render={({ field }) => <DatePicker value={field.value} onChange={field.onChange} max={new Date().toISOString().slice(0, 10)} placeholder="Select your birthday" />}
+                    />
                   </Field>
                 </>
               )}

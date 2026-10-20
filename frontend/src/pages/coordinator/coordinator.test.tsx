@@ -9,7 +9,7 @@ import { toApiDate } from '@/shared/lib/time';
 const T = { timeout: 10_000 };
 
 describe('event schema (mirrors CreateEventRequest)', () => {
-  const base = { title: 'X', location: 'Y', latitude: null, longitude: null, start_date: toApiDate(new Date()), end_date: toApiDate(new Date()), geofence_radius: 100, description: '' };
+  const base = { title: 'X', location: 'Y', latitude: 9.03, longitude: 38.75, start_date: toApiDate(new Date()), end_date: toApiDate(new Date()), geofence_radius: 100, description: '' };
   it('accepts a valid event', () => expect(eventCreateSchema.safeParse(base).success).toBe(true));
   it('rejects past starts, inverted ranges and tiny geofences', () => {
     expect(eventCreateSchema.safeParse({ ...base, start_date: '2020-01-01', end_date: '2020-01-02' }).success).toBe(false);
@@ -25,18 +25,26 @@ describe('coordinator workspace', () => {
     expect(await screen.findByRole('link', { name: /open live/i }, T)).toBeInTheDocument();
   });
 
-  it('creates an event and adds its first shift', async () => {
+  it('creates an event with its shifts through the wizard', async () => {
     const { screen, user, router } = await renderApp('/c/events/new', { as: DEMO.coordinator });
     await user.type(await screen.findByLabelText('Event name', {}, T), 'Library clean-up');
-    await user.click(screen.getByRole('button', { name: 'Piazza' }));
-    await user.click(screen.getByRole('button', { name: 'Create event' }));
+    await user.click(screen.getByRole('button', { name: /continue/i }));
+    await user.type(await screen.findByLabelText(/venue name/i, {}, T), 'Piazza library');
+    const lat = screen.getByLabelText('Latitude');
+    await user.clear(lat);
+    await user.type(lat, '9.035221');
+    const lng = screen.getByLabelText('Longitude');
+    await user.clear(lng);
+    await user.type(lng, '38.751044');
+    await user.tab();
+    await user.click(screen.getByRole('button', { name: /continue/i }));
+    expect(await screen.findByText(/volunteer places/i, {}, T)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /continue/i }));
+    await user.click(await screen.findByRole('button', { name: /publish event/i }, T));
     await waitFor(() => expect(router.state.location.pathname).toMatch(/^\/c\/events\/\d+$/), T);
-    const dialog = await screen.findByRole('dialog', { name: 'Add a shift' }, T);
-    await user.click(within(dialog).getByRole('button', { name: 'Add shift' }));
-    expect(await screen.findByText('Shift added', {}, T)).toBeInTheDocument();
     const created = db.t.events.find((e) => e.title === 'Library clean-up')!;
     expect(created.latitude).toBeCloseTo(9.035221);
-    expect(db.t.shifts.some((s) => s.event_id === created.id)).toBe(true);
+    expect(db.t.shifts.some((sh) => sh.event_id === created.id)).toBe(true);
   });
 
   it('approves an application from the queue', async () => {
@@ -60,7 +68,7 @@ describe('coordinator workspace', () => {
 
   it('verifies logged hours', async () => {
     const { screen, user } = await renderApp('/c/hours', { as: DEMO.coordinator });
-    const verify = await screen.findAllByRole('button', { name: /verify/i }, T);
+    const verify = await screen.findAllByRole('button', { name: /^verify$/i }, T);
     const pendingBefore = db.t.attendances.filter((a) => a.hours_status === 'pending' && a.check_out_time).length;
     await user.click(verify[0]!);
     await waitFor(() => expect(db.t.attendances.filter((a) => a.hours_status === 'pending' && a.check_out_time).length).toBe(pendingBefore - 1), T);
@@ -76,8 +84,8 @@ describe('coordinator workspace', () => {
     const shift = db.t.shifts.find((s) => s.qr_code_signature === 'VT-DEMO-7F3A9C21')!;
     const { screen } = await renderApp(`/c/live/${shift.id}`, { as: DEMO.coordinator });
     expect(await screen.findByRole('heading', { name: 'Roster' }, T)).toBeInTheDocument();
-    expect(await screen.findByText(/rotates in/i, {}, T)).toBeInTheDocument();
-    expect((await screen.findAllByRole('button', { name: /manual/i }, T)).length).toBeGreaterThan(0);
+    expect(await screen.findByText(/new code in/i, {}, T)).toBeInTheDocument();
+    expect((await screen.findAllByRole('button', { name: /check in|check out/i }, T)).length).toBeGreaterThan(0);
   });
 
   it('sends an urgent alert to matching volunteers', async () => {
@@ -86,7 +94,7 @@ describe('coordinator workspace', () => {
     const dialog = await screen.findByRole('dialog', {}, T);
     await within(dialog).findByText(/volunteers will be alerted/i, {}, T);
     await user.click(within(dialog).getByRole('button', { name: /send alert/i }));
-    expect(await screen.findByText('Alert queued', {}, T)).toBeInTheDocument();
+    expect(await screen.findByText('Urgent alert sent', {}, T)).toBeInTheDocument();
   });
 
   it('keeps other tenants’ events out of reach', async () => {

@@ -41,6 +41,7 @@ export default function LoginPage() {
   const onSubmit = handleSubmit(async (v) => {
     try {
       const res = await login.mutateAsync({ login: v.login, password: v.password });
+      if (res.must_change_password || res.user.must_change_password) return navigate('/welcome/password', { replace: true });
       const next = params.get('next');
       const home = ROLE_HOME[res.user.role];
       navigate(next && next.startsWith(home) ? next : home, { replace: true });
@@ -101,6 +102,16 @@ export default function LoginPage() {
         New here?{' '}
         <Link to="/register" className="font-medium text-accent-text hover:underline">
           Create a volunteer account
+        </Link>
+      </p>
+      <p className="mt-2 text-center text-sm text-muted">
+        Run an organization?{' '}
+        <Link to="/signup/organization" className="font-medium text-accent-text hover:underline">
+          Register it for free
+        </Link>
+        {' · '}
+        <Link to="/invite/resend" className="font-medium text-accent-text hover:underline">
+          Invitation expired?
         </Link>
       </p>
 

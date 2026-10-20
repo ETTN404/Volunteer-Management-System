@@ -8,58 +8,81 @@ import { useMyShifts } from '@/features/volunteer/derived';
 import { OpportunityCard, bestMatch } from '@/features/volunteer/components/opportunity-card';
 
 type Sort = 'match' | 'soonest' | 'open';
-type Scope = 'open' | 'all';
+type When = 'upcoming' | 'past';
 
 export default function OpportunitiesPage() {
   const [params, setParams] = useSearchParams();
   const page = Number(params.get('page') ?? 1);
   const [q, setQ] = useState(params.get('q') ?? '');
+  const [debounced, setDebounced] = useState(q);
   const [sort, setSort] = useState<Sort>((params.get('sort') as Sort) ?? 'match');
-  const [scope, setScope] = useState<Scope>('open');
+  const [when, setWhen] = useState<When>('upcoming');
   const [mineOnly, setMineOnly] = useState(false);
-  const events = useOpportunities(page);
+  const events = useOpportunities({ page, q: debounced || undefined, when, per_page: 12 });
   const profile = useVolunteerProfile();
   const shifts = useMyShifts();
 
   useEffect(() => {
     document.title = 'Opportunities · VolunTrack';
   }, []);
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced(q.trim()), 350);
+    return () => clearTimeout(t);
+  }, [q]);
 
   const applied = useMemo(() => new Set(shifts.rows.map((r) => r.shift.id)), [shifts.rows]);
   const mySkills = profile.data?.volunteer.skills ?? [];
 
   const list = useMemo(() => {
     let items = events.data?.items ?? [];
-    if (scope === 'open') items = items.filter((e) => e.status === 'upcoming' || e.status === 'ongoing');
-    if (q.trim()) {
-      const needle = q.trim().toLowerCase();
-      items = items.filter((e) => [e.title, e.location, e.description ?? '', ...(e.shifts ?? []).flatMap((s) => s.required_skills)].join(' ').toLowerCase().includes(needle));
-    }
     if (mineOnly) items = items.filter((e) => bestMatch(e) >= 50);
     const open = (e: (typeof items)[number]) => (e.shifts ?? []).reduce((n, s) => n + Math.max(0, s.capacity - (s.confirmed_count ?? 0)), 0);
     return [...items].sort((a, b) =>
       sort === 'match' ? bestMatch(b) - bestMatch(a) : sort === 'open' ? open(b) - open(a) : a.start_date.localeCompare(b.start_date),
     );
-  }, [events.data, q, sort, scope, mineOnly]);
+  }, [events.data, sort, mineOnly]);
 
   const pagination = events.data?.pagination;
-  const go = (p: number) => setParams((prev) => {
-    prev.set('page', String(p));
-    return prev;
-  });
+  const go = (p: number) =>
+    setParams((prev) => {
+      prev.set('page', String(p));
+      return prev;
+    });
 
   return (
-    <>
+    <div className="min-w-0">
       <PageHeader
         eyebrow="Opportunities"
         title="Find a shift that fits you"
-        description={mySkills.length ? 'Ranked by how well each shift matches your skills.' : 'Add skills to your profile and we’ll rank shifts by fit.'}
+        description={mySkills.length ? 'Every verified organization on VolunTrack, ranked by how well each shift matches your skills.' : 'Add skills to your profile and we’ll rank shifts by fit.'}
       />
 
-      <div className="mb-6 flex flex-col gap-3 lg:flex-row lg:items-center">
-        <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search by event, place or skill" leading={<Search />} className="lg:w-80" aria-label="Search opportunities" />
-        <div className="flex flex-wrap items-center gap-2 lg:ml-auto">
-          <Segmented value={scope} onValueChange={setScope} size="sm" aria-label="Which events" options={[{ value: 'open', label: 'Open now' }, { value: 'all', label: 'All' }]} />
+      <div className="mb-6 flex min-w-0 flex-col gap-3 lg:flex-row lg:items-center">
+        <Input
+          value={q}
+          onChange={(e) => {
+            setQ(e.target.value);
+            if (page !== 1) go(1);
+          }}
+          placeholder="Search events, places or descriptions"
+          leading={<Search />}
+          className="lg:w-80"
+          aria-label="Search opportunities"
+        />
+        <div className="-mx-1 flex min-w-0 flex-wrap items-center gap-2 px-1 lg:ml-auto">
+          <Segmented
+            value={when}
+            onValueChange={(v) => {
+              setWhen(v);
+              go(1);
+            }}
+            size="sm"
+            aria-label="Which events"
+            options={[
+              { value: 'upcoming', label: 'Open' },
+              { value: 'past', label: 'Past' },
+            ]}
+          />
           <Segmented
             value={sort}
             onValueChange={(v) => {
@@ -94,25 +117,26 @@ export default function OpportunitiesPage() {
       ) : list.length === 0 ? (
         <EmptyState
           icon={<SearchX />}
-          title="No shifts match these filters"
-          description="Clear the search or include completed events to see more."
+          title={debounced || mineOnly ? 'No shifts match these filters' : when === 'upcoming' ? 'No open events right now' : 'No past events'}
+          description={debounced || mineOnly ? 'Clear the search or the match filter to see more.' : 'New events appear here as soon as organizations publish them.'}
           action={
-            <Button
-              variant="secondary"
-              onClick={() => {
-                setQ('');
-                setMineOnly(false);
-                setScope('all');
-              }}
-            >
-              Clear filters
-            </Button>
+            debounced || mineOnly ? (
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setQ('');
+                  setMineOnly(false);
+                }}
+              >
+                Clear filters
+              </Button>
+            ) : undefined
           }
         />
       ) : (
-        <Stagger key={`${page}-${sort}-${scope}`} className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <Stagger key={`${page}-${sort}-${when}-${debounced}`} className="grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {list.map((e) => (
-            <StaggerItem key={e.id}>
+            <StaggerItem key={e.id} className="min-w-0">
               <OpportunityCard event={e} appliedShiftIds={applied} />
             </StaggerItem>
           ))}
@@ -132,6 +156,6 @@ export default function OpportunitiesPage() {
           </Button>
         </nav>
       )}
-    </>
+    </div>
   );
 }

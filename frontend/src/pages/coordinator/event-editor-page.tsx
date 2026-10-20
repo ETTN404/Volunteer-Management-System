@@ -1,17 +1,25 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { ArrowLeft, Crosshair, Info } from 'lucide-react';
-import { useEffect } from 'react';
+import { AnimatePresence, motion } from 'motion/react';
+import { ArrowLeft, ArrowRight, CalendarDays, Check, ClipboardList, MapPin, Rocket } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { Link, useNavigate, useParams } from 'react-router';
+import { format, parseISO } from 'date-fns';
 import { cn } from '@/shared/lib/cn';
-import { toApiDate } from '@/shared/lib/time';
-import { formatCoordinate } from '@/shared/lib/geo';
-import { isApiError } from '@/shared/api/http';
-import { Button, Card, CardBody, CardHeader, ErrorState, Field, FormError, Input, PageHeader, Skeleton, Slider, Textarea, VenueMap, notify } from '@/shared/ui';
+import { toApiDate, toApiDateTime } from '@/shared/lib/time';
+import { humanizeSkill } from '@/shared/lib/format';
+import { errorMessage, isApiError } from '@/shared/api/http';
+import { Button, Card, CardBody, CardHeader, DateRangePicker, ErrorState, Field, FormError, Input, LocationPicker, PageHeader, Skeleton, Textarea, notify } from '@/shared/ui';
 import { useCreateEvent, useOrgEvent, useUpdateEvent } from '@/features/operations/api';
-import { VENUE_PRESETS, eventCreateSchema, eventSchema, type EventFormValues } from '@/features/operations/event-schema';
+import { draftProblems, eventCreateSchema, eventSchema, type EventFormValues, type ShiftDraft } from '@/features/operations/event-schema';
+import { ShiftBuilder, emptyDraft } from '@/features/operations/components/shift-builder';
 
-const DEFAULT_CENTER = { latitude: 9.010733, longitude: 38.761269 };
+const STEPS = [
+  { key: 'basics', label: 'Basics', icon: ClipboardList },
+  { key: 'venue', label: 'Venue', icon: MapPin },
+  { key: 'shifts', label: 'Shifts', icon: CalendarDays },
+  { key: 'review', label: 'Review', icon: Rocket },
+] as const;
 
 export default function EventEditorPage() {
   const params = useParams();
@@ -22,15 +30,15 @@ export default function EventEditorPage() {
   const update = useUpdateEvent();
   const navigate = useNavigate();
   const today = toApiDate(new Date());
+  const [step, setStep] = useState(0);
+  const [drafts, setDrafts] = useState<ShiftDraft[]>([]);
 
   const form = useForm<EventFormValues>({
     resolver: zodResolver(editing ? eventSchema : eventCreateSchema),
     defaultValues: { title: '', description: '', location: '', latitude: null, longitude: null, start_date: today, end_date: today, geofence_radius: 100 },
   });
-  const { register, control, handleSubmit, reset, watch, setValue, formState, setError } = form;
-  const lat = watch('latitude');
-  const lng = watch('longitude');
-  const radius = watch('geofence_radius');
+  const { register, control, handleSubmit, reset, watch, setValue, formState, setError, trigger } = form;
+  const v = watch();
 
   useEffect(() => {
     document.title = `${editing ? 'Edit' : 'New'} event · VolunTrack`;
@@ -49,21 +57,43 @@ export default function EventEditorPage() {
         geofence_radius: e.geofence_radius,
       });
   }, [existing.data, reset]);
+  // First shift suggestion once dates are set.
+  useEffect(() => {
+    if (!editing && step === 2 && drafts.length === 0) setDrafts([emptyDraft(v.start_date)]);
+  }, [step]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const onSubmit = handleSubmit(async (v) => {
+  const applyServerErrors = (e: unknown) => {
+    if (isApiError(e)) for (const [f, m] of Object.entries(e.fieldErrors)) if (!f.startsWith('shifts')) setError(f as keyof EventFormValues, { message: m[0] });
+  };
+
+  const save = handleSubmit(async (values) => {
     try {
       if (editing) {
-        // UpdateEventRequest accepts dates/coords, but the controller only persists these fields.
-        await update.mutateAsync({ id: eventId!, title: v.title, description: v.description || null, location: v.location, geofence_radius: v.geofence_radius });
+        await update.mutateAsync({ id: eventId!, ...values, latitude: values.latitude!, longitude: values.longitude!, description: values.description || null });
         notify.success('Event saved');
         navigate(`/c/events/${eventId}`);
-      } else {
-        const e = await create.mutateAsync({ ...v, description: v.description || null });
-        notify.success('Event created', 'Now add the shifts volunteers can apply for.');
-        navigate(`/c/events/${e.id}`, { state: { addShift: true } });
+        return;
       }
+      const e = await create.mutateAsync({
+        ...values,
+        latitude: values.latitude!,
+        longitude: values.longitude!,
+        description: values.description || null,
+        shifts: drafts.map((d) => ({
+          title: d.title.trim() || null,
+          notes: d.notes.trim() || null,
+          start_time: toApiDateTime(new Date(`${d.date}T${d.start}:00`)),
+          end_time: toApiDateTime(new Date(`${d.date}T${d.end}:00`)),
+          capacity: d.capacity,
+          required_skills: d.required_skills,
+        })),
+      });
+      notify.success('Event published', drafts.length ? `${drafts.length} shifts are open for applications.` : 'Add shifts so volunteers can apply.');
+      navigate(`/c/events/${e.id}`, { state: drafts.length ? undefined : { addShift: true } });
     } catch (e) {
-      if (isApiError(e)) for (const [f, m] of Object.entries(e.fieldErrors)) setError(f as keyof EventFormValues, { message: m[0] });
+      applyServerErrors(e);
+      if (!editing && isApiError(e) && Object.keys(e.fieldErrors).some((k) => ['title', 'description', 'start_date', 'end_date'].includes(k))) setStep(0);
+      else if (!editing && isApiError(e) && Object.keys(e.fieldErrors).some((k) => ['location', 'latitude', 'longitude', 'geofence_radius'].includes(k))) setStep(1);
     }
   });
 
@@ -71,114 +101,189 @@ export default function EventEditorPage() {
   if (editing && existing.error) return <ErrorState error={existing.error} onRetry={() => existing.refetch()} />;
   const err = create.error ?? update.error;
 
+  const basics = (
+    <div className="space-y-5">
+      <Field label="Event name" error={formState.errors.title?.message}>
+        <Input {...register('title')} placeholder="e.g. Bole community blood drive" inputSize="lg" />
+      </Field>
+      <Field label="Dates" error={formState.errors.start_date?.message ?? formState.errors.end_date?.message} hint="One day or several — shifts are planned inside these dates.">
+        <DateRangePicker
+          value={{ from: v.start_date, to: v.end_date }}
+          min={editing ? undefined : today}
+          onChange={(r) => {
+            setValue('start_date', r.from, { shouldDirty: true });
+            setValue('end_date', r.to || r.from, { shouldDirty: true });
+          }}
+          invalid={Boolean(formState.errors.start_date || formState.errors.end_date)}
+        />
+      </Field>
+      <Field label="Description" optional error={formState.errors.description?.message} hint="What volunteers will do, what to bring, where to meet.">
+        <Textarea rows={6} {...register('description')} />
+      </Field>
+    </div>
+  );
+
+  const venue = (
+    <div className="space-y-5">
+      <Field label="Venue name" error={formState.errors.location?.message} hint="Shown to volunteers — filled in from the address you pick, edit it freely.">
+        <Input {...register('location')} placeholder="e.g. Millennium Hall, Gate 3" />
+      </Field>
+      <Controller
+        control={control}
+        name="latitude"
+        render={() => (
+          <LocationPicker
+            value={{ location: v.location, latitude: v.latitude, longitude: v.longitude, radius: v.geofence_radius }}
+            invalid={Boolean(formState.errors.latitude)}
+            onChange={(n) => {
+              if (n.location !== v.location) setValue('location', n.location, { shouldDirty: true, shouldValidate: true });
+              setValue('latitude', n.latitude, { shouldDirty: true, shouldValidate: Boolean(formState.errors.latitude) });
+              setValue('longitude', n.longitude, { shouldDirty: true });
+              setValue('geofence_radius', n.radius, { shouldDirty: true });
+            }}
+          />
+        )}
+      />
+      {formState.errors.latitude && <p className="text-[12.5px] text-danger-text">{formState.errors.latitude.message}</p>}
+    </div>
+  );
+
+  // ---------------- Edit mode: one page ----------------
+  if (editing) {
+    return (
+      <>
+        <Link to={`/c/events/${eventId}`} className="mb-6 inline-flex items-center gap-1.5 text-sm text-muted hover:text-text">
+          <ArrowLeft className="size-4" /> Back to event
+        </Link>
+        <PageHeader eyebrow="Edit event" title={existing.data?.title ?? 'Edit event'} description="Changing the dates is blocked while shifts fall outside them. Volunteers on the shifts are notified of time changes." />
+        <form onSubmit={save} noValidate className="grid gap-6 lg:grid-cols-2">
+          <Card>
+            <CardHeader title="Basics" />
+            <CardBody>{basics}</CardBody>
+          </Card>
+          <Card>
+            <CardHeader title="Venue & check-in area" />
+            <CardBody>{venue}</CardBody>
+          </Card>
+          <div className="flex justify-end gap-2 lg:col-span-2">
+            <FormError message={err && !(isApiError(err) && err.isValidation) ? errorMessage(err) : null} />
+            <Button variant="ghost" type="button" onClick={() => navigate(`/c/events/${eventId}`)}>
+              Cancel
+            </Button>
+            <Button type="submit" loading={update.isPending}>
+              Save event
+            </Button>
+          </div>
+        </form>
+      </>
+    );
+  }
+
+  // ---------------- Create mode: wizard ----------------
+  const next = async () => {
+    const fields: (keyof EventFormValues)[][] = [['title', 'description', 'start_date', 'end_date'], ['location', 'latitude', 'longitude', 'geofence_radius'], [], []];
+    const ok = await trigger(fields[step]);
+    if (!ok) return;
+    if (step === 2 && drafts.some((d) => draftProblems(d, v.start_date, v.end_date))) return notify.error('Fix the highlighted shifts first');
+    setStep((s) => Math.min(3, s + 1));
+  };
+
   return (
     <>
-      <Link to={editing ? `/c/events/${eventId}` : '/c/events'} className="mb-6 inline-flex items-center gap-1.5 text-sm text-muted hover:text-text">
-        <ArrowLeft className="size-4" /> {editing ? 'Back to event' : 'Events'}
+      <Link to="/c/events" className="mb-6 inline-flex items-center gap-1.5 text-sm text-muted hover:text-text">
+        <ArrowLeft className="size-4" /> Events
       </Link>
-      <PageHeader eyebrow={editing ? 'Edit event' : 'New event'} title={editing ? existing.data?.title ?? 'Edit event' : 'Create an event'} description="Volunteers will check in from inside the geofence you set on the map." />
+      <PageHeader eyebrow="New event" title="Create an event" description="Four short steps. Volunteers see it as soon as you publish." />
 
-      <form onSubmit={onSubmit} noValidate className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
-        <div className="space-y-6">
-          <Card>
-            <CardHeader title="Details" />
-            <CardBody className="space-y-5">
-              <Field label="Event name" error={formState.errors.title?.message}>
-                <Input {...register('title')} placeholder="Meskel Square Blood Drive" autoFocus={!editing} />
-              </Field>
-              <Field label="Description" optional hint="What volunteers will do, what to bring, who to ask for." error={formState.errors.description?.message}>
-                <Textarea rows={5} {...register('description')} />
-              </Field>
-            </CardBody>
-          </Card>
-          <Card>
-            <CardHeader title="When" />
-            <CardBody className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <Field label="Starts" error={formState.errors.start_date?.message}>
-                  <Input type="date" min={editing ? undefined : today} disabled={editing} {...register('start_date')} />
-                </Field>
-                <Field label="Ends" error={formState.errors.end_date?.message}>
-                  <Input type="date" min={watch('start_date')} disabled={editing} {...register('end_date')} />
-                </Field>
-              </div>
-              {editing && (
-                <p className="flex items-start gap-2 text-[12.5px] text-faint">
-                  <Info className="mt-0.5 size-3.5 shrink-0" /> Dates and the map pin are fixed once an event is created. Edit shift times from the event page.
-                </p>
-              )}
-            </CardBody>
-          </Card>
-        </div>
+      <ol className="mb-6 grid grid-cols-4 gap-2">
+        {STEPS.map((s, i) => (
+          <li key={s.key}>
+            <button
+              type="button"
+              disabled={i > step}
+              onClick={() => i < step && setStep(i)}
+              className={cn('flex w-full flex-col items-start gap-2 rounded-lg px-3 py-2.5 text-left transition-colors sm:flex-row sm:items-center', i === step ? 'bg-accent-soft text-accent-text' : i < step ? 'text-text hover:bg-surface-2' : 'text-faint')}
+            >
+              <span className={cn('grid size-7 shrink-0 place-items-center rounded-full text-[12px] font-bold', i < step ? 'bg-success text-white' : i === step ? 'bg-accent text-accent-fg' : 'bg-surface-2')}>
+                {i < step ? <Check className="size-3.5" strokeWidth={3} /> : <s.icon className="size-3.5" />}
+              </span>
+              <span className="text-[13px] font-medium">{s.label}</span>
+            </button>
+          </li>
+        ))}
+      </ol>
 
-        <Card className="lg:sticky lg:top-24 lg:self-start">
-          <CardHeader title="Where" description={editing ? undefined : 'Pick a venue or click the map to drop the pin.'} />
-          <CardBody className="space-y-5">
-            <Field label="Location name" error={formState.errors.location?.message}>
-              <Input {...register('location')} placeholder="Meskel Square, Kirkos, Addis Ababa" />
-            </Field>
-            {!editing && (
-              <div className="flex flex-wrap gap-1.5">
-                {VENUE_PRESETS.map((p) => (
-                  <button
-                    key={p.label}
-                    type="button"
-                    onClick={() => {
-                      setValue('location', p.location, { shouldDirty: true, shouldValidate: true });
-                      setValue('latitude', p.latitude, { shouldDirty: true });
-                      setValue('longitude', p.longitude, { shouldDirty: true });
-                    }}
-                    className={cn('rounded-md px-2.5 py-1.5 text-[12.5px] transition-colors [box-shadow:inset_0_0_0_1px_var(--line)] hover:bg-surface-2', lat === p.latitude ? 'bg-accent-soft text-accent-text' : 'text-muted')}
-                  >
-                    {p.label}
-                  </button>
-                ))}
-              </div>
-            )}
-            <div className="relative">
-              <VenueMap
-                venue={lat != null && lng != null ? { latitude: lat, longitude: lng } : DEFAULT_CENTER}
-                radius={radius}
-                showVenue={lat != null && lng != null}
-                className="h-[320px]"
-                onPick={
-                  editing
-                    ? undefined
-                    : (p) => {
-                        setValue('latitude', Math.round(p.latitude * 1e6) / 1e6, { shouldDirty: true });
-                        setValue('longitude', Math.round(p.longitude * 1e6) / 1e6, { shouldDirty: true });
-                      }
-                }
-              />
-              <div className="type-data pointer-events-none absolute bottom-3 left-3 z-[500] flex items-center gap-1.5 rounded-md bg-raised/85 px-2.5 py-1.5 text-[11px] text-muted backdrop-blur">
-                <Crosshair className="size-3.5 text-accent-text" />
-                {lat != null && lng != null ? `${formatCoordinate(lat, 'lat')} ${formatCoordinate(lng, 'lng')}` : 'No pin — GPS check won’t apply'}
-              </div>
-            </div>
-            <Controller
-              control={control}
-              name="geofence_radius"
-              render={({ field }) => (
-                <Field label={`Check-in radius · ${field.value} m`} hint="Volunteers must be inside this circle to check in. 100–200 m suits most venues." error={formState.errors.geofence_radius?.message}>
-                  <div className="pt-1">
-                    <Slider min={50} max={1000} step={10} value={[field.value]} onValueChange={([v]) => field.onChange(v)} aria-label="Geofence radius" />
-                  </div>
-                </Field>
-              )}
-            />
+      <form onSubmit={(e) => e.preventDefault()} noValidate>
+        <Card>
+          <CardBody className="p-5 sm:p-7">
+            <AnimatePresence mode="wait">
+              <motion.div key={step} initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }} transition={{ duration: 0.22 }}>
+                {step === 0 && basics}
+                {step === 1 && venue}
+                {step === 2 && <ShiftBuilder value={drafts} onChange={setDrafts} startDate={v.start_date} endDate={v.end_date} />}
+                {step === 3 && <Review values={v} drafts={drafts} />}
+              </motion.div>
+            </AnimatePresence>
+            <FormError message={err && !(isApiError(err) && err.isValidation && Object.keys(err.fieldErrors).every((k) => !k.startsWith('shifts'))) ? errorMessage(err) : null} />
           </CardBody>
         </Card>
-
-        <div className="flex items-center justify-end gap-3 lg:col-span-2">
-          <FormError message={err && !(isApiError(err) && err.isValidation) ? err.message : null} />
-          <Button variant="ghost" type="button" onClick={() => navigate(-1)}>
-            Cancel
+        <div className="mt-5 flex items-center justify-between gap-3">
+          <Button type="button" variant="ghost" disabled={step === 0} onClick={() => setStep((s) => s - 1)}>
+            <ArrowLeft /> Back
           </Button>
-          <Button type="submit" size="lg" loading={create.isPending || update.isPending}>
-            {editing ? 'Save changes' : 'Create event'}
-          </Button>
+          {step < 3 ? (
+            <Button type="button" onClick={next}>
+              {step === 2 && drafts.length === 0 ? 'Skip — add shifts later' : 'Continue'} <ArrowRight />
+            </Button>
+          ) : (
+            <Button type="button" size="lg" loading={create.isPending} onClick={save}>
+              <Rocket /> Publish event
+            </Button>
+          )}
         </div>
       </form>
     </>
+  );
+}
+
+function Review({ values, drafts }: { values: EventFormValues; drafts: ShiftDraft[] }) {
+  const days = [...new Set(drafts.map((d) => d.date))].sort();
+  return (
+    <div className="space-y-6">
+      <div>
+        <h3 className="type-title text-xl text-text wrap-anywhere">{values.title}</h3>
+        <p className="mt-1 text-sm text-muted">
+          {format(parseISO(values.start_date), 'EEE d MMM yyyy')}
+          {values.end_date !== values.start_date && ` – ${format(parseISO(values.end_date), 'EEE d MMM yyyy')}`} · {values.location}
+        </p>
+        <p className="mt-1 text-[13px] text-faint">
+          Check-in area: {values.geofence_radius} m around {values.latitude?.toFixed(5)}, {values.longitude?.toFixed(5)}
+        </p>
+      </div>
+      {drafts.length === 0 ? (
+        <p className="rounded-lg bg-warning-soft px-4 py-3 text-sm text-warning-text">No shifts yet — volunteers can’t apply until you add at least one.</p>
+      ) : (
+        days.map((day) => (
+          <div key={day}>
+            <div className="type-eyebrow mb-2">{format(parseISO(day), 'EEEE d MMMM')}</div>
+            <ul className="divide-y divide-line rounded-lg [box-shadow:inset_0_0_0_1px_var(--line)]">
+              {drafts
+                .filter((d) => d.date === day)
+                .sort((a, b) => a.start.localeCompare(b.start))
+                .map((d) => (
+                  <li key={d.key} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3 text-sm">
+                    <span className="type-data w-28 text-text">
+                      {d.start}–{d.end}
+                    </span>
+                    <span className="min-w-0 flex-1 font-medium text-text">{d.title || 'Shift'}</span>
+                    <span className="text-muted">{d.capacity} volunteers</span>
+                    {d.required_skills.length > 0 && <span className="w-full text-[12.5px] text-faint sm:w-auto">{d.required_skills.map(humanizeSkill).join(', ')}</span>}
+                  </li>
+                ))}
+            </ul>
+          </div>
+        ))
+      )}
+    </div>
   );
 }

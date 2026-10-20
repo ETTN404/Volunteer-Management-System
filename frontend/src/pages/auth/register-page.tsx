@@ -7,7 +7,7 @@ import { Link, useNavigate } from 'react-router';
 import { z } from 'zod';
 import { cn } from '@/shared/lib/cn';
 import { AVAILABILITY_SLOTS, SKILL_CATALOGUE, normalizeSkill } from '@/shared/lib/skills';
-import { Button, Field, FormError, InlineAlert, Input, Skeleton, TagInput, Textarea } from '@/shared/ui';
+import { Button, DatePicker, Field, FormError, InlineAlert, Input, PhoneInput, Skeleton, TagInput, Textarea, isValidPhone } from '@/shared/ui';
 import { errorMessage, isApiError } from '@/shared/api/http';
 import { useRegister } from '@/features/auth/api';
 import { usePublicOrganizations } from '@/features/public/api';
@@ -16,7 +16,9 @@ import { AuthLayout } from './auth-layout';
 
 // Mirrors App\Http\Requests\RegisterVolunteerRequest.
 const schema = z.object({
-  full_name: z.string().trim().min(1, 'Enter your full name.').max(100, 'Keep your name under 100 characters.'),
+  first_name: z.string().trim().min(1, 'Enter your first name.').max(60),
+  last_name: z.string().trim().min(1, 'Enter your last name.').max(60),
+  phone: z.string().refine((v) => !v || isValidPhone(v), 'Enter a valid phone number.'),
   email: z.string().trim().min(1, 'Enter your email.').email('Enter a valid email address.').max(100),
   password: z.string().min(8, 'Use at least 8 characters.'),
   org_id: z.number().nullable().optional(),
@@ -31,7 +33,7 @@ const schema = z.object({
 type Values = z.infer<typeof schema>;
 
 const STEPS = [
-  { title: 'Your account', fields: ['full_name', 'email', 'password'] as const },
+  { title: 'Your account', fields: ['first_name', 'last_name', 'email', 'phone', 'password'] as const },
   { title: 'Your organization', fields: ['org_id'] as const },
   { title: 'Skills & time', fields: ['skills', 'availability', 'date_of_birth', 'bio'] as const },
 ];
@@ -49,7 +51,7 @@ export default function RegisterPage() {
   const orgs = usePublicOrganizations();
   const form = useForm<Values>({
     resolver: zodResolver(schema),
-    defaultValues: { full_name: '', email: '', password: '', skills: [], availability: [], bio: '', date_of_birth: '' },
+    defaultValues: { first_name: '', last_name: '', phone: '', email: '', password: '', skills: [], availability: [], bio: '', date_of_birth: '' },
     mode: 'onTouched',
   });
   const { register, control, handleSubmit, trigger, formState, watch, setError } = form;
@@ -66,14 +68,14 @@ export default function RegisterPage() {
 
   const onSubmit = handleSubmit(async (v) => {
     try {
-      const res = await registerMut.mutateAsync({ ...v, bio: v.bio || null, date_of_birth: v.date_of_birth || null });
+      const res = await registerMut.mutateAsync({ ...v, phone: v.phone || null, bio: v.bio || null, date_of_birth: v.date_of_birth || null });
       navigate('/v', { replace: true, state: { welcome: res.user.full_name } });
     } catch (e) {
       if (isApiError(e) && e.isValidation) {
         for (const [field, msgs] of Object.entries(e.fieldErrors)) {
           if (field in v) setError(field as keyof Values, { message: msgs[0] });
         }
-        if (e.fieldErrors.email || e.fieldErrors.full_name || e.fieldErrors.password) setStep(0);
+        if (e.fieldErrors.email || e.fieldErrors.first_name || e.fieldErrors.last_name || e.fieldErrors.phone || e.fieldErrors.password) setStep(0);
       }
     }
   });
@@ -84,7 +86,7 @@ export default function RegisterPage() {
         <div className="max-w-md space-y-4">
           {['Shifts ranked by how well they fit your skills', 'Check in from the venue — no paper sign-in sheets', 'A certificate at every milestone: 10, 25, 50, 100+ hours'].map((t) => (
             <div key={t} className="flex items-center gap-3 rounded-2xl bg-white/[0.07] px-4 py-3.5 text-[15px] text-white backdrop-blur [box-shadow:inset_0_0_0_1px_rgba(255,255,255,0.1)]">
-              <Check className="size-4 text-[#7fe0b9]" /> {t}
+              <Check className="size-4 text-[#a9b2ff]" /> {t}
             </div>
           ))}
         </div>
@@ -119,11 +121,19 @@ export default function RegisterPage() {
           <motion.div key={step} initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }} transition={{ duration: 0.3, ease: EASE_OUT_EXPO }} className="space-y-5">
             {step === 0 && (
               <>
-                <Field label="Full name" error={formState.errors.full_name?.message}>
-                  <Input inputSize="lg" autoComplete="name" autoFocus placeholder="Hana Tesfaye" {...register('full_name')} />
-                </Field>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Field label="First name" error={formState.errors.first_name?.message}>
+                    <Input inputSize="lg" autoComplete="given-name" autoFocus placeholder="Hana" {...register('first_name')} />
+                  </Field>
+                  <Field label="Last name" error={formState.errors.last_name?.message}>
+                    <Input inputSize="lg" autoComplete="family-name" placeholder="Tesfaye" {...register('last_name')} />
+                  </Field>
+                </div>
                 <Field label="Email" error={formState.errors.email?.message}>
                   <Input inputSize="lg" type="email" autoComplete="email" placeholder="you@example.com" {...register('email')} />
+                </Field>
+                <Field label="Phone" optional hint="So coordinators can reach you about a shift." error={formState.errors.phone?.message}>
+                  <Controller control={control} name="phone" render={({ field }) => <PhoneInput country="ET" value={field.value} onChange={field.onChange} />} />
                 </Field>
                 <Field label="Password" hint="At least 8 characters." error={formState.errors.password?.message}>
                   <Input
@@ -230,7 +240,7 @@ export default function RegisterPage() {
                   )}
                 />
                 <Field label="Date of birth" optional hint="Volunteers under 18 need a parental consent form before joining shifts." error={formState.errors.date_of_birth?.message}>
-                  <Input type="date" max={new Date().toISOString().slice(0, 10)} {...register('date_of_birth')} />
+                  <Controller control={control} name="date_of_birth" render={({ field }) => <DatePicker value={field.value} onChange={field.onChange} max={new Date().toISOString().slice(0, 10)} placeholder="Select your birthday" />} />
                 </Field>
                 {age != null && age < 18 && (
                   <InlineAlert tone="warning" title="Parental consent needed">

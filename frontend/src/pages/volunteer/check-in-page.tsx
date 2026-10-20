@@ -1,20 +1,23 @@
 import { AnimatePresence, motion } from 'motion/react';
-import { ArrowLeft, Check, Crosshair, Keyboard, LocateFixed, MapPinOff, QrCode, ScanLine, Wand2 } from 'lucide-react';
+import { ArrowLeft, Check, CheckCircle2, Crosshair, Keyboard, LocateFixed, LogOut, MapPinOff, QrCode, RotateCcw, ScanLine, Wand2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { cn } from '@/shared/lib/cn';
 import { checkGeofence, formatDistance, offsetMeters } from '@/shared/lib/geo';
-import { checkInWindow, formatTime, formatTimeRange } from '@/shared/lib/time';
+import { formatTime, formatTimeRange } from '@/shared/lib/time';
+import { formatHours } from '@/shared/lib/format';
 import { env } from '@/shared/config/env';
 import { useGeolocation } from '@/shared/hooks/use-geolocation';
 import { useNow } from '@/shared/hooks/use-now';
-import { isApiError } from '@/shared/api/http';
-import { Badge, Button, Card, EmptyState, Input, InlineAlert, Segmented, Skeleton, VenueMap } from '@/shared/ui';
+import { errorMessage, isApiError } from '@/shared/api/http';
+import { Badge, Button, Card, EmptyState, Input, InlineAlert, Segmented, Skeleton, VenueMap, notify } from '@/shared/ui';
 import { EASE_OUT_EXPO } from '@/shared/motion';
-import { useCheckIn } from '@/features/volunteer/api';
-import { useMyShifts } from '@/features/volunteer/derived';
+import type { CheckOutResult } from '@/shared/types/api';
+import { useCheckIn, useResumeShift } from '@/features/volunteer/api';
+import { shiftPhase, useMyShifts } from '@/features/volunteer/derived';
 import { explainCheckInError } from '@/features/volunteer/check-in-errors';
 import { QrScanner } from '@/features/volunteer/components/qr-scanner';
+import { CheckOutDialog, CheckOutResultDialog } from '@/features/volunteer/components/check-out-flow';
 
 /** Demo seed QR (mock backend only) so the flow can be tried without a coordinator screen. */
 const MOCK_QR = 'VT-DEMO-7F3A9C21';
@@ -22,7 +25,7 @@ const MOCK_QR = 'VT-DEMO-7F3A9C21';
 function StepHeader({ n, title, done, active }: { n: number; title: string; done: boolean; active: boolean }) {
   return (
     <div className="flex items-center gap-3">
-      <span className={cn('grid size-7 shrink-0 place-items-center rounded-full text-[12px] font-bold transition-colors', done ? 'bg-success text-[#03241a]' : active ? 'bg-accent text-accent-fg' : 'bg-surface-2 text-faint')}>
+      <span className={cn('grid size-7 shrink-0 place-items-center rounded-full text-[12px] font-bold transition-colors', done ? 'bg-success text-white' : active ? 'bg-accent text-accent-fg' : 'bg-surface-2 text-faint')}>
         {done ? <Check className="size-3.5" strokeWidth={3.5} /> : n}
       </span>
       <h2 className={cn('type-title text-[16px]', active || done ? 'text-text' : 'text-faint')}>{title}</h2>
@@ -40,7 +43,10 @@ export default function CheckInPage() {
   const [mode, setMode] = useState<'scan' | 'type'>('scan');
   const [code, setCode] = useState('');
   const [doneAt, setDoneAt] = useState<Date | null>(null);
+  const [checkoutOpen, setCheckoutOpen] = useState(false);
+  const [result, setResult] = useState<CheckOutResult | null>(null);
   const checkIn = useCheckIn();
+  const resume = useResumeShift();
   const now = useNow(5000);
 
   useEffect(() => {
@@ -49,9 +55,10 @@ export default function CheckInPage() {
 
   const venue = target && target.event.coordinates.latitude != null ? { latitude: target.event.coordinates.latitude, longitude: target.event.coordinates.longitude! } : null;
   const position = simulated ?? (geo.status === 'ready' ? { latitude: geo.latitude!, longitude: geo.longitude! } : null);
+  const accuracy = simulated ? 8 : geo.accuracy ?? null;
   const fence = useMemo(() => (venue && position ? checkGeofence(position, venue, target!.event.geofence_radius) : null), [venue, position, target]);
-  const locationOk = !venue || Boolean(fence?.inside);
-  const w = target ? checkInWindow(target.shift.start_time, now) : null;
+  const weak = accuracy != null && accuracy > Math.max(150, target?.event.geofence_radius ?? 100);
+  const locationOk = !venue || (Boolean(fence?.inside) && !weak);
 
   if (isLoading) return <Skeleton className="h-[520px] rounded-xl" />;
   if (!target) {
@@ -69,6 +76,8 @@ export default function CheckInPage() {
     );
   }
 
+  const phase = shiftPhase(target, now);
+
   const submit = (qr: string) => {
     if (!position && venue) return;
     checkIn.mutate(
@@ -77,6 +86,7 @@ export default function CheckInPage() {
         qr_code_signature: qr.trim(),
         latitude: position?.latitude ?? 0,
         longitude: position?.longitude ?? 0,
+        accuracy,
         client_timestamp: new Date().toISOString(),
       },
       { onSuccess: () => setDoneAt(new Date()) },
@@ -85,13 +95,27 @@ export default function CheckInPage() {
 
   const guidance = checkIn.error && isApiError(checkIn.error) ? explainCheckInError(checkIn.error) : null;
 
+  const header = (
+    <>
+      <Link to="/v/schedule" className="mb-6 inline-flex items-center gap-1.5 text-sm text-muted hover:text-text">
+        <ArrowLeft className="size-4" /> My schedule
+      </Link>
+      <div className="mb-8 min-w-0">
+        <p className="type-eyebrow mb-3">{phase === 'on-shift' ? 'On shift' : phase === 'checked-out' ? 'Shift finished' : 'Check in'}</p>
+        <h1 className="type-headline text-[clamp(1.6rem,6vw,2.4rem)] text-text wrap-anywhere">{target.event.title}</h1>
+        <p className="mt-2 text-[15px] text-muted">
+          {formatTimeRange(target.shift.start_time, target.shift.end_time)} · {target.event.location}
+        </p>
+      </div>
+    </>
+  );
+
   if (doneAt) {
     return (
       <div className="mx-auto max-w-lg py-10 text-center">
         <motion.div initial={{ scale: 0.4, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: 'spring', stiffness: 200, damping: 14 }} className="relative mx-auto grid size-36 place-items-center">
           <motion.span className="absolute inset-0 rounded-full border-2 border-dashed border-success" animate={{ rotate: 360 }} transition={{ duration: 18, repeat: Infinity, ease: 'linear' }} />
-          <motion.span className="absolute inset-0 rounded-full bg-success/20" initial={{ scale: 0.6, opacity: 1 }} animate={{ scale: 1.6, opacity: 0 }} transition={{ duration: 1.4, repeat: 2 }} />
-          <span className="grid size-24 place-items-center rounded-full bg-success text-[#03241a]">
+          <span className="grid size-24 place-items-center rounded-full bg-success text-white">
             <Check className="size-12" strokeWidth={3} />
           </span>
         </motion.div>
@@ -101,7 +125,7 @@ export default function CheckInPage() {
             {target.event.title} · {formatTime(doneAt)}
             {fence && ` · ${formatDistance(fence.distance)} from the venue`}
           </p>
-          <p className="mt-6 text-sm text-muted">Check out from the green bar at the top when your shift ends — your hours are counted from now.</p>
+          <p className="mt-6 text-sm text-muted">Keep VolunTrack open when you can — it quietly confirms you’re still at the venue. Check out from the green bar when your shift ends.</p>
           <Button size="lg" className="mt-8" onClick={() => navigate('/v')}>
             Done
           </Button>
@@ -110,31 +134,79 @@ export default function CheckInPage() {
     );
   }
 
+  // Already on shift → this page becomes the check-out screen.
+  if (phase === 'on-shift') {
+    return (
+      <>
+        {header}
+        <Card tone="accent" className="mx-auto max-w-xl p-6 text-center">
+          <CheckCircle2 className="mx-auto size-10 text-success-text" />
+          <h2 className="type-title mt-3 text-xl text-text">You checked in at {formatTime(target.attendance?.check_in_time)}</h2>
+          <p className="mt-2 text-sm text-muted">The shift ends at {formatTime(target.end)}. Check out when you leave — leaving early asks for a reason so your coordinator can fill your place.</p>
+          <Button size="lg" className="mt-6 w-full sm:w-auto" variant="success" onClick={() => setCheckoutOpen(true)}>
+            <LogOut /> Check out
+          </Button>
+        </Card>
+        <CheckOutDialog row={target} open={checkoutOpen} onOpenChange={setCheckoutOpen} onDone={setResult} />
+        <CheckOutResultDialog result={result} onClose={() => setResult(null)} />
+      </>
+    );
+  }
+
+  if (phase === 'checked-out') {
+    const a = target.attendance!;
+    return (
+      <>
+        {header}
+        <Card className="mx-auto max-w-xl p-6">
+          <div className="flex items-center gap-3">
+            <CheckCircle2 className="size-6 text-success-text" />
+            <h2 className="type-title text-lg text-text">
+              {formatTime(a.check_in_time)} – {formatTime(a.check_out_time)} · {formatHours(a.hours ?? 0)}
+            </h2>
+          </div>
+          <p className="mt-3 text-sm text-muted">
+            {a.hours_status === 'pending'
+              ? 'Your coordinator will verify these hours soon.'
+              : a.hours_status === 'rejected'
+                ? `Your coordinator did not approve these hours.${a.verification_note ? ` Note: ${a.verification_note}` : ''}`
+                : `Verified: ${formatHours(a.verified_hours ?? 0)} count toward your impact.`}
+          </p>
+          {a.check_out_method === 'auto' && <InlineAlert tone="info" className="mt-4">You didn’t check out, so the shift was closed at its scheduled end.</InlineAlert>}
+          {a.can_resume && (
+            <Button
+              variant="secondary"
+              className="mt-5"
+              loading={resume.isPending}
+              onClick={() => resume.mutate(target.shift.id, { onSuccess: () => notify.success('You’re back on shift'), onError: (e) => notify.error(errorMessage(e)) })}
+            >
+              <RotateCcw /> I checked out by mistake — resume
+            </Button>
+          )}
+        </Card>
+      </>
+    );
+  }
+
   return (
     <>
-      <Link to="/v/schedule" className="mb-6 inline-flex items-center gap-1.5 text-sm text-muted hover:text-text">
-        <ArrowLeft className="size-4" /> My schedule
-      </Link>
-      <div className="mb-8">
-        <p className="type-eyebrow mb-3">Check in</p>
-        <h1 className="type-headline text-[clamp(1.7rem,3.4vw,2.4rem)] text-text">{target.event.title}</h1>
-        <p className="mt-2 text-[15px] text-muted">
-          {formatTimeRange(target.shift.start_time, target.shift.end_time)} · {target.event.location}
-        </p>
-        {w?.state !== 'open' && (
-          <InlineAlert tone="warning" className="mt-5">
-            {w?.state === 'early' ? `Check-in opens at ${formatTime(w.opensAt)}.` : 'The check-in window for this shift has closed. Ask your coordinator for a manual check-in.'}
-          </InlineAlert>
-        )}
-      </div>
+      {header}
+      {phase !== 'check-in-open' && (
+        <InlineAlert tone="warning" className="-mt-4 mb-6">
+          {phase === 'too-early'
+            ? `Check-in opens at ${formatTime(new Date(target.start.getTime() - 15 * 60_000))}.`
+            : phase === 'not-confirmed'
+              ? 'You can check in once a coordinator confirms your place.'
+              : 'The check-in window has closed. If you are at the venue, the coordinator can check you in by hand.'}
+        </InlineAlert>
+      )}
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* Step 1 — location */}
-        <Card className="p-5 sm:p-6">
+      <div className="grid min-w-0 gap-6 lg:grid-cols-2">
+        <Card className="min-w-0 p-5 sm:p-6">
           <StepHeader n={1} title="Confirm you’re at the venue" done={Boolean(position) && locationOk} active={!position || !locationOk} />
           <div className="mt-5">
             {venue ? (
-              <VenueMap venue={venue} radius={target.event.geofence_radius} you={position} inside={fence?.inside} className="h-[300px]" label={target.event.location.split(',')[0]} />
+              <VenueMap venue={venue} radius={target.event.geofence_radius} you={position} youAccuracy={accuracy} inside={fence?.inside} className="h-[300px]" label={target.event.location.split(',')[0]} />
             ) : (
               <InlineAlert tone="info">This event has no map pin, so your location isn’t checked.</InlineAlert>
             )}
@@ -150,39 +222,33 @@ export default function CheckInPage() {
                     ? 'Location is blocked. Allow it in your browser’s site settings, then try again.'
                     : geo.status === 'unavailable' || geo.status === 'timeout'
                       ? 'Couldn’t get a GPS fix. Move outdoors or near a window and retry.'
-                      : 'Used only for this check-in.'}
+                      : 'Used only to confirm you’re at the venue.'}
                 </p>
               </div>
             )}
             {fence && (
-              <div className={cn('flex items-center gap-3 rounded-lg px-4 py-3', fence.inside ? 'bg-success-soft' : 'bg-danger-soft')}>
-                <Crosshair className={cn('size-5 shrink-0', fence.inside ? 'text-success-text' : 'text-danger-text')} />
+              <div className={cn('flex items-center gap-3 rounded-lg px-4 py-3', locationOk ? 'bg-success-soft' : 'bg-danger-soft')}>
+                <Crosshair className={cn('size-5 shrink-0', locationOk ? 'text-success-text' : 'text-danger-text')} />
                 <div className="text-sm">
-                  <div className={cn('font-semibold', fence.inside ? 'text-success-text' : 'text-danger-text')}>
-                    {fence.inside ? 'Inside the check-in area' : `${formatDistance(fence.outsideBy)} outside the check-in area`}
+                  <div className={cn('font-semibold', locationOk ? 'text-success-text' : 'text-danger-text')}>
+                    {weak ? 'GPS signal too weak — step outside for a moment' : fence.inside ? 'Inside the check-in area' : `${formatDistance(fence.outsideBy)} outside the check-in area`}
                   </div>
                   <div className="text-muted">
-                    {formatDistance(fence.distance)} from the venue center · limit {target.event.geofence_radius} m
-                    {geo.accuracy && !simulated ? ` · GPS ±${Math.round(geo.accuracy)} m` : ''}
+                    {formatDistance(fence.distance)} from the venue · limit {target.event.geofence_radius} m{accuracy ? ` · GPS ±${Math.round(accuracy)} m` : ''}
                   </div>
                 </div>
               </div>
             )}
             {env.mockMode !== 'off' && venue && (
-              <button
-                type="button"
-                onClick={() => setSimulated(offsetMeters(venue, 24, -18))}
-                className="mt-3 inline-flex items-center gap-1.5 text-[12.5px] font-medium text-faint hover:text-muted"
-              >
+              <button type="button" onClick={() => setSimulated(offsetMeters(venue, 24, -18))} className="mt-3 inline-flex items-center gap-1.5 text-[12.5px] font-medium text-faint hover:text-muted">
                 <Wand2 className="size-3.5" /> Demo: place me at the venue
               </button>
             )}
           </div>
         </Card>
 
-        {/* Step 2 — QR */}
-        <Card className={cn('p-5 sm:p-6 transition-opacity', !locationOk || (!position && venue) ? 'opacity-55' : '')}>
-          <div className="flex items-center justify-between gap-3">
+        <Card className={cn('min-w-0 p-5 transition-opacity sm:p-6', !locationOk || (!position && venue) ? 'opacity-55' : '')}>
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <StepHeader n={2} title="Scan the coordinator’s QR" done={false} active={Boolean(position) && locationOk} />
             <Segmented
               size="sm"
@@ -195,17 +261,18 @@ export default function CheckInPage() {
               ]}
             />
           </div>
+          <p className="mt-3 text-[13px] text-muted">The coordinator at the venue shows a QR on their phone or a screen. It changes every 30 seconds, so scan it live.</p>
           <div className="mt-5">
             <AnimatePresence mode="wait">
               {mode === 'scan' ? (
                 <motion.div key="scan" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="mx-auto max-w-[320px]">
-                  {position || !venue ? (
-                    <QrScanner onCode={(c) => !checkIn.isPending && submit(c)} />
+                  {(position && locationOk) || !venue ? (
+                    <QrScanner onCode={(c) => !checkIn.isPending && phase === 'check-in-open' && submit(c)} />
                   ) : (
                     <div className="grid aspect-square place-items-center rounded-xl bg-sunken text-center text-sm text-faint [box-shadow:inset_0_0_0_1px_var(--line)]">
                       <div>
                         <QrCode className="mx-auto mb-2 size-7" />
-                        Share your location first
+                        Confirm your location first
                       </div>
                     </div>
                   )}
@@ -223,12 +290,12 @@ export default function CheckInPage() {
                   className="space-y-3"
                 >
                   <Input value={code} onChange={(e) => setCode(e.target.value)} placeholder="Code shown under the QR" className="type-data" aria-label="QR code" inputSize="lg" />
-                  <Button type="submit" className="w-full" size="lg" disabled={!code.trim() || (!position && Boolean(venue))} loading={checkIn.isPending}>
+                  <Button type="submit" className="w-full" size="lg" disabled={!code.trim() || !locationOk || (!position && Boolean(venue)) || phase !== 'check-in-open'} loading={checkIn.isPending}>
                     Check in
                   </Button>
                   {env.mockMode !== 'off' && (
                     <button type="button" onClick={() => setCode(MOCK_QR)} className="inline-flex items-center gap-1.5 text-[12.5px] font-medium text-faint hover:text-muted">
-                      <Wand2 className="size-3.5" /> Demo: use today’s blood-drive code
+                      <Wand2 className="size-3.5" /> Demo: use today’s code
                     </button>
                   )}
                 </motion.form>

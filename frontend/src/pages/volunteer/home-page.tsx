@@ -16,12 +16,12 @@ import { formatDay } from '@/shared/lib/time';
 
 function Stat({ icon, label, value, suffix, decimals = 0, hint }: { icon: React.ReactNode; label: string; value: number | undefined; suffix?: string; decimals?: number; hint?: string }) {
   return (
-    <Card className="p-5">
-      <div className="flex items-center gap-2 text-muted [&_svg]:size-4">
+    <Card className="min-w-0 p-4 sm:p-5">
+      <div className="flex min-w-0 items-center gap-2 text-muted [&_svg]:size-4 [&_svg]:shrink-0">
         {icon}
-        <span className="type-eyebrow-sm">{label}</span>
+        <span className="type-eyebrow-sm truncate">{label}</span>
       </div>
-      <div className="type-data mt-3 text-[28px] leading-none text-text">
+      <div className="type-data mt-3 text-[clamp(1.4rem,6vw,1.75rem)] leading-none text-text">
         {value == null ? <Skeleton className="h-7 w-16" /> : <CountUp value={value} decimals={decimals} />}
         {value != null && suffix && <span className="ml-1 text-base text-faint">{suffix}</span>}
       </div>
@@ -35,7 +35,7 @@ export default function VolunteerHomePage() {
   const profile = useVolunteerProfile();
   const impact = useImpact();
   const shifts = useMyShifts();
-  const events = useOpportunities(1);
+  const events = useOpportunities({ per_page: 12 });
   const announcements = useAnnouncements();
 
   useEffect(() => {
@@ -59,7 +59,7 @@ export default function VolunteerHomePage() {
   const needsConsent = v?.is_minor && !v.parental_consent_verified;
 
   return (
-    <>
+    <div className="min-w-0">
       <PageHeader
         eyebrow={new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}
         title={`${greeting()}, ${firstName(user?.full_name)}`}
@@ -83,11 +83,17 @@ export default function VolunteerHomePage() {
         </InlineAlert>
       )}
 
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
-        {shifts.isLoading ? <SkeletonCard className="h-64" /> : shifts.error ? <ErrorState error={shifts.error} onRetry={shifts.refetch} /> : <NextShiftCard next={shifts.nextConfirmed} />}
+      <div className="grid min-w-0 gap-5 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+        {shifts.isLoading ? (
+          <SkeletonCard className="h-64" />
+        ) : shifts.error ? (
+          <ErrorState error={shifts.error} onRetry={shifts.refetch} />
+        ) : (
+          <NextShiftCard next={shifts.active ?? shifts.nextConfirmed} />
+        )}
 
         <Card className="flex flex-col items-center justify-center p-6 text-center">
-          <ProgressRing value={hours - prev} max={(next ?? hours) - prev || 1} size={168} thickness={9} ticks={30} label={`${hours} verified hours`}>
+          <ProgressRing value={hours - prev} max={(next ?? hours) - prev || 1} size={152} thickness={9} ticks={30} label={`${hours} verified hours`}>
             <div>
               <div className="type-display text-[40px] leading-none text-text">
                 <CountUp value={hours} decimals={hours % 1 ? 1 : 0} />
@@ -104,13 +110,16 @@ export default function VolunteerHomePage() {
               'Every milestone reached. Remarkable.'
             )}
           </p>
+          {Boolean(impact.data?.pending_hours) && (
+            <p className="mt-1 text-xs text-faint">+{formatHours(impact.data!.pending_hours!)} waiting for coordinator review</p>
+          )}
           <Button asChild variant="link" size="sm" className="mt-2">
             <Link to="/v/impact">See your impact</Link>
           </Button>
         </Card>
       </div>
 
-      <Stagger className="mt-5 grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <Stagger className="mt-5 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         <StaggerItem>
           <Stat icon={<Gauge />} label="Impact score" value={impact.data?.impact_score} decimals={1} suffix="/100" />
         </StaggerItem>
@@ -125,9 +134,9 @@ export default function VolunteerHomePage() {
         </StaggerItem>
       </Stagger>
 
-      <div className="mt-10 grid gap-8 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-        <section aria-labelledby="matched-title">
-          <div className="mb-4 flex items-end justify-between">
+      <div className="mt-10 grid min-w-0 gap-8 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+        <section aria-labelledby="matched-title" className="min-w-0">
+          <div className="mb-4 flex flex-wrap items-end justify-between gap-2">
             <div>
               <h2 id="matched-title" className="type-title text-lg text-text">
                 Matched to your skills
@@ -139,13 +148,13 @@ export default function VolunteerHomePage() {
             </Link>
           </div>
           {events.isLoading ? (
-            <div className="grid gap-4 md:grid-cols-3">
+            <div className="grid gap-4 sm:grid-cols-2 2xl:grid-cols-3">
               {[0, 1, 2].map((i) => (
                 <SkeletonCard key={i} className="h-60" />
               ))}
             </div>
           ) : matched.length ? (
-            <div className="grid gap-4 md:grid-cols-3">
+            <div className="grid min-w-0 gap-4 sm:grid-cols-2 2xl:grid-cols-3">
               {matched.map((e) => (
                 <OpportunityCard key={e.id} event={e} appliedShiftIds={appliedShiftIds} />
               ))}
@@ -156,17 +165,23 @@ export default function VolunteerHomePage() {
         </section>
 
         <Card>
-          <CardHeader title="Announcements" eyebrow={<span className="inline-flex items-center gap-1.5"><Megaphone className="size-3.5" /> From your organization</span>} />
+          <CardHeader title="Announcements" eyebrow={<span className="inline-flex items-center gap-1.5"><Megaphone className="size-3.5" /> From your organizations</span>} />
           <div className="divide-y divide-line px-5 pb-2 pt-3">
             {announcements.isLoading && <Skeleton className="my-3 h-16" />}
-            {announcements.data?.slice(0, 3).map((a) => (
-              <article key={a.id} className="py-3.5">
-                <h3 className="text-[14px] font-medium text-text">{a.title}</h3>
-                <p className="mt-1 line-clamp-2 text-[13px] text-muted">{a.message}</p>
-                <p className="mt-1.5 text-[11.5px] text-faint">{formatRelative(a.created_at)}</p>
+            {announcements.data?.items.slice(0, 3).map((a) => (
+              <article key={a.id} className="min-w-0 py-3.5">
+                <h3 className="flex items-center gap-2 text-[14px] font-medium text-text">
+                  {!a.is_read && <span className="size-1.5 shrink-0 rounded-full bg-accent" aria-label="Unread" />}
+                  <span className="min-w-0 wrap-anywhere">{a.title}</span>
+                </h3>
+                <p className="mt-1 line-clamp-2 text-[13px] text-muted wrap-anywhere">{a.message}</p>
+                <p className="mt-1.5 text-[11.5px] text-faint">
+                  {a.organization?.name ? `${a.organization.name} · ` : ''}
+                  {formatRelative(a.created_at)}
+                </p>
               </article>
             ))}
-            {announcements.data?.length === 0 && <p className="py-6 text-center text-sm text-faint">No announcements yet.</p>}
+            {announcements.data?.items.length === 0 && <p className="py-6 text-center text-sm text-faint">No announcements yet.</p>}
           </div>
           <div className="px-5 pb-4">
             <Button asChild variant="ghost" size="sm" className="w-full">
@@ -175,6 +190,6 @@ export default function VolunteerHomePage() {
           </div>
         </Card>
       </div>
-    </>
+    </div>
   );
 }

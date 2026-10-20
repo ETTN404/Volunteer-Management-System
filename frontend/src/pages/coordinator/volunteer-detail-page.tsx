@@ -5,8 +5,8 @@ import { cn } from '@/shared/lib/cn';
 import { formatDate } from '@/shared/lib/time';
 import { formatHours, humanizeSkill } from '@/shared/lib/format';
 import { CERTIFICATE_MILESTONES, normalizeAvailability, AVAILABILITY_SLOTS } from '@/shared/lib/skills';
-import type { SkillVerificationStatus } from '@/shared/types/api';
-import { Avatar, Badge, Button, Card, CardBody, CardHeader, ErrorState, Menu, MenuContent, MenuItem, MenuTrigger, PageHeader, ProgressBar, Select, Skeleton, notify } from '@/shared/ui';
+import type { AssignmentStatus, SkillVerificationStatus } from '@/shared/types/api';
+import { AssignmentBadge, Avatar, Badge, Button, Card, CardBody, CardHeader, ErrorState, Menu, MenuContent, MenuItem, MenuTrigger, PageHeader, ProgressBar, Select, Skeleton, notify } from '@/shared/ui';
 import { SkillRadar } from '@/shared/ui/charts';
 import { useIssueCertificate, useVerifySkill, useVolunteerDetail } from '@/features/people/api';
 import { useOrgVolunteer } from '@/features/organization/api';
@@ -142,6 +142,33 @@ export default function VolunteerDetailPage() {
               <Button asChild variant="link" size="sm" className="mt-3">
                 <Link to="/c/documents">Open document review</Link>
               </Button>
+            </CardBody>
+          </Card>
+
+          <Card>
+            <CardHeader title="Shifts with your organization" description={detail.data.relationship === 'applicant' ? 'Registered with another organization (or none) — applied to your shifts.' : 'Member of your organization.'} />
+            <CardBody>
+              {(detail.data.history ?? []).length === 0 ? (
+                <p className="text-sm text-muted">No applications yet.</p>
+              ) : (
+                <ul className="divide-y divide-line">
+                  {(detail.data.history ?? []).map((h) => (
+                    <li key={h.assignment_id} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2.5 text-sm">
+                      <Link to={`/c/events/${h.event.id}`} className="min-w-0 flex-1 truncate font-medium text-text hover:text-accent-text">
+                        {h.event.title}
+                        {h.shift.title ? ` · ${h.shift.title}` : ''}
+                      </Link>
+                      <span className="text-[12.5px] text-muted">{h.shift.start_time ? formatDate(h.shift.start_time, 'd MMM yyyy HH:mm') : ''}</span>
+                      <AssignmentBadge status={h.status as AssignmentStatus} size="sm" />
+                      {h.attendance && (
+                        <span className="type-data text-[12px] text-faint">
+                          {formatHours(h.attendance.hours ?? 0)} · {h.attendance.hours_status}
+                        </span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
             </CardBody>
           </Card>
         </div>

@@ -1,19 +1,30 @@
-import { useCallback, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { PageHeader } from '@/shared/ui';
-import { AuditTrail } from '@/features/audit/audit-trail';
-import { useAllOrganizations, usePlatformAudit } from '@/features/platform/api';
+import { AuditTrail, type AuditFilters } from '@/features/audit/audit-trail';
+import { platformApi, useAllOrganizations, usePlatformAudit } from '@/features/platform/api';
 
 export default function PlatformAuditPage() {
-  const audit = usePlatformAudit();
+  const [filters, setFilters] = useState<AuditFilters>({ page: 1, action: '', from: '', to: '', org_id: '' });
+  const query = { page: filters.page, action: filters.action || undefined, from: filters.from || undefined, to: filters.to || undefined, org_id: filters.org_id || undefined };
+  const audit = usePlatformAudit(query);
   const orgs = useAllOrganizations();
   useEffect(() => {
     document.title = 'Audit trail · VolunTrack';
   }, []);
-  const orgName = useCallback((id: number | null) => (id == null ? undefined : orgs.data?.find((o) => o.id === id)?.name), [orgs.data]);
   return (
     <>
-      <PageHeader eyebrow="Governance" title="Platform audit trail" description="An append-only record of sensitive actions across every organization." />
-      <AuditTrail logs={audit.data} isLoading={audit.isLoading} error={audit.error} onRetry={() => audit.refetch()} orgName={orgName} />
+      <PageHeader eyebrow="Governance" title="Platform audit trail" description="An append-only record of sensitive actions across every organization — readable on screen and in the CSV export." />
+      <AuditTrail
+        data={audit.data}
+        isLoading={audit.isLoading}
+        error={audit.error}
+        onRetry={() => audit.refetch()}
+        filters={filters}
+        onFilters={setFilters}
+        exportCsv={() => platformApi.auditCsv(query)}
+        showOrg
+        orgOptions={(orgs.data ?? []).map((o) => ({ value: String(o.id), label: o.name }))}
+      />
     </>
   );
 }

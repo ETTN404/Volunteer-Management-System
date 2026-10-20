@@ -27,6 +27,7 @@ import {
   Tabs,
   TabsContent,
   TabsList,
+  Textarea,
   VenueMap,
   notify,
 } from '@/shared/ui';
@@ -58,6 +59,7 @@ export default function EventDetailPage() {
   const wantsShift = useRef(Boolean((location.state as { addShift?: boolean } | null)?.addShift));
   const [broadcastShift, setBroadcastShift] = useState<number | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleteReason, setDeleteReason] = useState('');
   const [deletingShift, setDeletingShift] = useState<Shift | null>(null);
 
   useEffect(() => {
@@ -166,6 +168,12 @@ export default function EventDetailPage() {
                 return (
                   <Card key={s.id} className="flex flex-col gap-4 p-5 md:flex-row md:items-center">
                     <div className="min-w-0 flex-1">
+                      {(s.title || s.pending_count) && (
+                        <div className="mb-1 flex flex-wrap items-center gap-2 text-[13px]">
+                          {s.title && <span className="font-semibold text-accent-text">{s.title}</span>}
+                          {Boolean(s.pending_count) && <span className="rounded-full bg-warning-soft px-2 py-0.5 text-[11.5px] font-medium text-warning-text">{s.pending_count} to review</span>}
+                        </div>
+                      )}
                       <div className="flex items-center gap-2 text-[15px] font-medium text-text">
                         {formatDay(s.start_time)} · {formatTimeRange(s.start_time, s.end_time)}
                         {live && <span className="size-2 animate-pulse rounded-full bg-success" aria-label="Live" />}
@@ -265,7 +273,17 @@ export default function EventDetailPage() {
 
       <Dialog open={Boolean(deletingShift)} onOpenChange={(o) => !o && setDeletingShift(null)}>
         <DialogContent title="Delete this shift?" description={deletingShift ? `${formatDay(deletingShift.start_time)} · ${formatTimeRange(deletingShift.start_time, deletingShift.end_time)}` : undefined} size="sm">
-          <p className="text-sm text-muted">Volunteers who applied are removed from it.</p>
+          {(deletingShift?.confirmed_count ?? 0) + (deletingShift?.pending_count ?? 0) > 0 ? (
+            <div className="space-y-3">
+              <InlineAlert tone="warning">
+                {(deletingShift?.confirmed_count ?? 0)} confirmed and {(deletingShift?.pending_count ?? 0)} pending volunteer(s) lose their place and get a notification with your reason.
+              </InlineAlert>
+              <Textarea value={deleteReason} onChange={(e) => setDeleteReason(e.target.value)} rows={2} maxLength={300} placeholder="Reason shown to volunteers (optional), e.g. Venue closed that day" aria-label="Reason" />
+            </div>
+          ) : (
+            <p className="text-sm text-muted">No one has applied yet.</p>
+          )}
+          <p className="mt-3 text-[12.5px] text-faint">Shifts where anyone already checked in can’t be deleted — their hours must stay traceable.</p>
           {deleteShift.error && <InlineAlert tone="danger" className="mt-3">{errorMessage(deleteShift.error)}</InlineAlert>}
           <DialogActions>
             <Button variant="ghost" onClick={() => setDeletingShift(null)}>
@@ -276,12 +294,16 @@ export default function EventDetailPage() {
               loading={deleteShift.isPending}
               onClick={() =>
                 deletingShift &&
-                deleteShift.mutate(deletingShift.id, {
-                  onSuccess: () => {
-                    notify.success('Shift deleted');
-                    setDeletingShift(null);
+                deleteShift.mutate(
+                  { shiftId: deletingShift.id, reason: deleteReason.trim() || undefined },
+                  {
+                    onSuccess: (r) => {
+                      notify.success('Shift deleted', r.notified ? `${r.notified} volunteer(s) notified.` : undefined);
+                      setDeletingShift(null);
+                      setDeleteReason('');
+                    },
                   },
-                })
+                )
               }
             >
               Delete shift

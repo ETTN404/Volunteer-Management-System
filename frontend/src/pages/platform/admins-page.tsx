@@ -1,18 +1,20 @@
-import { Search, ShieldCheck } from 'lucide-react';
+import { Search, Send, ShieldCheck } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router';
 import { formatRelative } from '@/shared/lib/time';
-import { Avatar, Card, EmptyState, ErrorState, Input, PageHeader, Skeleton, Switch, notify } from '@/shared/ui';
-import { useOrgAdmins, useToggleAdmin } from '@/features/platform/api';
+import { Avatar, Badge, Button, Card, EmptyState, ErrorState, Input, PageHeader, Skeleton, Switch, notify } from '@/shared/ui';
+import { errorMessage } from '@/shared/api/http';
+import { useOrgAdmins, useResendInvite, useToggleAdmin } from '@/features/platform/api';
 
 export default function AdminsPage() {
   const admins = useOrgAdmins();
   const toggle = useToggleAdmin();
+  const resend = useResendInvite();
   const [q, setQ] = useState('');
   useEffect(() => {
     document.title = 'Org admins · VolunTrack';
   }, []);
-  const list = useMemo(() => (admins.data ?? []).filter((a) => `${a.full_name} ${a.email} ${a.organization?.name}`.toLowerCase().includes(q.trim().toLowerCase())), [admins.data, q]);
+  const list = useMemo(() => (admins.data?.items ?? []).filter((a) => `${a.full_name} ${a.email} ${a.organization?.name}`.toLowerCase().includes(q.trim().toLowerCase())), [admins.data, q]);
 
   return (
     <>
@@ -56,9 +58,29 @@ export default function AdminsPage() {
                       '—'
                     )}
                   </td>
-                  <td className="px-5 py-3 text-muted">{a.last_login ? formatRelative(a.last_login) : 'Never'}</td>
+                  <td className="px-5 py-3 text-muted">
+                    {a.invitation_pending ? (
+                      <span className="inline-flex items-center gap-2">
+                        <Badge size="sm" tone="warning">
+                          Invitation pending
+                        </Badge>
+                        <Button
+                          size="xs"
+                          variant="ghost"
+                          loading={resend.isPending && resend.variables === a.id}
+                          onClick={() => resend.mutate(a.id, { onSuccess: (r) => notify.success(r.message ?? 'Invitation sent'), onError: (e) => notify.error(errorMessage(e)) })}
+                        >
+                          <Send /> Resend
+                        </Button>
+                      </span>
+                    ) : a.last_login ? (
+                      formatRelative(a.last_login)
+                    ) : (
+                      'Never'
+                    )}
+                  </td>
                   <td className="px-5 py-3 text-right">
-                    <Switch checked={a.is_active} aria-label={`${a.full_name} active`} onCheckedChange={() => toggle.mutate(a.id, { onSuccess: (r) => notify.success(r.message, a.full_name), onError: (e) => notify.error(e) })} />
+                    <Switch checked={a.is_active !== false} aria-label={`${a.full_name} active`} onCheckedChange={() => toggle.mutate(a.id, { onSuccess: (r) => notify.success(r.message, a.full_name), onError: (e) => notify.error(e) })} />
                   </td>
                 </tr>
               ))}

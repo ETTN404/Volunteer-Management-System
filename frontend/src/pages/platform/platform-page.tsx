@@ -68,11 +68,25 @@ export default function PlatformPage() {
         ))}
       </Stagger>
 
+      <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {[
+          { to: '/p/organizations?verification=pending', label: 'Awaiting verification', value: m.data?.pending_verification ?? 0, warn: (m.data?.pending_verification ?? 0) > 0 },
+          { to: '/p/payments', label: 'Payments to confirm', value: m.data?.pending_payments ?? 0, warn: (m.data?.pending_payments ?? 0) > 0 },
+          { to: '/p/reports', label: 'Open reports', value: m.data?.open_reports ?? 0, warn: (m.data?.open_reports ?? 0) > 0 },
+          { to: '/p/payments', label: 'Revenue this month (ETB)', value: m.data?.revenue_this_month ?? 0, warn: false },
+        ].map((q) => (
+          <Link key={q.label} to={q.to} className={`rounded-lg px-4 py-3 transition-colors hover:bg-surface-2 ${q.warn ? 'bg-warning-soft' : 'bg-surface [box-shadow:inset_0_0_0_1px_var(--line)]'}`}>
+            <div className={`text-xs ${q.warn ? 'text-warning-text' : 'text-muted'}`}>{q.label}</div>
+            <div className="type-data mt-1 text-xl font-semibold text-text">{q.value.toLocaleString()}</div>
+          </Link>
+        ))}
+      </div>
+
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
-        <ChartCard title="Growth" description="Cumulative users, last 12 months">
+        <ChartCard title="Growth" description="Total users at the end of each month">
           {ts.data ? <AreaTrend data={ts.data} x="date" y="users" xFormat={(d) => formatDate(`${d}-01`, 'MMM')} /> : <Skeleton className="h-60" />}
         </ChartCard>
-        <ChartCard title="Volunteer hours per month" description="Across all organizations">
+        <ChartCard title="Volunteer hours per month" description="Recorded hours across all organizations (verified + awaiting review)">
           {ts.data ? <Bars data={ts.data} x="date" y="hours" unit=" h" xFormat={(d) => formatDate(`${d}-01`, 'MMM')} height={240} /> : <Skeleton className="h-60" />}
         </ChartCard>
       </div>
@@ -114,9 +128,9 @@ export default function PlatformPage() {
             }
           />
           <ul className="mt-2 divide-y divide-line px-5 pb-3">
-            {audit.data?.slice(0, 6).map((l) => (
+            {audit.data?.items.slice(0, 6).map((l) => (
               <li key={l.id} className="flex items-center justify-between gap-3 py-3 text-sm">
-                <span className="truncate text-text">{actionLabel(l.action)}</span>
+                <span className="truncate text-text">{l.action_label ?? actionLabel(l.action)}</span>
                 <span className="shrink-0 text-[12px] text-faint">{formatRelative(l.created_at)}</span>
               </li>
             ))}

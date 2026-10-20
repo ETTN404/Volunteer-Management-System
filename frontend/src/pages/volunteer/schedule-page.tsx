@@ -1,14 +1,14 @@
-import { CalendarX2, CheckCircle2, Clock, History, MapPin, QrCode, Undo2 } from 'lucide-react';
+import { CalendarX2, CheckCircle2, Clock, History, LogOut, MapPin, QrCode, Undo2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router';
 import { cn } from '@/shared/lib/cn';
-import { checkInWindow, durationHours, formatDate, formatDay, formatTime, formatTimeRange } from '@/shared/lib/time';
+import { durationHours, formatDate, formatDay, formatTime, formatTimeRange } from '@/shared/lib/time';
 import { formatHours } from '@/shared/lib/format';
 import { useNow } from '@/shared/hooks/use-now';
 import { AssignmentBadge, Badge, Button, Card, EmptyState, ErrorState, PageHeader, Segmented, SkeletonCard, notify } from '@/shared/ui';
 import { Stagger, StaggerItem } from '@/shared/motion';
 import { useWithdrawApplication } from '@/features/volunteer/api';
-import { useMyShifts, type ScheduledShift } from '@/features/volunteer/derived';
+import { shiftPhase, useMyShifts, type ScheduledShift } from '@/features/volunteer/derived';
 
 const HOURS_STATUS = {
   pending: { tone: 'warning', label: 'Awaiting verification' },
@@ -20,19 +20,20 @@ const HOURS_STATUS = {
 function UpcomingRow({ s }: { s: ScheduledShift }) {
   const now = useNow(15_000);
   const withdraw = useWithdrawApplication();
-  const w = checkInWindow(s.shift.start_time, now);
-  const canCheckIn = s.assignment.status === 'confirmed' && w?.state === 'open' && !s.attendance;
+  const phase = shiftPhase(s, now);
+  const canCheckIn = phase === 'check-in-open';
+  const opensAt = new Date(s.start.getTime() - 15 * 60_000);
 
   return (
-    <Card className={cn('flex flex-col gap-4 p-5 sm:flex-row sm:items-center', canCheckIn && '[box-shadow:var(--elev-2),inset_0_0_0_1.5px_var(--accent)]')}>
-      <div className="flex w-16 shrink-0 flex-col items-center rounded-lg bg-surface-2 py-2.5 text-center">
+    <Card className={cn('flex min-w-0 flex-col gap-4 p-4 sm:flex-row sm:items-center sm:p-5', (canCheckIn || phase === 'on-shift') && '[box-shadow:var(--elev-2),inset_0_0_0_1.5px_var(--accent)]')}>
+      <div className="hidden w-16 shrink-0 sm:flex flex-col items-center rounded-lg bg-surface-2 py-2.5 text-center">
         <span className="type-eyebrow-sm">{formatDate(s.start, 'MMM')}</span>
         <span className="type-display text-2xl leading-none text-text">{formatDate(s.start, 'd')}</span>
         <span className="mt-0.5 text-[10.5px] text-faint">{formatDate(s.start, 'EEE')}</span>
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
-          <Link to={`/v/opportunities/${s.event.id}`} className="type-title text-[16px] text-text hover:text-accent-text">
+          <Link to={`/v/opportunities/${s.event.id}`} className="type-title min-w-0 text-[16px] text-text wrap-anywhere hover:text-accent-text">
             {s.event.title}
           </Link>
           <AssignmentBadge status={s.assignment.status} size="sm" />
@@ -41,28 +42,37 @@ function UpcomingRow({ s }: { s: ScheduledShift }) {
           <span className="inline-flex items-center gap-1.5">
             <Clock className="size-3.5 text-faint" /> {formatDay(s.start)} · {formatTimeRange(s.shift.start_time, s.shift.end_time)}
           </span>
-          <span className="inline-flex items-center gap-1.5 truncate">
-            <MapPin className="size-3.5 text-faint" /> {s.event.location}
+          <span className="inline-flex min-w-0 items-center gap-1.5">
+            <MapPin className="size-3.5 shrink-0 text-faint" /> <span className="truncate">{s.event.location}</span>
           </span>
         </div>
       </div>
-      <div className="flex shrink-0 items-center gap-2">
+      <div className="flex shrink-0 flex-wrap items-center gap-2">
         {canCheckIn ? (
-          <Button asChild>
+          <Button asChild className="w-full sm:w-auto">
             <Link to={`/v/check-in/${s.shift.id}`}>
               <QrCode /> Check in
             </Link>
           </Button>
-        ) : s.attendance && !s.attendance.check_out_time ? (
-          <Badge tone="success" dot pulse>
-            Checked in {formatTime(s.attendance.check_in_time)}
-          </Badge>
+        ) : phase === 'on-shift' ? (
+          <>
+            <Badge tone="success" dot pulse>
+              Checked in {formatTime(s.attendance!.check_in_time)}
+            </Badge>
+            <Button asChild size="sm" variant="secondary">
+              <Link to={`/v/check-in/${s.shift.id}`}>
+                <LogOut /> Check out
+              </Link>
+            </Button>
+          </>
+        ) : phase === 'missed' ? (
+          <span className="text-[12.5px] text-warning-text">Check-in closed — the coordinator can check you in</span>
         ) : s.assignment.status === 'pending' ? (
           <Button variant="ghost" size="sm" loading={withdraw.isPending} onClick={() => withdraw.mutate(s.assignment.id, { onSuccess: () => notify.success('Application withdrawn') })}>
             <Undo2 /> Withdraw
           </Button>
-        ) : w?.state === 'early' ? (
-          <span className="text-[12.5px] text-faint">Check-in opens {formatDay(w.opensAt).toLowerCase()} {formatTime(w.opensAt)}</span>
+        ) : phase === 'too-early' ? (
+          <span className="text-[12.5px] text-faint">Check-in opens {formatDay(opensAt).toLowerCase()} {formatTime(opensAt)}</span>
         ) : null}
       </div>
     </Card>
@@ -80,7 +90,8 @@ export default function SchedulePage() {
     const done = past.filter((p) => p.attendance?.check_out_time);
     return {
       shifts: done.length,
-      hours: done.reduce((n, p) => n + (p.attendance?.verified_hours ?? durationHours(p.attendance!.check_in_time, p.attendance!.check_out_time!)), 0),
+      hours: done.reduce((n, p) => n + (['verified', 'adjusted'].includes(p.attendance?.hours_status ?? '') ? (p.attendance?.verified_hours ?? 0) : 0), 0),
+      pending: done.filter((p) => p.attendance?.hours_status === 'pending').reduce((n, p) => n + (p.attendance?.hours ?? 0), 0),
     };
   }, [past]);
 
@@ -140,8 +151,9 @@ export default function SchedulePage() {
               <div className="type-data mt-1.5 text-2xl text-text">{totals.shifts}</div>
             </Card>
             <Card className="p-4">
-              <div className="type-eyebrow-sm">Hours logged</div>
+              <div className="type-eyebrow-sm">Verified hours</div>
               <div className="type-data mt-1.5 text-2xl text-text">{formatHours(totals.hours)}</div>
+              {totals.pending > 0 && <div className="mt-1 text-[11.5px] text-faint">+{formatHours(totals.pending)} awaiting review</div>}
             </Card>
           </div>
           <Card className="overflow-hidden">
@@ -162,8 +174,11 @@ export default function SchedulePage() {
                   return (
                     <tr key={p.assignment.id} className="transition-colors hover:bg-surface-2/50">
                       <td className="px-5 py-3.5">
-                        <div className="font-medium text-text">{p.event.title}</div>
+                        <div className="font-medium text-text wrap-anywhere">{p.event.title}</div>
                         <div className="text-[12.5px] text-faint">{formatDate(p.start, 'EEE d MMM yyyy')}</div>
+                        <div className="mt-1 md:hidden">{status ? <Badge tone={status.tone} size="sm">{status.label}</Badge> : <AssignmentBadge status={p.assignment.status} size="sm" />}</div>
+                        {a?.check_out_method === 'auto' && <div className="mt-1 text-[11.5px] text-faint">Closed automatically at shift end</div>}
+                        {a?.verification_note && <div className="mt-1 text-[11.5px] text-muted">Coordinator: {a.verification_note}</div>}
                       </td>
                       <td className="hidden px-5 py-3.5 text-muted sm:table-cell">
                         {a ? (
