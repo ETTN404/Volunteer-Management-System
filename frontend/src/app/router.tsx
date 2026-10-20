@@ -19,6 +19,8 @@ export const routes: RouteObject[] = [
       { path: '/verify/:number?', ...page(() => import('@/pages/public/verify-page')) },
       { path: '/403', element: <ForbiddenPage /> },
       { path: '/suspended', element: <SuspendedPage /> },
+      { path: '/invite/:token', ...page(() => import('@/pages/auth/invite-page')) },
+      { path: '/signup/organization', ...page(() => import('@/pages/public/org-signup-page')) },
       {
         element: <RedirectIfAuthed />,
         children: [
@@ -32,6 +34,7 @@ export const routes: RouteObject[] = [
         element: <RequireAuth />,
         children: [
           { path: '/app', element: <RoleRedirect /> },
+          { path: '/welcome/password', ...page(() => import('@/pages/auth/force-password-page')) },
           {
             element: <WorkspaceLayout />,
             errorElement: <RouteErrorPage />,
@@ -43,6 +46,7 @@ export const routes: RouteObject[] = [
                   { index: true, ...page(() => import('@/pages/volunteer/home-page')) },
                   { path: 'opportunities', ...page(() => import('@/pages/volunteer/opportunities-page')) },
                   { path: 'opportunities/:eventId', ...page(() => import('@/pages/volunteer/opportunity-detail-page')) },
+                  { path: 'organizations/:orgId', ...page(() => import('@/pages/volunteer/organization-page')) },
                   { path: 'schedule', ...page(() => import('@/pages/volunteer/schedule-page')) },
                   { path: 'check-in/:shiftId', ...page(() => import('@/pages/volunteer/check-in-page')) },
                   { path: 'impact', ...page(() => import('@/pages/volunteer/impact-page')) },
@@ -85,6 +89,9 @@ export const routes: RouteObject[] = [
                   { path: 'members/:volunteerId', ...page(() => import('@/pages/coordinator/volunteer-detail-page')) },
                   { path: 'reports', ...page(() => import('@/pages/coordinator/reports-page')) },
                   { path: 'audit', ...page(() => import('@/pages/org/audit-page')) },
+                  { path: 'billing', ...page(() => import('@/pages/org/billing-page')) },
+                  { path: 'messages', ...page(() => import('@/pages/shared/messages-page')) },
+                  { path: 'messages/:threadId', ...page(() => import('@/pages/shared/messages-page')) },
                 ],
               },
               {
@@ -98,6 +105,11 @@ export const routes: RouteObject[] = [
                   { path: 'admins', ...page(() => import('@/pages/platform/admins-page')) },
                   { path: 'users', ...page(() => import('@/pages/platform/users-page')) },
                   { path: 'audit', ...page(() => import('@/pages/platform/audit-page')) },
+                  { path: 'payments', ...page(() => import('@/pages/platform/payments-page')) },
+                  { path: 'health', ...page(() => import('@/pages/platform/health-page')) },
+                  { path: 'reports', ...page(() => import('@/pages/platform/reports-page')) },
+                  { path: 'messages', ...page(() => import('@/pages/shared/messages-page')) },
+                  { path: 'messages/:threadId', ...page(() => import('@/pages/shared/messages-page')) },
                 ],
               },
               { path: '/account', ...page(() => import('@/pages/account/account-page')) },

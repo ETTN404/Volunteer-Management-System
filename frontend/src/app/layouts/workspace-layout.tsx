@@ -8,7 +8,7 @@ import { useSession } from '@/features/auth/use-session';
 import { useLogout, useMe } from '@/features/auth/api';
 import { ROLE_LABEL } from '@/features/auth/session-store';
 import { useNotifications } from '@/features/notifications/api';
-import { useOpsDashboard, usePendingHours } from '@/features/operations/api';
+import { useOpsDashboard } from '@/features/operations/api';
 import { useDocumentQueue } from '@/features/documents/api';
 import { EASE_OUT_EXPO } from '@/shared/motion';
 import { useUiStore } from '../ui-store';
@@ -25,12 +25,11 @@ import { useResolvedTheme } from '../providers/theme';
 function useCoordinatorBadges(enabled: boolean): NavBadges {
   const dash = useOpsDashboard();
   const docs = useDocumentQueue('pending');
-  const hours = usePendingHours();
   if (!enabled) return {};
   return {
     applications: dash.data?.pending_applications,
     documents: docs.data?.length,
-    hours: hours.data?.length,
+    hours: dash.data?.hours_to_verify,
   };
 }
 
@@ -92,7 +91,7 @@ export function WorkspaceLayout({ slot }: { slot?: ReactNode }) {
         Skip to content
       </a>
 
-      {role === 'Coordinator' ? <CoordinatorBadges>{(b) => sidebar(b)}</CoordinatorBadges> : sidebar({})}
+      {role === 'Coordinator' || role === 'OrgAdmin' ? <CoordinatorBadges>{(b) => sidebar(b)}</CoordinatorBadges> : sidebar({})}
 
       <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
         <SheetContent title="Menu" side="left" width="sm" className="!p-0 lg:hidden">

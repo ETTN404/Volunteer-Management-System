@@ -34,9 +34,9 @@ describe('auth', () => {
   });
 
   it('registers a volunteer and validates uniqueness', async () => {
-    const r = await authApi.register({ full_name: 'New Person', email: 'new@person.et', password: 'longenough', org_id: 1, skills: ['first_aid'] });
+    const r = await authApi.register({ first_name: 'New', last_name: 'Person', email: 'new@person.et', password: 'longenough', org_id: 1, skills: ['first_aid'] });
     expect(r.user.volunteer?.skills).toEqual(['first_aid']);
-    await expect(authApi.register({ full_name: 'Dup', email: DEMO.volunteer, password: 'longenough' })).rejects.toMatchObject({
+    await expect(authApi.register({ first_name: 'Dup', last_name: 'Licate', email: DEMO.volunteer, password: 'longenough' })).rejects.toMatchObject({
       status: 422,
       fieldErrors: { email: ['The email has already been taken.'] },
     });
@@ -81,15 +81,26 @@ describe('volunteer portal', () => {
   it('enforces every check-in gate', async () => {
     await signInAs(DEMO.volunteer);
     const base = { shift_id: liveShiftId(), qr_code_signature: DEMO_QR_SIGNATURE, ...MESKEL, client_timestamp: new Date().toISOString() };
-    await expect(volunteerApi.checkIn({ ...base, client_timestamp: new Date(Date.now() - 10 * 60_000).toISOString() })).rejects.toMatchObject({ message: expect.stringContaining('time-drift') });
-    await expect(volunteerApi.checkIn({ ...base, qr_code_signature: 'wrong' })).rejects.toMatchObject({ message: expect.stringContaining('QR code') });
+    await expect(volunteerApi.checkIn({ ...base, client_timestamp: new Date(Date.now() - 10 * 60_000).toISOString() })).rejects.toMatchObject({ code: 'clock_drift' });
+    await expect(volunteerApi.checkIn({ ...base, qr_code_signature: 'wrong' })).rejects.toMatchObject({ code: 'qr_invalid' });
     const far = offsetMeters(MESKEL, 400, 0);
-    await expect(volunteerApi.checkIn({ ...base, ...far })).rejects.toMatchObject({ message: expect.stringContaining('meters away') });
+    await expect(volunteerApi.checkIn({ ...base, ...far })).rejects.toMatchObject({ code: 'outside_geofence' });
+    await expect(volunteerApi.checkIn({ ...base, accuracy: 900 })).rejects.toMatchObject({ code: 'gps_inaccurate' });
     const ok = await volunteerApi.checkIn(base);
     expect(ok.attendance.qr_verified).toBe(true);
-    await expect(volunteerApi.checkIn(base)).rejects.toMatchObject({ message: 'You are already checked in to this shift.' });
-    const out = await volunteerApi.checkOut(base.shift_id);
-    expect(out.result.cumulative_hours).toBeGreaterThanOrEqual(46.5);
+    // A second phone (or a double tap) cannot create a second check-in.
+    await expect(volunteerApi.checkIn(base)).rejects.toMatchObject({ status: 409, code: 'already_checked_in' });
+    const schedule = await volunteerApi.schedule();
+    expect(schedule.find((a) => a.shift_id === base.shift_id)?.attendance?.check_out_time).toBeNull();
+    // Leaving early needs a reason; hours wait for the coordinator.
+    await expect(volunteerApi.checkOut({ shift_id: base.shift_id })).rejects.toMatchObject({ code: 'reason_required' });
+    const before = db.t.volunteers.find((v) => v.id === 1)!.total_hours;
+    const out = await volunteerApi.checkOut({ shift_id: base.shift_id, reason: 'Feeling unwell' });
+    expect(out.result.hours_status).toBe('pending');
+    expect(out.result.cumulative_hours).toBe(before);
+    expect(out.result.can_resume).toBe(true);
+    const resumed = await volunteerApi.resume(base.shift_id);
+    expect(resumed.check_out_time).toBeNull();
   });
 
   it('blocks check-in for unapproved shifts', async () => {
@@ -130,7 +141,7 @@ describe('coordinator operations', () => {
     const late = new Date(start);
     late.setDate(late.getDate() + 5);
     await expect(opsApi.createShift(e.id, { start_time: toApiDateTime(late), end_time: toApiDateTime(new Date(late.getTime() + 3_600_000)), capacity: 5, required_skills: [] })).rejects.toMatchObject({ message: expect.stringContaining('event boundaries') });
-    await expect(opsApi.createEvent({ title: '', location: '', start_date: '2020-01-01', end_date: '2020-01-01' })).rejects.toMatchObject({ status: 422 });
+    await expect(opsApi.createEvent({ title: '', location: '', start_date: '2020-01-01', end_date: '2020-01-01' } as never)).rejects.toMatchObject({ status: 422 });
   });
 
   it('approves applications and enforces capacity', async () => {
@@ -156,19 +167,21 @@ describe('coordinator operations', () => {
   it('runs live-shift tools: QR, roster, force check-in, hours, broadcast', async () => {
     await signInAs(DEMO.coordinator);
     const shiftId = liveShiftId();
-    const qr = await opsApi.generateQr(shiftId);
-    expect(qr.qr_code_signature).toBeTruthy();
+    const qr = await opsApi.qr(shiftId);
+    expect(qr.token).toBeTruthy();
+    expect(qr.period_seconds).toBe(30);
     const roster = await opsApi.roster(shiftId);
-    const notIn = roster.find((r) => r.status === 'confirmed' && !r.attendance)!;
-    await opsApi.forceCheckIn(notIn.assignment_id, 'data:image/png;base64,AAA', 'GPS unavailable');
-    await expect(opsApi.forceCheckIn(notIn.assignment_id, 'data:x')).rejects.toMatchObject({ message: 'Volunteer is already checked in to this shift.' });
+    expect(roster.meta?.capacity).toBeGreaterThan(0);
+    const notIn = roster.entries.find((r) => r.status === 'confirmed' && !r.attendance)!;
+    await opsApi.forceCheckIn(notIn.assignment_id, { id_verified: true, note: 'No phone' });
+    await expect(opsApi.forceCheckIn(notIn.assignment_id, { id_verified: true })).rejects.toMatchObject({ message: 'Volunteer is already checked in to this shift.' });
     const pending = await opsApi.pendingHours();
     expect(pending.length).toBeGreaterThan(0);
     await opsApi.verifyHours(pending[0]!.id, { status: 'adjusted', verified_hours: 3.5 });
     const preview = await opsApi.broadcastPreview(shiftId);
     expect(preview.matching_volunteers).toBeGreaterThanOrEqual(0);
     const r = await opsApi.broadcast(shiftId);
-    expect(r.status).toBe(202);
+    expect(r.notified).toBeGreaterThanOrEqual(0);
     expect((await opsApi.dashboard()).shifts_today).toBeGreaterThan(0);
   });
 
@@ -179,12 +192,12 @@ describe('coordinator operations', () => {
     const detail = await peopleApi.volunteer(1);
     expect(detail.skills_alignment.Medical).toBe(95);
     await expect(peopleApi.issueCertificate(1, 50)).rejects.toMatchObject({ status: 422 });
-    const gen = await peopleApi.generateReport('Q4 2026');
+    const gen = await peopleApi.generateReport({ period: 'Q4 2026' });
     expect(gen.report?.period).toBe('Q4 2026');
-    const queued = await peopleApi.generateReport('Q4 2026', true);
+    const queued = await peopleApi.generateReport({ period: 'Q4 2026', async: true });
     expect(queued.queued).toBe(true);
     const a = await announcementsApi.create({ title: 'Hello', message: 'World', target_audience: 'all' });
-    expect((await announcementsApi.list())[0]!.id).toBe(a.id);
+    expect((await announcementsApi.list()).items[0]!.id).toBe(a.announcement.id);
     const queue = await documentsApi.queue('pending');
     const reviewed = await documentsApi.review(queue[0]!.id, { status: 'verified', notes: 'Looks good' });
     expect(reviewed.verification_status).toBe('verified');
@@ -197,28 +210,41 @@ describe('org admin & platform', () => {
     const org = await orgApi.update({ phone: '+251 900 000 000' });
     expect(org.phone).toBe('+251 900 000 000');
     await expect(orgApi.update({ website: 'not a url' })).rejects.toMatchObject({ status: 422 });
-    const c = await orgApi.createCoordinator({ full_name: 'Coord Two', email: 'coord2@rc.org', password: 'password1' });
-    expect(c.role).toBe('Coordinator');
-    const toggled = await orgApi.toggleCoordinator(c.id);
+    const c = await orgApi.createCoordinator({ first_name: 'Coord', last_name: 'Two', email: 'coord2@rc.org' });
+    expect(c.user.role).toBe('Coordinator');
+    expect(c.invitation.invite_url).toContain('/invite/');
+    const toggled = await orgApi.toggleCoordinator(c.user.id);
     expect(toggled.is_active).toBe(false);
     const members = await orgApi.allMembers();
     const vol = members.find((m) => m.role === 'Volunteer')!;
     expect((await orgApi.toggleVolunteer(vol.id)).is_active).toBe(!vol.is_active);
     expect((await orgApi.analytics()).volunteers).toBeGreaterThan(5);
-    expect((await orgApi.audit()).every((l) => l.org_id === 1)).toBe(true);
+    expect((await orgApi.audit()).items.every((l) => l.org_id === 1)).toBe(true);
   });
 
   it('onboards tenants and changes status', async () => {
     await signInAs(DEMO.superadmin);
     const m = await platformApi.metrics();
-    const result = await platformApi.onboard({ org_name: 'New NGO', org_email: 'ngo@new.org', org_address: 'Adama', admin_full_name: 'Ngo Admin', admin_email: 'admin@new.org', admin_password: 'password1' });
+    const result = await platformApi.onboard({
+      org_name: 'New NGO',
+      org_email: 'ngo@new.org',
+      org_country: 'ET',
+      org_city: 'Adama',
+      org_phone: '+251911000222',
+      admin_first_name: 'Ngo',
+      admin_last_name: 'Admin',
+      admin_email: 'admin@new.org',
+    });
     expect(result.admin.role).toBe('OrgAdmin');
+    expect(result.invitation.email_sent).toBe(true);
     expect((await platformApi.metrics()).total_organizations).toBe(m.total_organizations + 1);
     const updated = await platformApi.updateStatus(result.organization.id, { status: 'suspended' });
     expect(updated.status).toBe('suspended');
-    expect((await platformApi.audit())[0]!.action).toBe('tenant.status_updated');
+    const audit = await platformApi.audit();
+    expect(audit.items[0]!.action).toBe('tenant.status_updated');
+    expect(audit.items[0]!.actor?.role).toBe('SuperAdmin');
     expect((await platformApi.timeseries()).length).toBe(12);
-    expect((await platformApi.users({ role: 'SuperAdmin' })).length).toBe(1);
+    expect((await platformApi.users({ role: 'SuperAdmin' })).items.length).toBe(1);
   });
 
   it('denies wrong roles', async () => {

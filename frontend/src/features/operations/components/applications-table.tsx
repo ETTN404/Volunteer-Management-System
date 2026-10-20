@@ -13,7 +13,7 @@ import { useAiFeedback, useDecideApplication } from '../api';
 
 export type ApplicationRowData = ShiftAssignment & { event: VmsEvent };
 
-function FeedbackSheet({ app, onClose, onDecide }: { app: ApplicationRowData | null; onClose: () => void; onDecide: (a: ApplicationRowData, s: 'confirmed' | 'cancelled', reason?: string) => void }) {
+function FeedbackSheet({ app, onClose, onDecide }: { app: ApplicationRowData | null; onClose: () => void; onDecide: (a: ApplicationRowData, s: 'confirmed' | 'rejected', reason?: string) => void }) {
   const fb = useAiFeedback(app?.id ?? null);
   const v = app?.volunteer;
   const skills = v?.skills ?? [];
@@ -86,7 +86,7 @@ function FeedbackSheet({ app, onClose, onDecide }: { app: ApplicationRowData | n
                 <Button variant="success" className="flex-1" onClick={() => onDecide(app, 'confirmed')}>
                   <Check /> Approve
                 </Button>
-                <Button variant="secondary" className="flex-1" onClick={() => onDecide(app, 'cancelled', fb.data?.missing_skills.length ? fb.data.ai_drafted_feedback : undefined)}>
+                <Button variant="secondary" className="flex-1" onClick={() => onDecide(app, 'rejected', fb.data?.missing_skills.length ? fb.data.ai_drafted_feedback : undefined)}>
                   Decline
                 </Button>
               </div>
@@ -105,7 +105,7 @@ export function ApplicationsTable({ rows, isLoading, showEvent = true }: { rows:
   const [declining, setDeclining] = useState<{ app: ApplicationRowData; reason: string } | null>(null);
   const pendingIds = rows.filter((r) => r.status === 'pending').map((r) => r.id);
 
-  const run = async (app: ApplicationRowData, status: 'confirmed' | 'cancelled', reason?: string) => {
+  const run = async (app: ApplicationRowData, status: 'confirmed' | 'rejected', reason?: string) => {
     try {
       await decide.mutateAsync({ assignmentId: app.id, status, reason });
       notify.success(status === 'confirmed' ? 'Approved' : 'Declined', `${app.volunteer?.user?.full_name} · ${app.event.title}`);
@@ -243,7 +243,7 @@ export function ApplicationsTable({ rows, isLoading, showEvent = true }: { rows:
         </table>
       </div>
 
-      <FeedbackSheet app={open} onClose={() => setOpen(null)} onDecide={(a, s, reason) => (s === 'cancelled' ? setDeclining({ app: a, reason: reason ?? '' }) : run(a, s))} />
+      <FeedbackSheet app={open} onClose={() => setOpen(null)} onDecide={(a, s, reason) => (s === 'rejected' ? setDeclining({ app: a, reason: reason ?? '' }) : run(a, s))} />
 
       <Dialog open={Boolean(declining)} onOpenChange={(o) => !o && setDeclining(null)}>
         <DialogContent title="Decline this application?" description={declining ? `${declining.app.volunteer?.user?.full_name} · ${declining.app.event.title}` : undefined} size="sm">
@@ -257,7 +257,7 @@ export function ApplicationsTable({ rows, isLoading, showEvent = true }: { rows:
                 <Button variant="ghost" onClick={() => setDeclining(null)}>
                   Keep pending
                 </Button>
-                <Button variant="danger" loading={decide.isPending} onClick={() => run(declining.app, 'cancelled', declining.reason.trim() || undefined)}>
+                <Button variant="danger" loading={decide.isPending} onClick={() => run(declining.app, 'rejected', declining.reason.trim() || undefined)}>
                   Decline
                 </Button>
               </DialogActions>

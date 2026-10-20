@@ -8,18 +8,31 @@ interface AuthResponse {
   token_type: 'Bearer';
   user: User;
   role?: string;
+  must_change_password?: boolean;
 }
 
 export interface RegisterInput {
   org_id?: number | null;
-  full_name: string;
+  first_name: string;
+  last_name: string;
   email: string;
+  phone?: string | null;
   password: string;
   skills?: string[];
   availability?: string[];
   bio?: string | null;
-  /** PENDING-BE (G5) — accepted by the mock; Laravel ignores unknown fields today. */
   date_of_birth?: string | null;
+}
+
+export interface InvitationInfo {
+  email: string;
+  first_name: string | null;
+  full_name: string;
+  role: string;
+  organization: string | null;
+  expires_at: string;
+  usable: boolean;
+  reason: 'used' | 'expired' | null;
 }
 
 export const authApi = {
@@ -34,15 +47,20 @@ export const authApi = {
   },
   logout: () => http.post('/logout'),
   me: async () => (await http.get<User>('/user')).data,
-  /** PENDING-BE (G3) */
-  forgotPassword: (email: string) => http.post('/forgot-password', { email }),
-  /** PENDING-BE (G3) */
+  forgotPassword: (email: string) => http.post('/forgot-password', { email }, { skipAuthRedirect: true }),
   resetPassword: (input: { token: string; email: string; password: string; password_confirmation: string }) =>
-    http.post('/reset-password', input),
-  /** PENDING-BE (G4) */
+    http.post('/reset-password', input, { skipAuthRedirect: true }),
   changePassword: (input: { current_password: string; password: string; password_confirmation: string }) =>
     http.patch('/account/password', input),
-  /** PENDING-BE (G28) */
+  updateAccount: async (input: { first_name?: string; last_name?: string; phone?: string | null }) =>
+    (await http.patch<User>('/account', input)).data,
+  invitation: async (token: string) => (await http.get<InvitationInfo>(`/invitations/${token}`, { skipAuthRedirect: true })).data,
+  acceptInvitation: async (token: string, password: string) => {
+    const r = await http.post<AuthResponse>(`/invitations/${token}/accept`, { password, password_confirmation: password }, { skipAuthRedirect: true });
+    return r.raw as unknown as AuthResponse;
+  },
+  resendInvitation: (email: string) => http.post('/invitations/resend', { email }, { skipAuthRedirect: true }),
+  deletePhoto: () => http.delete('/account/photo'),
   uploadPhoto: async (file: File) => {
     const form = new FormData();
     form.append('photo', file);
@@ -105,7 +123,53 @@ export function useLogout() {
 }
 
 export function useChangePassword() {
-  return useMutation({ mutationFn: authApi.changePassword });
+  const qc = useQueryClient();
+  const user = useSessionStore((s) => s.user);
+  const setUser = useSessionStore((s) => s.setUser);
+  return useMutation({
+    mutationFn: authApi.changePassword,
+    onSuccess: () => {
+      if (user?.must_change_password) setUser({ ...user, must_change_password: false });
+      qc.invalidateQueries({ queryKey: authKeys.me });
+    },
+  });
+}
+
+export function useUpdateAccount() {
+  const qc = useQueryClient();
+  const setUser = useSessionStore((s) => s.setUser);
+  return useMutation({
+    mutationFn: authApi.updateAccount,
+    onSuccess: (user) => {
+      setUser(user);
+      qc.invalidateQueries({ queryKey: authKeys.me });
+    },
+  });
+}
+
+export function useInvitation(token: string) {
+  return useQuery({ queryKey: ['auth', 'invitation', token], queryFn: () => authApi.invitation(token), retry: false });
+}
+
+export function useAcceptInvitation() {
+  const signIn = useSessionStore((s) => s.signIn);
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ token, password }: { token: string; password: string }) => authApi.acceptInvitation(token, password),
+    onSuccess: (res) => {
+      qc.clear();
+      signIn(res.access_token, res.user);
+    },
+  });
+}
+
+export function useResendInvitation() {
+  return useMutation({ mutationFn: authApi.resendInvitation });
+}
+
+export function useDeletePhoto() {
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: authApi.deletePhoto, onSuccess: () => qc.invalidateQueries({ queryKey: authKeys.me }) });
 }
 
 export function useUploadPhoto() {

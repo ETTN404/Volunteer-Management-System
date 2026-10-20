@@ -1,6 +1,18 @@
 import type { ApiError } from '@/shared/api/http';
 
-export type CheckInProblem = 'drift' | 'not-approved' | 'already' | 'window' | 'qr' | 'location' | 'rate' | 'other';
+export type CheckInProblem =
+  | 'drift'
+  | 'not-approved'
+  | 'already'
+  | 'checked-out'
+  | 'window'
+  | 'qr'
+  | 'location'
+  | 'gps'
+  | 'org'
+  | 'busy'
+  | 'rate'
+  | 'other';
 
 export interface CheckInGuidance {
   kind: CheckInProblem;
@@ -10,24 +22,36 @@ export interface CheckInGuidance {
   detail: string;
 }
 
-/** Maps AttendanceController::checkIn failures to plain guidance (what happened + how to fix it). */
+/** Maps AttendanceService::checkIn failures (by `code`) to plain guidance: what happened + how to fix it. */
 export function explainCheckInError(e: ApiError): CheckInGuidance {
   const m = e.message;
-  if (e.status === 429) return { kind: 'rate', title: 'Too many attempts', fix: 'Wait a minute, then try once more. If it keeps failing, ask your coordinator for a manual check-in.', detail: m };
-  if (/time-drift/i.test(m)) return { kind: 'drift', title: 'Your phone’s clock is off', fix: 'Turn on automatic date & time in your phone settings, then try again.', detail: m };
-  if (/not scheduled or approved/i.test(m)) return { kind: 'not-approved', title: 'You’re not confirmed for this shift', fix: 'Only confirmed volunteers can check in. Check your schedule or speak to the coordinator.', detail: m };
-  if (/already checked in/i.test(m)) return { kind: 'already', title: 'You’re already checked in', fix: 'Your attendance is recorded. Check out from the green bar when you finish.', detail: m };
-  if (/check-in window/i.test(m)) return { kind: 'window', title: 'Check-in isn’t open right now', fix: 'Check-in opens 15 minutes before the shift and closes 30 minutes after it starts.', detail: m };
-  if (/QR code/i.test(m)) return { kind: 'qr', title: 'That QR code isn’t current', fix: 'Codes rotate every 15 minutes. Ask your coordinator to show the code on screen now and scan it again.', detail: m };
-  const meters = /You are ([\d.]+) meters away/i.exec(m);
-  if (meters) {
-    const limit = /limit: (\d+)/i.exec(m)?.[1];
-    return {
-      kind: 'location',
-      title: `You’re ${Math.round(Number(meters[1]))} m from the venue`,
-      fix: `Move inside the ${limit ?? ''} m check-in area and try again. Indoors, step near a window to improve GPS accuracy.`.replace('  ', ' '),
-      detail: m,
-    };
+  const g = (kind: CheckInProblem, title: string, fix: string): CheckInGuidance => ({ kind, title, fix, detail: m });
+
+  if (e.status === 429) return g('rate', 'Too many attempts', 'Wait a minute, then try once more. If it keeps failing, ask your coordinator to check you in.');
+  switch (e.code) {
+    case 'clock_drift':
+      return g('drift', 'Your phone’s clock is off', 'Turn on automatic date & time in your phone settings, then try again.');
+    case 'not_confirmed':
+      return g('not-approved', 'You’re not confirmed for this shift', 'Only confirmed volunteers can check in. Check your schedule or speak to the coordinator.');
+    case 'already_checked_in':
+      return g('already', 'You’re already checked in', 'Your attendance is recorded. Check out when you finish.');
+    case 'already_checked_out':
+      return g('checked-out', 'You already checked out', m);
+    case 'outside_window':
+      return g('window', 'Check-in isn’t open right now', 'Check-in opens 15 minutes before the shift and closes 30 minutes after it starts. Late? The coordinator can check you in.');
+    case 'qr_invalid':
+      return g('qr', 'That QR code isn’t current', 'The code on the coordinator’s screen changes every 30 seconds. Scan it again directly from their screen — photos sent by others will not work.');
+    case 'gps_inaccurate':
+      return g('gps', 'Your GPS signal is too weak', 'Step outside or away from tall buildings for a few seconds until the accuracy improves, then try again.');
+    case 'outside_geofence': {
+      const meters = Number((e.body.distance_m as number | undefined) ?? /You are ([\d.]+) meters/i.exec(m)?.[1] ?? 0);
+      return g('location', `You’re ${Math.round(meters)} m from the venue`, 'Move inside the check-in area shown on the map and try again.');
+    }
+    case 'organization_inactive':
+    case 'event_cancelled':
+      return g('org', 'This event can’t take check-ins', m);
+    case 'busy':
+      return g('busy', 'Another device is checking you in', 'Wait a moment — your other phone or tab is already doing this.');
   }
-  return { kind: 'other', title: 'Check-in didn’t go through', fix: 'Try again. If it keeps failing, ask your coordinator for a manual check-in.', detail: m };
+  return g('other', 'Check-in didn’t go through', 'Try again. If it keeps failing, ask your coordinator to check you in.');
 }

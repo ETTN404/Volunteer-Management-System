@@ -1,4 +1,4 @@
-/** PENDING-BE (G6) — volunteer document upload & coordinator review. */
+/** Volunteer documents (upload, delete) and coordinator review. Files are private; links are short-lived. */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { http } from '@/shared/api/http';
 import type { DocumentType, VolunteerDocument } from '@/shared/types/api';
@@ -8,11 +8,12 @@ export const DOCUMENT_TYPES: { value: DocumentType; label: string; hint: string 
   { value: 'id_proof', label: 'ID document', hint: 'Kebele ID, passport or student ID' },
   { value: 'parental_consent', label: 'Parental consent', hint: 'Required for volunteers under 18' },
   { value: 'medical_clearance', label: 'Medical clearance', hint: 'Fitness letter for physically demanding shifts' },
+  { value: 'other', label: 'Other', hint: 'Anything else a coordinator asked you for' },
 ];
 
 export const DOCUMENT_LIMITS = {
   maxBytes: 2 * 1024 * 1024,
-  accept: { 'application/pdf': ['.pdf'], 'image/png': ['.png'], 'image/jpeg': ['.jpg', '.jpeg'] },
+  accept: { 'application/pdf': ['.pdf'], 'image/png': ['.png'], 'image/jpeg': ['.jpg', '.jpeg'], 'image/webp': ['.webp'] },
 } as const;
 
 export const documentsApi = {
@@ -52,6 +53,9 @@ export function useReviewDocument() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ id, ...input }: { id: number; status: 'verified' | 'rejected'; notes?: string | null }) => documentsApi.review(id, input),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['documents', 'queue'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['documents', 'queue'] });
+      qc.invalidateQueries({ queryKey: ['people'] });
+    },
   });
 }

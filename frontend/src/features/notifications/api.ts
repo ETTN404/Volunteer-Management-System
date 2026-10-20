@@ -1,11 +1,11 @@
-/** PENDING-BE (G25) — Laravel already has a notifications table; endpoints are missing. */
+/** In-app notifications (bell). Backed by Laravel's notifications table. */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { http } from '@/shared/api/http';
 import type { AppNotification } from '@/shared/types/api';
 
 export const notificationsApi = {
   list: async () => {
-    const r = await http.get<AppNotification[]>('/notifications');
+    const r = await http.get<AppNotification[]>('/notifications', { silent: true });
     return { items: r.data, unread: Number(r.raw.unread_count ?? r.data.filter((n) => !n.read_at).length) };
   },
   read: (id: string) => http.post(`/notifications/${id}/read`),
@@ -15,7 +15,7 @@ export const notificationsApi = {
 export const notificationKeys = { list: ['notifications'] as const };
 
 export const useNotifications = () =>
-  useQuery({ queryKey: notificationKeys.list, queryFn: notificationsApi.list, refetchInterval: 60_000, retry: false });
+  useQuery({ queryKey: notificationKeys.list, queryFn: notificationsApi.list, refetchInterval: 45_000, retry: false });
 
 export function useMarkNotificationRead() {
   const qc = useQueryClient();

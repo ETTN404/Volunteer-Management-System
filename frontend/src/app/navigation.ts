@@ -7,6 +7,10 @@ import {
   CalendarRange,
   ClipboardCheck,
   Clock4,
+  CreditCard,
+  Flag,
+  HeartPulse,
+  MessageSquare,
   FileCheck2,
   FileText,
   Gauge,
@@ -112,6 +116,8 @@ export const NAV: Record<Role, NavSection[]> = {
       items: [
         { to: '/c/events', label: 'Events', icon: CalendarRange },
         { to: '/c/applications', label: 'Applications', icon: Inbox },
+        { to: '/c/live', label: 'Live shifts', icon: Radar },
+        { to: '/c/hours', label: 'Verify hours', icon: Clock4, badgeKey: 'hours' },
         { to: '/o/reports', label: 'Impact reports', icon: BarChart3 },
         { to: '/c/announcements', label: 'Announcements', icon: Megaphone },
       ],
@@ -120,6 +126,8 @@ export const NAV: Record<Role, NavSection[]> = {
       label: 'Organization',
       items: [
         { to: '/o/settings', label: 'Settings & brand', icon: Settings2 },
+        { to: '/o/billing', label: 'Plan & billing', icon: CreditCard },
+        { to: '/o/messages', label: 'Messages', icon: MessageSquare },
         { to: '/o/audit', label: 'Audit trail', icon: ScrollText },
       ],
     },
@@ -129,7 +137,15 @@ export const NAV: Record<Role, NavSection[]> = {
       items: [
         { to: '/p', label: 'Platform', icon: Gauge, end: true },
         { to: '/p/organizations', label: 'Organizations', icon: Building2 },
-        { to: '/p/onboard', label: 'Onboard tenant', icon: UserPlus },
+        { to: '/p/onboard', label: 'Onboard organization', icon: UserPlus },
+        { to: '/p/messages', label: 'Messages', icon: MessageSquare },
+      ],
+    },
+    {
+      label: 'Business',
+      items: [
+        { to: '/p/payments', label: 'Payments', icon: CreditCard },
+        { to: '/p/health', label: 'System health', icon: HeartPulse },
       ],
     },
     {
@@ -137,6 +153,7 @@ export const NAV: Record<Role, NavSection[]> = {
       items: [
         { to: '/p/admins', label: 'Org admins', icon: ShieldCheck },
         { to: '/p/users', label: 'All users', icon: Users },
+        { to: '/p/reports', label: 'Reports', icon: Flag },
         { to: '/p/audit', label: 'Audit trail', icon: ScrollText },
       ],
     },

@@ -1,4 +1,5 @@
-import { Award, BellOff, CalendarCheck2, FileCheck2, Megaphone, ShieldAlert, Siren } from 'lucide-react';
+import { Award, BadgeCheck, BellOff, CalendarCheck2, CalendarX2, Clock4, CreditCard, FileCheck2, Flag, LogOut, Megaphone, MessageSquare, ShieldAlert, Siren, UserMinus } from 'lucide-react';
+import { useSession } from '@/features/auth/use-session';
 import { useNavigate } from 'react-router';
 import { cn } from '@/shared/lib/cn';
 import { formatRelative } from '@/shared/lib/time';
@@ -6,22 +7,38 @@ import { Button, EmptyState, Sheet, SheetContent, Skeleton } from '@/shared/ui';
 import type { AppNotification } from '@/shared/types/api';
 import { useMarkAllNotificationsRead, useMarkNotificationRead, useNotifications } from '@/features/notifications/api';
 
-const ICON: Record<AppNotification['type'], typeof Award> = {
-  shift_approved: CalendarCheck2,
-  shift_broadcast: Siren,
-  certificate_issued: Award,
-  organization_suspended: ShieldAlert,
-  announcement: Megaphone,
-  document_reviewed: FileCheck2,
-};
+const OK = 'bg-success-soft text-success-text';
+const BAD = 'bg-danger-soft text-danger-text';
+const INFO = 'bg-info-soft text-info-text';
+const ACC = 'bg-accent-soft text-accent-text';
+const WARN = 'bg-warning-soft text-warning-text';
 
-const TONE: Record<AppNotification['type'], string> = {
-  shift_approved: 'bg-success-soft text-success-text',
-  shift_broadcast: 'bg-danger-soft text-danger-text',
-  certificate_issued: 'bg-accent-soft text-accent-text',
-  organization_suspended: 'bg-danger-soft text-danger-text',
-  announcement: 'bg-info-soft text-info-text',
-  document_reviewed: 'bg-success-soft text-success-text',
+const KIND: Record<string, { icon: typeof Award; tone: string }> = {
+  shift_approved: { icon: CalendarCheck2, tone: OK },
+  shift_broadcast: { icon: Siren, tone: BAD },
+  shift_changed: { icon: Clock4, tone: WARN },
+  shift_cancelled: { icon: CalendarX2, tone: BAD },
+  application_declined: { icon: CalendarX2, tone: WARN },
+  certificate_issued: { icon: Award, tone: ACC },
+  hours_reviewed: { icon: BadgeCheck, tone: OK },
+  auto_checked_out: { icon: LogOut, tone: WARN },
+  volunteer_left_early: { icon: LogOut, tone: BAD },
+  volunteer_withdrew: { icon: UserMinus, tone: WARN },
+  organization_suspended: { icon: ShieldAlert, tone: BAD },
+  organization_inactive: { icon: ShieldAlert, tone: BAD },
+  organization_active: { icon: BadgeCheck, tone: OK },
+  organization_verification: { icon: BadgeCheck, tone: OK },
+  organization_signup: { icon: Flag, tone: INFO },
+  organization_document: { icon: FileCheck2, tone: INFO },
+  organization_reported: { icon: Flag, tone: BAD },
+  report_closed: { icon: Flag, tone: INFO },
+  announcement: { icon: Megaphone, tone: INFO },
+  document_reviewed: { icon: FileCheck2, tone: OK },
+  document_uploaded: { icon: FileCheck2, tone: INFO },
+  payment_pending: { icon: CreditCard, tone: WARN },
+  payment_verified: { icon: CreditCard, tone: OK },
+  payment_rejected: { icon: CreditCard, tone: BAD },
+  support_message: { icon: MessageSquare, tone: ACC },
 };
 
 export function NotificationsPanel({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
@@ -29,6 +46,9 @@ export function NotificationsPanel({ open, onOpenChange }: { open: boolean; onOp
   const markRead = useMarkNotificationRead();
   const markAll = useMarkAllNotificationsRead();
   const navigate = useNavigate();
+  const { role } = useSession();
+  // Announcements carry no link: send each role to its own announcements page.
+  const linkFor = (n: AppNotification) => n.action_url ?? (n.type === 'announcement' ? (role === 'Volunteer' ? '/v/announcements' : '/c/announcements') : null);
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -59,20 +79,22 @@ export function NotificationsPanel({ open, onOpenChange }: { open: boolean; onOp
             <EmptyState icon={<BellOff />} title="No notifications yet" description="Approvals, urgent shifts and certificates will show up here." compact />
           )}
           {data?.items.map((n) => {
-            const Icon = ICON[n.type] ?? Megaphone;
+            const k = KIND[n.type] ?? { icon: Megaphone, tone: INFO };
+            const Icon = k.icon;
+            const to = linkFor(n);
             return (
               <button
                 key={n.id}
                 onClick={() => {
                   if (!n.read_at) markRead.mutate(n.id);
-                  if (n.action_url) {
+                  if (to) {
                     onOpenChange(false);
-                    navigate(n.action_url);
+                    navigate(to);
                   }
                 }}
                 className="group flex w-full gap-3 rounded-lg p-2.5 text-left transition-colors hover:bg-surface-2"
               >
-                <span className={cn('grid size-9 shrink-0 place-items-center rounded-full', TONE[n.type])}>
+                <span className={cn('grid size-9 shrink-0 place-items-center rounded-full', k.tone)}>
                   <Icon className="size-4" />
                 </span>
                 <span className="min-w-0 flex-1">

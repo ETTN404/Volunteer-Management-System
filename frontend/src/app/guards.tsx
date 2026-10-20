@@ -4,11 +4,15 @@ import { useSession } from '@/features/auth/use-session';
 import { ROLE_HOME } from '@/features/auth/session-store';
 
 export function RequireAuth() {
-  const { isAuthenticated } = useSession();
+  const { isAuthenticated, user } = useSession();
   const location = useLocation();
   if (!isAuthenticated) {
     const next = encodeURIComponent(location.pathname + location.search);
     return <Navigate to={`/login?next=${next}`} replace />;
+  }
+  // Signed in with an invitation's temporary password: choose a real one first.
+  if (user?.must_change_password && location.pathname !== '/welcome/password') {
+    return <Navigate to="/welcome/password" replace />;
   }
   return <Outlet />;
 }

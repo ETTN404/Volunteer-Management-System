@@ -23,7 +23,7 @@ export function BroadcastDialog({ events, open, onOpenChange, initialShiftId }: 
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent title="Send an urgent shift alert" description="Only volunteers whose skills match the shift are notified." size="md">
+      <DialogContent title="Send an urgent shift alert" description="Goes to volunteers who work with you or have no home organization, whose skills match and who are free at that time — in the app and by email." size="md">
         <div className="space-y-5">
           <Field label="Shift">
             <Select
@@ -53,11 +53,14 @@ export function BroadcastDialog({ events, open, onOpenChange, initialShiftId }: 
                   <AvatarStack names={preview.data.sample.map((v) => v.full_name)} max={5} />
                   <div className="text-sm">
                     <div className="font-semibold text-text">{preview.data.matching_volunteers} volunteers will be alerted</div>
-                    <div className="text-muted">{preview.data.remaining_slots} spots still open</div>
+                    <div className="text-muted">
+                      {preview.data.remaining_slots} spots still open
+                      {preview.data.plan?.limit != null && ` · ${preview.data.plan.used}/${preview.data.plan.limit} alerts used this month`}
+                    </div>
                   </div>
                 </div>
               ) : (
-                <p className="text-sm text-muted">Matching volunteers will be notified by the background queue.</p>
+                <p className="text-sm text-muted">Checking who can be alerted…</p>
               )}
             </div>
           )}
@@ -74,8 +77,8 @@ export function BroadcastDialog({ events, open, onOpenChange, initialShiftId }: 
             onClick={() =>
               shiftId &&
               send.mutate(shiftId, {
-                onSuccess: () => {
-                  notify.success('Alert queued', `Matching volunteers are being notified about ${target?.e.title}.`);
+                onSuccess: (r) => {
+                  notify.success('Urgent alert sent', r.message ?? `${r.notified} volunteers notified about ${target?.e.title}.`);
                   onOpenChange(false);
                 },
               })
