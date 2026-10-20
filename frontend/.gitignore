@@ -11,3 +11,4 @@ blob-report/
 .env.local
 .env.*.local
 .env.production
+public/geo/

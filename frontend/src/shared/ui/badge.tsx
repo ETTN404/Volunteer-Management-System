@@ -47,7 +47,9 @@ export function Badge({ className, tone, size, dot, pulse, children, ...props }:
 const ASSIGNMENT: Record<AssignmentStatus, { tone: BadgeProps['tone']; label: string }> = {
   pending: { tone: 'warning', label: 'Awaiting review' },
   confirmed: { tone: 'success', label: 'Confirmed' },
-  cancelled: { tone: 'neutral', label: 'Not selected' },
+  rejected: { tone: 'neutral', label: 'Not selected' },
+  cancelled: { tone: 'neutral', label: 'Cancelled' },
+  removed: { tone: 'danger', label: 'Removed from shift' },
 };
 
 const EVENT: Record<EventStatus, { tone: BadgeProps['tone']; label: string; pulse?: boolean }> = {
@@ -58,7 +60,7 @@ const EVENT: Record<EventStatus, { tone: BadgeProps['tone']; label: string; puls
 };
 
 export function AssignmentBadge({ status, size }: { status: AssignmentStatus; size?: 'sm' | 'md' }) {
-  const s = ASSIGNMENT[status];
+  const s = ASSIGNMENT[status] ?? ASSIGNMENT.pending;
   return (
     <Badge tone={s.tone} size={size} dot>
       {s.label}

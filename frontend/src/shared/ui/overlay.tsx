@@ -1,13 +1,40 @@
 /** Dialog, Sheet (side drawer), Popover, Tooltip, DropdownMenu — Radix primitives in system styling. */
 import { Dialog as D, DropdownMenu as DM, Popover as P, Tooltip as T } from 'radix-ui';
 import { X } from 'lucide-react';
-import type { ComponentPropsWithoutRef, ReactNode } from 'react';
+import { useEffect, type ComponentProps, type ComponentPropsWithoutRef, type ReactNode } from 'react';
 import { cn } from '@/shared/lib/cn';
 
 const overlay =
   'fixed inset-0 z-50 bg-[rgba(3,12,13,0.62)] backdrop-blur-[3px] data-[state=open]:animate-[fade-in_180ms_ease-out] data-[state=closed]:animate-[fade-out_140ms_ease-in]';
 
-export const Dialog = D.Root;
+/**
+ * Radix leaves `pointer-events: none` on <body> when a modal closes while another layer
+ * (a dropdown that opened it, a nested select) is still unmounting — the page then looks
+ * alive but nothing can be clicked. After any dialog closes we verify and clean it up.
+ */
+function releaseBodyLock() {
+  window.setTimeout(() => {
+    const anyOpen = document.querySelector('[role="dialog"][data-state="open"], [role="alertdialog"][data-state="open"]');
+    if (!anyOpen && document.body.style.pointerEvents === 'none') document.body.style.pointerEvents = '';
+  }, 320);
+}
+
+export function Dialog({ onOpenChange, open, ...props }: ComponentProps<typeof D.Root>) {
+  useEffect(() => {
+    if (open === false) releaseBodyLock();
+    return releaseBodyLock;
+  }, [open]);
+  return (
+    <D.Root
+      open={open}
+      onOpenChange={(o) => {
+        if (!o) releaseBodyLock();
+        onOpenChange?.(o);
+      }}
+      {...props}
+    />
+  );
+}
 export const DialogTrigger = D.Trigger;
 export const DialogClose = D.Close;
 
@@ -64,7 +91,7 @@ export function DialogActions({ children, className }: { children: ReactNode; cl
   return <div className={cn('mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end', className)}>{children}</div>;
 }
 
-export const Sheet = D.Root;
+export const Sheet = Dialog;
 export const SheetTrigger = D.Trigger;
 
 export function SheetContent({
@@ -153,7 +180,10 @@ export function Tooltip({ content, children, side = 'top' }: { content: ReactNod
   );
 }
 
-export const Menu = DM.Root;
+/** Non-modal by default so a menu item can open a dialog without locking the page. */
+export function Menu({ modal = false, ...props }: ComponentProps<typeof DM.Root>) {
+  return <DM.Root modal={modal} {...props} />;
+}
 export const MenuTrigger = DM.Trigger;
 export function MenuContent({ className, align = 'end', ...props }: ComponentPropsWithoutRef<typeof DM.Content>) {
   return (

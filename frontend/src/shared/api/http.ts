@@ -49,6 +49,10 @@ export class ApiError extends Error {
   get isRouteMissing() {
     return this.status === 404 && this.message === 'Resource not found.';
   }
+  /** Machine-readable reason from the API (`code`), e.g. `reason_required`, `plan_limit`. */
+  get code(): string | undefined {
+    return typeof this.body.code === 'string' ? this.body.code : undefined;
+  }
   /** First message for a field, for inline form errors. */
   field(name: string): string | undefined {
     return this.fieldErrors[name]?.[0];
@@ -126,6 +130,10 @@ export interface RequestOptions {
   asBlob?: boolean;
   /** Skip the global 401 handler (used by the login call itself). */
   skipAuthRedirect?: boolean;
+  /** Extra request headers. */
+  headers?: Record<string, string>;
+  /** Background call: never shows the "server is waking up" indicator. */
+  silent?: boolean;
 }
 
 export function buildUrl(path: string, query?: RequestOptions['query']): string {
@@ -163,7 +171,7 @@ function laravelMessage(json: Record<string, unknown>, status: number): string {
 }
 
 export async function request<T>(method: HttpMethod, path: string, opts: RequestOptions = {}): Promise<ApiResult<T>> {
-  const headers: Record<string, string> = { Accept: 'application/json' };
+  const headers: Record<string, string> = { Accept: 'application/json', ...opts.headers };
   const token = hooks.getToken();
   if (token) headers.Authorization = `Bearer ${token}`;
 
@@ -181,6 +189,7 @@ export async function request<T>(method: HttpMethod, path: string, opts: Request
   const timeout = setTimeout(() => controller.abort('timeout'), opts.timeoutMs ?? 45_000);
   let markedSlow = false;
   const slowTimer = setTimeout(() => {
+    if (opts.silent) return;
     markedSlow = true;
     setSlow(1);
   }, SLOW_AFTER_MS);
@@ -215,7 +224,8 @@ export async function request<T>(method: HttpMethod, path: string, opts: Request
   if (!res.ok) {
     const message = laravelMessage(json, res.status);
     if (res.status === 401 && !opts.skipAuthRedirect) hooks.onUnauthorized();
-    if (res.status === 403 && json.error === 'Organization Suspended') hooks.onSuspended(message);
+    if (res.status === 403 && (json.error === 'Organization Suspended' || json.error === 'Organization Inactive' || json.code === 'account_inactive') && !opts.skipAuthRedirect)
+      hooks.onSuspended(message);
     throw new ApiError({
       status: res.status,
       kind: 'http',

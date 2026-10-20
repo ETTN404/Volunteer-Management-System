@@ -1,4 +1,4 @@
-import { cloneElement, isValidElement, useId, type ReactElement, type ReactNode } from 'react';
+import { cloneElement, createContext, isValidElement, useContext, useId, type ReactElement, type ReactNode } from 'react';
 import { AlertCircle } from 'lucide-react';
 import { cn } from '@/shared/lib/cn';
 
@@ -11,6 +11,21 @@ interface FieldProps {
   /** Right side of the label row (e.g. "Forgot password?") */
   aside?: ReactNode;
   children: ReactElement<Record<string, unknown>>;
+}
+
+interface FieldControl {
+  id: string;
+  describedBy?: string;
+  invalid?: boolean;
+}
+const FieldContext = createContext<FieldControl | null>(null);
+
+/**
+ * For custom controls rendered inside a Field through a wrapper (e.g. react-hook-form
+ * Controller), where Field cannot inject props: returns the id/aria wiring to use.
+ */
+export function useFieldControl(): FieldControl | null {
+  return useContext(FieldContext);
 }
 
 /** Label + control + hint/error, wired with ids and aria attributes. */
@@ -36,7 +51,7 @@ export function Field({ label, hint, error, optional, className, aside, children
         </label>
         {aside}
       </div>
-      {control}
+      <FieldContext.Provider value={{ id: controlId, describedBy: [hintId, errorId].filter(Boolean).join(' ') || undefined, invalid: Boolean(error) }}>{control}</FieldContext.Provider>
       {error ? (
         <p id={errorId} className="flex items-start gap-1.5 text-[12.5px] text-danger-text" role="alert">
           <AlertCircle className="mt-px size-3.5 shrink-0" aria-hidden />
