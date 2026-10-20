@@ -19,6 +19,7 @@ class ShiftAssignmentResource extends JsonResource
             'status'       => $this->status,
             'decline_reason' => in_array($this->status, ['rejected', 'cancelled', 'removed'], true) ? $this->coordinator_feedback : null,
             'match_score'  => $this->match_score,
+            'waitlist_position' => $this->status === 'waitlisted' ? app(\App\Services\WaitlistService::class)->position($this->resource) : null,
             'applied_at'   => $this->created_at->toDateTimeString(),
 
             // Conditionally load nested shift if eager-loaded

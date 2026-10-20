@@ -451,6 +451,14 @@ class SuperAdminController extends Controller
         $checks['payment_verification'] = ['ok' => collect($drivers)->contains(fn ($x) => $x['configured']), 'drivers' => $drivers,
             'receiver_check' => (bool) (config('plans.verifier.receiver_account_suffix') || config('plans.verifier.receiver_name'))];
 
+        // Optional channels: never fail overall health, just say what is missing.
+        $tg = (bool) config('services.telegram.bot_token');
+        $checks['telegram_alerts'] = ['ok' => true, 'configured' => $tg && config('services.telegram.bot_username') && config('services.telegram.webhook_secret'),
+            'linked_users' => DB::table('users')->whereNotNull('telegram_chat_id')->count(),
+            'note' => $tg ? null : 'Optional: set TELEGRAM_BOT_TOKEN, TELEGRAM_BOT_USERNAME and TELEGRAM_WEBHOOK_SECRET, then register the webhook.'];
+        $sms = config('services.sms.driver', 'log');
+        $checks['sms_alerts'] = ['ok' => true, 'driver' => $sms, 'opted_in_users' => DB::table('users')->where('sms_opt_in', true)->count(),
+            'note' => $sms === 'log' ? 'Optional: SMS is written to the log. Set SMS_DRIVER=afromessage and AFROMESSAGE_TOKEN to send real texts.' : null];
         $checks['storage'] = ['ok' => true, 'stored_files' => DB::table('stored_files')->count(),
             'stored_mb' => round(DB::table('stored_files')->sum('size_bytes') / 1048576, 1)];
 

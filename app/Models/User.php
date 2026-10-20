@@ -62,6 +62,10 @@ class User extends Authenticatable
         'email_verified_at',
         'password',
         'must_change_password',
+        'telegram_chat_id',
+        'telegram_link_token',
+        'sms_opt_in',
+        'locale',
         'role',
         'last_login',
         'profile_photo_path',
@@ -76,6 +80,7 @@ class User extends Authenticatable
     protected $hidden = [
         'password',
         'remember_token',
+        'telegram_link_token',
     ];
 
     /**
@@ -90,6 +95,7 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'must_change_password' => 'boolean',
             'is_active' => 'boolean',
+            'sms_opt_in' => 'boolean',
             'password' => 'hashed',
         ];
     }

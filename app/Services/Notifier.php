@@ -21,6 +21,9 @@ class Notifier
             try {
                 $user->notify($notification);
                 $sent++;
+                if (method_exists($notification, 'toArray')) {
+                    app(AlertChannels::class)->deliver($user, $notification->toArray($user));
+                }
             } catch (\Throwable $e) {
                 Log::warning('Notification failed: ' . $e->getMessage(), ['user_id' => $user->id, 'type' => get_class($notification)]);
             }

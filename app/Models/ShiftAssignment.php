@@ -24,10 +24,11 @@ class ShiftAssignment extends Model
         'assigned_at',
         'coordinator_feedback',
         'match_score',
+        'waitlisted_at',
     ];
 
     /** pending → confirmed | rejected (coordinator) | cancelled (volunteer withdrew or shift removed) | removed (taken off a running shift). */
-    public const STATUSES = ['pending', 'confirmed', 'rejected', 'cancelled', 'removed'];
+    public const STATUSES = ['pending', 'confirmed', 'waitlisted', 'rejected', 'cancelled', 'removed'];
 
     /**
      * Get the attributes that should be cast.
@@ -38,6 +39,7 @@ class ShiftAssignment extends Model
     {
         return [
             'assigned_at' => 'datetime',
+            'waitlisted_at' => 'datetime',
         ];
     }
 

@@ -30,6 +30,7 @@ class VolunteerController extends Controller
         private SkillMatchingService $skillMatcher,
         private AttendanceService $attendance,
         private Notifier $notifier,
+        private \App\Services\WaitlistService $waitlist,
     ) {}
 
     /**
@@ -185,7 +186,7 @@ class VolunteerController extends Controller
         }
 
         $existing = ShiftAssignment::where('shift_id', $shiftId)->where('volunteer_id', $volunteer->id)->first();
-        if ($existing && in_array($existing->status, ['pending', 'confirmed'], true)) {
+        if ($existing && in_array($existing->status, ['pending', 'confirmed', 'waitlisted'], true)) {
             return response()->json(['status' => 'error', 'message' => 'You have already applied for this shift.'], 422);
         }
         if ($existing && in_array($existing->status, ['rejected', 'removed'], true)) {
@@ -196,6 +197,7 @@ class VolunteerController extends Controller
             ->where('shift_assignments.volunteer_id', $volunteer->id)
             ->whereIn('shift_assignments.status', ['pending', 'confirmed'])
             ->whereNull('shifts.deleted_at')
+            ->where('shifts.id', '!=', $shift->id)
             ->where('shifts.start_time', '<', $shift->end_time)
             ->where('shifts.end_time', '>', $shift->start_time)
             ->select('shift_assignments.*')
@@ -209,14 +211,27 @@ class VolunteerController extends Controller
             ], 422);
         }
 
+        // Full shift → join the waitlist; the first free place goes to the first in line.
+        $full = $shift->confirmedCount() >= $shift->capacity;
+
         $assignment = $existing ?? new ShiftAssignment(['shift_id' => $shift->id, 'volunteer_id' => $volunteer->id]);
         $assignment->fill([
-            'status'      => 'pending',
-            'assigned_at' => null,
-            'match_score' => $this->skillMatcher->calculateMatchScore($volunteer->skills ?? [], $shift->required_skills ?? []),
+            'status'        => $full ? 'waitlisted' : 'pending',
+            'waitlisted_at' => $full ? now() : null,
+            'assigned_at'   => null,
+            'match_score'   => $this->skillMatcher->calculateMatchScore($volunteer->skills ?? [], $shift->required_skills ?? []),
         ])->save();
 
         Cache::forget("volunteer_{$volunteer->id}_schedule");
+
+        if ($full) {
+            $position = $this->waitlist->position($assignment);
+            return response()->json([
+                'status'  => 'success',
+                'message' => "This shift is full, so you're on the waitlist (#{$position}). If a place opens up you get it automatically and we'll tell you.",
+                'data'    => new ShiftAssignmentResource($assignment),
+            ], 201);
+        }
 
         return response()->json([
             'status'  => 'success',
@@ -354,7 +369,7 @@ class VolunteerController extends Controller
     {
         $volunteer  = Auth::user()->volunteer;
         $assignment = ShiftAssignment::with('shift.event')->where('id', $assignmentId)->where('volunteer_id', $volunteer->id)
-            ->whereIn('status', ['pending', 'confirmed'])->firstOrFail();
+            ->whereIn('status', ['pending', 'confirmed', 'waitlisted'])->firstOrFail();
 
         if ($assignment->status === 'confirmed') {
             if ($assignment->shift->start_time->lt(now()->addHours(2))) {
@@ -367,6 +382,7 @@ class VolunteerController extends Controller
                 'A confirmed place on ' . $assignment->shift->start_time->toDayDateTimeString() . ' UTC is open again.',
                 '/c/events/' . $assignment->shift->event_id,
             ));
+            $this->waitlist->fill($assignment->shift);
         } else {
             $assignment->delete();
         }

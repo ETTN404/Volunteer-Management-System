@@ -35,6 +35,20 @@ return [
         ],
     ],
 
+    // Alerts for volunteers without the app (see App\Services\AlertChannels).
+    'telegram' => [
+        'bot_token'      => env('TELEGRAM_BOT_TOKEN'),
+        'bot_username'   => env('TELEGRAM_BOT_USERNAME'),
+        'webhook_secret' => env('TELEGRAM_WEBHOOK_SECRET'),
+    ],
+
+    'sms' => [
+        'driver'                 => env('SMS_DRIVER', 'log'), // log | afromessage
+        'afromessage_token'      => env('AFROMESSAGE_TOKEN'),
+        'afromessage_identifier' => env('AFROMESSAGE_IDENTIFIER'),
+        'sender'                 => env('SMS_SENDER', 'VolunTrack'),
+    ],
+
     'gemini' => [
         'key'   => env('GEMINI_API_KEY'),
         'model' => env('GEMINI_MODEL', 'gemini-1.5-flash'),

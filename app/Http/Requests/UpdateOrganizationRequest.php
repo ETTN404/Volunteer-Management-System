@@ -29,6 +29,7 @@ class UpdateOrganizationRequest extends FormRequest
             'primary_color' => ['sometimes', 'nullable', 'regex:/^#[0-9A-Fa-f]{6}$/'],
             'subdomain'     => 'sometimes|nullable|alpha_dash|min:3|max:40|unique:organizations,subdomain,' . $orgId,
 
+            'about'                             => 'sometimes|nullable|string|max:1500',
             'attendance'                        => 'sometimes|array',
             'attendance.checkin_before_minutes' => 'sometimes|integer|min:0|max:120',
             'attendance.checkin_after_minutes'  => 'sometimes|integer|min:5|max:240',

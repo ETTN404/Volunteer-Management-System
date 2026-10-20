@@ -21,7 +21,12 @@ class AccountController extends Controller
             'first_name' => 'sometimes|string|max:60',
             'last_name'  => 'sometimes|string|max:60',
             'phone'      => ['sometimes', 'nullable', 'string', 'regex:/^\+[1-9]\d{6,14}$/'],
+            'sms_opt_in' => 'sometimes|boolean',
+            'locale'     => 'sometimes|in:en,am',
         ]);
+        if (!empty($data['sms_opt_in']) && !($data['phone'] ?? $request->user()->phone)) {
+            return response()->json(['message' => 'Add your phone number first.', 'errors' => ['phone' => ['Add your phone number to receive SMS alerts.']]], 422);
+        }
         $request->user()->update($data);
 
         return response()->json(['status' => 'success', 'data' => new UserResource($request->user()->fresh()->load('volunteer', 'organization'))]);

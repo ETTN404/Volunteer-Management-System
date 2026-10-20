@@ -29,6 +29,7 @@ class OrganizationResource extends JsonResource
                 'attendance' => $this->attendancePolicy(),
             ],
             'phone'             => $this->phone,
+            'about'             => $this->settings['about'] ?? null,
             'website'           => $this->website,
             'status'            => $this->status,
             'subscription_plan' => $this->subscription_plan,

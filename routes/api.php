@@ -14,6 +14,7 @@ use App\Http\Controllers\PublicController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\SuperAdminController;
 use App\Http\Controllers\SupportController;
+use App\Http\Controllers\TelegramController;
 use App\Http\Controllers\TenantOnboardingController;
 use App\Http\Controllers\VolunteerController;
 use App\Http\Middleware\EnsureVolunteerProfile;
@@ -36,6 +37,8 @@ Route::get('/public/stats', [PublicController::class, 'stats']);
 Route::get('/public/plans', [PublicController::class, 'plans']);
 Route::post('/public/organizations/signup', [TenantOnboardingController::class, 'signup'])->middleware('throttle:5,10');
 Route::get('/files/{id}', [FileController::class, 'show'])->name('files.show');
+Route::get('/public/organizations/{id}', [PublicController::class, 'organization']);
+Route::post('/telegram/webhook/{secret}', [TelegramController::class, 'webhook'])->middleware('throttle:120,1');
 
 // ----------------------------------------------------------------------
 // Authenticated
@@ -49,6 +52,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::patch('/account', [AccountController::class, 'update']);
     Route::patch('/account/password', [AccountController::class, 'changePassword'])->middleware('throttle:10,1');
     Route::post('/account/photo', [AccountController::class, 'uploadPhoto']);
+    Route::post('/account/telegram', [TelegramController::class, 'link']);
+    Route::delete('/account/telegram', [TelegramController::class, 'unlink']);
     Route::delete('/account/photo', [AccountController::class, 'deletePhoto']);
     Route::get('/notifications', [AccountController::class, 'notifications']);
     Route::post('/notifications/read-all', [AccountController::class, 'markAllNotificationsRead']);

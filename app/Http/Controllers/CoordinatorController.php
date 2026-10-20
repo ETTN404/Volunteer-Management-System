@@ -37,6 +37,7 @@ class CoordinatorController extends Controller
         private Notifier $notifier,
         private AttendanceService $attendance,
         private SkillMatchingService $matcher,
+        private \App\Services\WaitlistService $waitlist,
     ) {}
 
     private function org(): Organization
@@ -310,6 +311,9 @@ class CoordinatorController extends Controller
 
         $this->audit->log('shift.updated', $shift, $old, $shift->fresh()->only(array_keys($old)));
         Cache::forget("shift_{$shift->id}_capacity");
+        if (isset($data['capacity']) && $data['capacity'] > ($old['capacity'] ?? 0)) {
+            $this->waitlist->fill($shift->fresh('event'));
+        }
 
         return response()->json([
             'status'  => 'success',
@@ -388,7 +392,8 @@ class CoordinatorController extends Controller
         $shift = Shift::findForStaffOrFail($shiftId);
 
         $assignments = ShiftAssignment::where('shift_id', $shift->id)
-            ->whereIn('status', ['confirmed', 'pending', 'removed'])
+            ->whereIn('status', ['confirmed', 'pending', 'removed', 'waitlisted'])
+            ->orderByRaw("status = 'waitlisted'")->orderBy('waitlisted_at')
             ->with('volunteer.user')->get();
         $attendances = Attendance::where('shift_id', $shift->id)->with('pings')->get()->keyBy('volunteer_id');
 
@@ -411,6 +416,7 @@ class CoordinatorController extends Controller
                 'checked_out'     => $attendances->whereNotNull('check_out_time')->count(),
                 'left_early'      => $attendances->filter(fn ($x) => in_array('left_early', $x->flags ?? [], true))->count(),
                 'open_places'     => max(0, $shift->capacity - $assignments->where('status', 'confirmed')->count()),
+                'waitlisted'      => $assignments->where('status', 'waitlisted')->count(),
                 'policy'          => $this->attendance->policy($shift),
             ],
         ]);
@@ -513,6 +519,7 @@ class CoordinatorController extends Controller
             }
         }
 
+        $wasConfirmed = $assignment->status === 'confirmed';
         $assignment->update([
             'status'               => $status,
             'assigned_at'          => $status === 'confirmed' ? now() : null,
@@ -536,6 +543,9 @@ class CoordinatorController extends Controller
         ]);
         Cache::forget("shift_{$assignment->shift_id}_capacity");
         Cache::forget("volunteer_{$assignment->volunteer_id}_schedule");
+        if ($wasConfirmed && $status !== 'confirmed') {
+            $this->waitlist->fill($assignment->shift);
+        }
 
         return response()->json([
             'status'  => 'success',
@@ -559,6 +569,7 @@ class CoordinatorController extends Controller
         }
         Cache::forget("volunteer_{$assignment->volunteer_id}_schedule");
         $this->audit->log('shift.volunteer_removed', $assignment, [], ['reason' => $data['reason']]);
+        $this->waitlist->fill($assignment->shift);
 
         return response()->json(['status' => 'success', 'message' => 'Volunteer removed from the shift.']);
     }

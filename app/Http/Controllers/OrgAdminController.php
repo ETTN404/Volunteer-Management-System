@@ -65,10 +65,16 @@ class OrgAdminController extends Controller
             $data['subdomain'] = Str::lower($data['subdomain']);
         }
 
-        if ($request->has('attendance')) {
-            $settings = $org->settings ?? [];
-            $settings['attendance'] = array_merge($settings['attendance'] ?? [], $request->input('attendance'));
+        if ($request->has('attendance') || $request->has('about')) {
+            $settings = $data['settings'] ?? ($org->settings ?? []);
+            if ($request->has('attendance')) {
+                $settings['attendance'] = array_merge($settings['attendance'] ?? [], $request->input('attendance'));
+            }
+            if ($request->has('about')) {
+                $settings['about'] = $request->input('about') ?: null;
+            }
             $data['settings'] = $settings;
+            \Illuminate\Support\Facades\Cache::forget("public_org_{$org->id}");
         }
 
         $oldData = $org->only($fields) + ['attendance' => $org->attendancePolicy()];
