@@ -33,7 +33,7 @@ class GeminiService
             foreach ($history as $chat) {
                 $contents[] = [
                     'role' => $chat['role'] === 'user' ? 'user' : 'model',
-                    'parts' => [['text' => $chat['message']]]
+                    'parts' => [['text' => $chat['parts'][0]['text'] ?? $chat['message'] ?? '']]
                 ];
             }
 

@@ -17,12 +17,15 @@ class UserResource extends JsonResource
             'id'                  => $this->id,
             'org_id'              => $this->org_id,
             'full_name'           => $this->full_name,
+            'first_name'          => $this->first_name,
+            'last_name'           => $this->last_name,
+            'phone'               => $this->phone,
+            'must_change_password'=> (bool) $this->must_change_password,
+            'email_verified_at'   => $this->email_verified_at?->toDateTimeString(),
             'email'               => $this->email,
             'role'                => $this->role,
-            'is_active'           => $this->is_active,
-            'profile_photo_url'   => $this->profile_photo_path
-                ? asset('storage/' . $this->profile_photo_path)
-                : null,
+            'is_active'           => $this->is_active === null ? true : (bool) $this->is_active,
+            'profile_photo_url'   => app(\App\Services\FileStore::class)->url($this->profile_photo_path),
             'last_login'          => $this->last_login?->toDateTimeString(),
             'created_at'          => $this->created_at->toDateTimeString(),
 

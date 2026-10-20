@@ -7,204 +7,283 @@ use App\Http\Resources\CertificateResource;
 use App\Http\Resources\EventResource;
 use App\Http\Resources\ShiftAssignmentResource;
 use App\Http\Resources\VolunteerResource;
+use App\Models\Attendance;
 use App\Models\Certificate;
 use App\Models\Event;
+use App\Models\Organization;
+use App\Models\OrganizationReport;
+use App\Models\Scopes\TenantScope;
 use App\Models\Shift;
 use App\Models\ShiftAssignment;
+use App\Notifications\AppNotification;
+use App\Services\AttendanceService;
+use App\Services\Notifier;
 use App\Services\SkillMatchingService;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 
 class VolunteerController extends Controller
 {
-    public function __construct(private SkillMatchingService $skillMatcher) {}
-    /**
-     * Browse available events with shifts and calculate personalized skill match scores.
-     */
-    public function browseEvents()
-    {
-        $user = Auth::user();
-        $volunteer = $user->volunteer;
+    public function __construct(
+        private SkillMatchingService $skillMatcher,
+        private AttendanceService $attendance,
+        private Notifier $notifier,
+    ) {}
 
-        if (!$volunteer) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Volunteer profile not found.'
-            ], 404);
+    /**
+     * Events volunteers can see: every active + verified organization's events
+     * (volunteers are not locked to one organization). Suspended or inactive
+     * organizations disappear immediately.
+     */
+    private function publicEvents()
+    {
+        return Event::withoutGlobalScope(TenantScope::class)
+            ->whereIn('events.org_id', Organization::query()->public()->select('id'));
+    }
+
+    private function loadShifts($query, array $skills)
+    {
+        return $query->with(['organization', 'shifts' => fn ($q) => $q->orderBy('start_time')->withCount([
+            'shiftAssignments as confirmed_count' => fn ($a) => $a->where('status', 'confirmed'),
+        ])]);
+    }
+
+    private function scoreShifts($events, array $skills): void
+    {
+        foreach ($events as $event) {
+            foreach ($event->shifts as $shift) {
+                $shift->match_score = $this->skillMatcher->calculateMatchScore($skills, $shift->required_skills ?? []);
+            }
+        }
+    }
+
+    public function browseEvents(Request $request)
+    {
+        $volunteer = Auth::user()->volunteer;
+        $skills    = $volunteer->skills ?? [];
+        $when      = $request->query('when', 'upcoming');
+
+        $query = $this->loadShifts($this->publicEvents(), $skills);
+        if ($when === 'past') {
+            $query->where(fn ($q) => $q->where('events.status', 'completed')->orWhere('events.end_date', '<', now()->toDateString()))->orderByDesc('start_date');
+        } else {
+            $query->whereIn('events.status', ['upcoming', 'ongoing'])->where('events.end_date', '>=', now()->toDateString())->orderBy('start_date');
+        }
+        if ($orgId = $request->query('org_id')) {
+            $query->where('events.org_id', (int) $orgId);
+        }
+        if ($q = trim((string) $request->query('q'))) {
+            $query->where(fn ($w) => $w->where('title', 'like', "%$q%")->orWhere('location', 'like', "%$q%")->orWhere('description', 'like', "%$q%"));
         }
 
-        $volunteerSkills = $volunteer->skills ?? [];
-
-        // Task 10.2.2.1: Paginated event fetching instead of loading all records
-        $events = Event::with('shifts')->paginate(10);
-
-        // Calculate skill match score for each shift using SkillMatchingService
-        $events->each(function ($event) use ($volunteerSkills) {
-            $event->shifts->each(function ($shift) use ($volunteerSkills) {
-                $shift->match_score = $this->skillMatcher->calculateMatchScore(
-                    $volunteerSkills,
-                    $shift->required_skills ?? []
-                );
-            });
-        });
+        $events = $query->paginate(min(50, (int) $request->query('per_page', 12)));
+        $this->scoreShifts($events->items(), $skills);
 
         return response()->json([
-            'status' => 'success',
-            'data'   => EventResource::collection($events->items()),
+            'status'     => 'success',
+            'data'       => EventResource::collection($events->items()),
             'pagination' => [
                 'current_page' => $events->currentPage(),
                 'last_page'    => $events->lastPage(),
                 'per_page'     => $events->perPage(),
                 'total'        => $events->total(),
-            ]
+            ],
         ]);
     }
 
-    /**
-     * Apply for a volunteer shift with automated overlap/conflict detection.
-     */
+    /** G8 */
+    public function showEvent($eventId)
+    {
+        $skills = Auth::user()->volunteer->skills ?? [];
+        $event  = $this->loadShifts($this->publicEvents(), $skills)->findOrFail($eventId);
+        $this->scoreShifts([$event], $skills);
+
+        return response()->json(['status' => 'success', 'data' => new EventResource($event)]);
+    }
+
+    /** Organization page: profile, impact and its events (active / past). */
+    public function showOrganization(Request $request, $orgId)
+    {
+        $org = Organization::query()->public()->findOrFail($orgId);
+        $eventIds = Event::withoutGlobalScopes()->where('org_id', $org->id)->select('id');
+        $shiftIds = Shift::whereIn('event_id', $eventIds)->select('id');
+
+        return response()->json([
+            'status' => 'success',
+            'data'   => [
+                'id'            => $org->id,
+                'name'          => $org->name,
+                'logo_url'      => app(\App\Services\FileStore::class)->url($org->logo_path),
+                'primary_color' => $org->primary_color,
+                'website'       => $org->website,
+                'email'         => $org->email,
+                'phone'         => $org->phone,
+                'city'          => $org->city,
+                'country'       => $org->country,
+                'address'       => $org->address,
+                'verified'      => $org->verification_status === 'verified',
+                'member_since'  => $org->created_at->toDateString(),
+                'stats'         => [
+                    'active_events'   => Event::withoutGlobalScopes()->where('org_id', $org->id)->whereIn('status', ['upcoming', 'ongoing'])->count(),
+                    'past_events'     => Event::withoutGlobalScopes()->where('org_id', $org->id)->where('status', 'completed')->count(),
+                    'volunteers'      => ShiftAssignment::whereIn('shift_id', $shiftIds)->where('status', 'confirmed')->distinct('volunteer_id')->count('volunteer_id'),
+                    'verified_hours'  => round((float) Attendance::whereIn('shift_id', $shiftIds)->whereIn('hours_status', ['verified', 'adjusted'])->sum('verified_hours'), 1),
+                ],
+            ],
+        ]);
+    }
+
+    /** Report an organization to the platform team (fraud, safety, misleading event…). */
+    public function reportOrganization(Request $request, $orgId)
+    {
+        $org  = Organization::findOrFail($orgId);
+        $data = $request->validate([
+            'category' => 'required|in:' . implode(',', OrganizationReport::CATEGORIES),
+            'details'  => 'required|string|min:20|max:3000',
+            'event_id' => 'nullable|integer',
+        ]);
+
+        $recent = OrganizationReport::where('reporter_id', Auth::id())->where('org_id', $org->id)->where('created_at', '>', now()->subDay())->exists();
+        if ($recent) {
+            return response()->json(['status' => 'error', 'message' => 'You already reported this organization today. The platform team is reviewing it.'], 429);
+        }
+
+        $report = OrganizationReport::create($data + ['org_id' => $org->id, 'reporter_id' => Auth::id(), 'status' => 'open']);
+
+        $this->notifier->send($this->notifier->superAdmins(), new AppNotification(
+            'organization_reported',
+            'Report filed against ' . $org->name,
+            str_replace('_', ' ', ucfirst($data['category'])) . ': ' . mb_strimwidth($data['details'], 0, 140, '…'),
+            '/p/reports',
+            ['report_id' => $report->id, 'org_id' => $org->id],
+        ));
+
+        return response()->json([
+            'status'  => 'success',
+            'message' => 'Thank you. The VolunTrack platform team has been notified and will review your report.',
+            'data'    => ['id' => $report->id, 'status' => $report->status],
+        ], 201);
+    }
+
     public function applyForShift($shiftId)
     {
-        $shift = Shift::with('event')->findOrFail($shiftId);
-        $user = Auth::user();
-        $volunteer = $user->volunteer;
+        $shift     = Shift::with('event.organization')->findOrFail($shiftId);
+        $volunteer = Auth::user()->volunteer;
+        $org       = $shift->event?->organization;
 
-        if (!$volunteer) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Volunteer profile not found.'
-            ], 404);
+        if (!$org || !$org->isPublic()) {
+            return response()->json(['status' => 'error', 'message' => 'This organization is not accepting volunteers right now.'], 403);
+        }
+        if (in_array($shift->event->status, ['completed', 'cancelled'], true) || $shift->start_time->isPast()) {
+            return response()->json(['status' => 'error', 'message' => 'This shift has already started or the event is closed.'], 422);
+        }
+        if ($volunteer->isMinor() && !$volunteer->parental_consent_verified) {
+            return response()->json(['status' => 'error', 'code' => 'consent_required',
+                'message' => 'Volunteers under 18 need a verified parental consent form before applying for shifts.'], 422);
         }
 
-        // 1. Check if already applied/assigned to this specific shift
-        $existing = ShiftAssignment::where('shift_id', $shiftId)
-            ->where('volunteer_id', $volunteer->id)
-            ->first();
-
-        if ($existing) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'You have already applied for this shift.'
-            ], 422);
+        $existing = ShiftAssignment::where('shift_id', $shiftId)->where('volunteer_id', $volunteer->id)->first();
+        if ($existing && in_array($existing->status, ['pending', 'confirmed'], true)) {
+            return response()->json(['status' => 'error', 'message' => 'You have already applied for this shift.'], 422);
+        }
+        if ($existing && in_array($existing->status, ['rejected', 'removed'], true)) {
+            return response()->json(['status' => 'error', 'message' => 'The coordinator already reviewed your application for this shift.'], 422);
         }
 
-        // 2. Automated Shift Timing Conflict Detection
         $overlap = ShiftAssignment::join('shifts', 'shift_assignments.shift_id', '=', 'shifts.id')
             ->where('shift_assignments.volunteer_id', $volunteer->id)
             ->whereIn('shift_assignments.status', ['pending', 'confirmed'])
-            ->where(function ($query) use ($shift) {
-                $query->where('shifts.start_time', '<', $shift->end_time)
-                      ->where('shifts.end_time', '>', $shift->start_time);
-            })
+            ->whereNull('shifts.deleted_at')
+            ->where('shifts.start_time', '<', $shift->end_time)
+            ->where('shifts.end_time', '>', $shift->start_time)
+            ->select('shift_assignments.*')
             ->first();
 
         if ($overlap) {
             return response()->json([
-                'status' => 'error',
-                'message' => 'Scheduling Conflict: This shift overlaps with another shift you are already scheduled for or have applied to.',
+                'status'            => 'error',
+                'message'           => 'Scheduling Conflict: This shift overlaps with another shift you are already scheduled for or have applied to.',
                 'conflict_shift_id' => $overlap->shift_id,
             ], 422);
         }
 
-        // 3. Create the Shift Assignment
-        $assignment = ShiftAssignment::create([
-            'shift_id' => $shift->id,
-            'volunteer_id' => $volunteer->id,
-            'status' => 'pending',
+        $assignment = $existing ?? new ShiftAssignment(['shift_id' => $shift->id, 'volunteer_id' => $volunteer->id]);
+        $assignment->fill([
+            'status'      => 'pending',
             'assigned_at' => null,
-        ]);
+            'match_score' => $this->skillMatcher->calculateMatchScore($volunteer->skills ?? [], $shift->required_skills ?? []),
+        ])->save();
 
-        // Invalidate schedule cache for volunteer
         Cache::forget("volunteer_{$volunteer->id}_schedule");
 
         return response()->json([
             'status'  => 'success',
             'message' => 'Application submitted successfully. Under coordinator review.',
-            'data'    => new ShiftAssignmentResource($assignment)
+            'data'    => new ShiftAssignmentResource($assignment),
         ], 201);
     }
 
     /**
-     * Get the logged-in volunteer's scheduled shifts.
+     * Schedule with each shift's attendance state, so the app knows instantly
+     * whether to show "Check in", "Check out", "Resume" or "Done".
      */
     public function getSchedule()
     {
-        $user = Auth::user();
-        $volunteer = $user->volunteer;
+        $this->attendance->sweepIfDue();
+        $volunteer = Auth::user()->volunteer;
 
-        if (!$volunteer) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Volunteer profile not found.'
-            ], 404);
+        $schedule = ShiftAssignment::where('volunteer_id', $volunteer->id)
+            ->whereHas('shift')
+            ->with(['shift.event.organization'])
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        $attendance = Attendance::where('volunteer_id', $volunteer->id)->whereIn('shift_id', $schedule->pluck('shift_id'))
+            ->with(['pings', 'shift.event.organization'])->get()->keyBy('shift_id');
+
+        foreach ($schedule as $a) {
+            $a->attendance_summary = isset($attendance[$a->shift_id]) ? $this->attendance->present($attendance[$a->shift_id]) : null;
         }
 
-        $scheduleData = Cache::remember("volunteer_{$volunteer->id}_schedule", 300, function () use ($volunteer) {
-            $schedule = ShiftAssignment::where('volunteer_id', $volunteer->id)
-                ->with(['shift.event'])
-                ->orderBy('created_at', 'desc')
-                ->get();
-            return ShiftAssignmentResource::collection($schedule);
-        });
+        return response()->json(['status' => 'success', 'data' => ShiftAssignmentResource::collection($schedule)]);
+    }
+
+    public function getProfile()
+    {
+        $volunteer = Auth::user()->volunteer;
 
         return response()->json([
             'status' => 'success',
-            'data'   => $scheduleData,
-        ]);
-    }
-
-    /**
-     * Get the authenticated volunteer's full profile details including metrics.
-     */
-    public function getProfile()
-    {
-        $user = Auth::user();
-        $volunteer = $user->volunteer;
-
-        if (!$volunteer) {
-            return response()->json([
-                'status'  => 'error',
-                'message' => 'Volunteer profile not found.'
-            ], 404);
-        }
-
-        $profileData = Cache::remember("volunteer_{$volunteer->id}_profile", 600, function () use ($volunteer) {
-            return [
+            'data'   => [
                 'volunteer'        => new VolunteerResource($volunteer->load('user')),
                 'reliability'      => $volunteer->getReliabilityMetrics(),
                 'skills_alignment' => $volunteer->getSkillsAlignment(),
-            ];
-        });
-
-        return response()->json([
-            'status' => 'success',
-            'data'   => $profileData,
+            ],
         ]);
     }
 
-    /**
-     * Update volunteer profile details (skills, availability, bio, full_name).
-     */
     public function updateProfile(UpdateVolunteerProfileRequest $request)
     {
-        $user = Auth::user();
+        $user      = Auth::user();
         $volunteer = $user->volunteer;
 
-        if (!$volunteer) {
-            return response()->json([
-                'status'  => 'error',
-                'message' => 'Volunteer profile not found.'
-            ], 404);
+        $userFields = array_filter($request->only(['first_name', 'last_name', 'phone']), fn ($v) => $v !== null);
+        if ($request->has('full_name') && !$request->has('first_name')) {
+            $userFields['full_name'] = $request->full_name;
+        }
+        if ($userFields) {
+            $user->update($userFields);
         }
 
-        if ($request->has('full_name')) {
-            $user->update(['full_name' => $request->full_name]);
+        $data = $request->only(['skills', 'availability', 'bio', 'date_of_birth']);
+        if (isset($data['skills'])) {
+            // Dropping a skill drops its verification; new skills start unverified.
+            $data['skills_verification'] = array_intersect_key($volunteer->skills_verification ?? [], array_flip($data['skills']));
         }
+        $volunteer->update($data);
 
-        $volunteer->update($request->only(['skills', 'availability', 'bio']));
-
-        // Invalidate volunteer profile cache
         Cache::forget("volunteer_{$volunteer->id}_profile");
 
         return response()->json([
@@ -214,101 +293,86 @@ class VolunteerController extends Controller
         ]);
     }
 
-    /**
-     * Get all certificates earned by the authenticated volunteer.
-     */
     public function getCertificates()
     {
-        $user = Auth::user();
-        $volunteer = $user->volunteer;
+        $certificates = Certificate::withoutGlobalScopes()->with('organization')
+            ->where('volunteer_id', Auth::user()->volunteer->id)->latest()->get();
 
-        if (!$volunteer) {
-            return response()->json([
-                'status'  => 'error',
-                'message' => 'Volunteer profile not found.'
-            ], 404);
-        }
-
-        $certificates = Certificate::where('volunteer_id', $volunteer->id)
-            ->latest()
-            ->get();
-
-        return response()->json([
-            'status' => 'success',
-            'data'   => CertificateResource::collection($certificates),
-        ]);
+        return response()->json(['status' => 'success', 'data' => CertificateResource::collection($certificates)]);
     }
 
-    /**
-     * Get detailed community impact breakdown for the volunteer dashboard.
-     */
     public function getImpactBreakdown()
     {
-        $user = Auth::user();
-        $volunteer = $user->volunteer;
-
-        if (!$volunteer) {
-            return response()->json([
-                'status'  => 'error',
-                'message' => 'Volunteer profile not found.'
-            ], 404);
-        }
-
-        $impactData = Cache::remember("volunteer_{$volunteer->id}_impact", 600, function () use ($volunteer) {
-            $completedShiftsCount = \App\Models\Attendance::where('volunteer_id', $volunteer->id)
-                ->whereNotNull('check_out_time')
-                ->count();
-
-            $milestones = config('vms.certificate_milestones', [10, 25, 50, 100, 200, 500]);
-            $currentHours = (float) $volunteer->total_hours;
-
-            $nextMilestone = null;
-            foreach ($milestones as $m) {
-                if ($m > $currentHours) {
-                    $nextMilestone = $m;
-                    break;
-                }
-            }
-
-            $hoursToNextMilestone = $nextMilestone ? round($nextMilestone - $currentHours, 2) : 0.00;
-
-            return [
-                'total_hours'            => $currentHours,
-                'impact_score'           => (float) $volunteer->impact_score,
-                'completed_shifts_count' => $completedShiftsCount,
-                'next_milestone'         => $nextMilestone,
-                'hours_to_next'          => $hoursToNextMilestone,
-                'earned_certificates'    => Certificate::where('volunteer_id', $volunteer->id)->count(),
-            ];
-        });
+        $volunteer = Auth::user()->volunteer;
+        $milestones   = config('vms.certificate_milestones', [10, 25, 50, 100, 200, 500]);
+        $currentHours = (float) $volunteer->total_hours;
+        $next = collect($milestones)->first(fn ($m) => $m > $currentHours);
 
         return response()->json([
             'status' => 'success',
-            'data'   => $impactData,
+            'data'   => [
+                'total_hours'            => $currentHours,
+                'pending_hours'          => round(Attendance::where('volunteer_id', $volunteer->id)->whereNotNull('check_out_time')->where('hours_status', 'pending')->get()->sum(fn ($a) => $a->rawHours()), 2),
+                'impact_score'           => (float) $volunteer->impact_score,
+                'completed_shifts_count' => Attendance::where('volunteer_id', $volunteer->id)->whereNotNull('check_out_time')->count(),
+                'organizations_helped'   => count($volunteer->engagedOrgIds()),
+                'next_milestone'         => $next,
+                'hours_to_next'          => $next ? round($next - $currentHours, 2) : 0.0,
+                'earned_certificates'    => Certificate::withoutGlobalScopes()->where('volunteer_id', $volunteer->id)->count(),
+            ],
         ]);
     }
 
-    /**
-     * Withdraw a pending shift application.
-     */
+    /** G10 — last 12 months of verified hours. */
+    public function impactHistory()
+    {
+        $volunteer = Auth::user()->volunteer;
+        $rows = Attendance::where('volunteer_id', $volunteer->id)->whereNotNull('check_in_time')
+            ->where('check_in_time', '>=', now()->subMonths(11)->startOfMonth())->get();
+
+        $out = [];
+        $running = 0.0;
+        for ($i = 11; $i >= 0; $i--) {
+            $month = now()->subMonths($i)->format('Y-m');
+            $inMonth = $rows->filter(fn ($a) => $a->check_in_time->format('Y-m') === $month);
+            $hours = round($inMonth->sum(fn ($a) => in_array($a->hours_status, ['verified', 'adjusted'], true) ? (float) $a->verified_hours : 0), 2);
+            $running += $hours;
+            $out[] = [
+                'month'         => $month,
+                'hours'         => $hours,
+                'pending_hours' => round($inMonth->where('hours_status', 'pending')->sum(fn ($a) => $a->rawHours()), 2),
+                'shifts'        => $inMonth->count(),
+                'impact_score'  => round(min(config('vms.impact_score_max', 100), $running * config('vms.impact_score_per_hour', 0.1)), 2),
+            ];
+        }
+
+        return response()->json(['status' => 'success', 'data' => $out]);
+    }
+
+    /** Pending applications can be withdrawn any time; confirmed ones until 2 h before start. */
     public function withdrawApplication($assignmentId)
     {
-        $user = Auth::user();
-        $volunteer = $user->volunteer;
+        $volunteer  = Auth::user()->volunteer;
+        $assignment = ShiftAssignment::with('shift.event')->where('id', $assignmentId)->where('volunteer_id', $volunteer->id)
+            ->whereIn('status', ['pending', 'confirmed'])->firstOrFail();
 
-        $assignment = ShiftAssignment::where('id', $assignmentId)
-            ->where('volunteer_id', $volunteer->id)
-            ->where('status', 'pending')
-            ->firstOrFail();
+        if ($assignment->status === 'confirmed') {
+            if ($assignment->shift->start_time->lt(now()->addHours(2))) {
+                return response()->json(['status' => 'error', 'message' => 'Your shift starts in less than 2 hours. Contact the coordinator instead of withdrawing.'], 422);
+            }
+            $assignment->update(['status' => 'cancelled', 'coordinator_feedback' => 'Withdrawn by volunteer.']);
+            $this->notifier->send($this->notifier->staffOf($assignment->shift->event->org_id), new AppNotification(
+                'volunteer_withdrew',
+                Auth::user()->full_name . ' withdrew from ' . $assignment->shift->event->title,
+                'A confirmed place on ' . $assignment->shift->start_time->toDayDateTimeString() . ' UTC is open again.',
+                '/c/events/' . $assignment->shift->event_id,
+            ));
+        } else {
+            $assignment->delete();
+        }
 
-        $assignment->delete();
-
-        // Invalidate volunteer schedule cache
         Cache::forget("volunteer_{$volunteer->id}_schedule");
 
-        return response()->json([
-            'status'  => 'success',
-            'message' => 'Shift application withdrawn successfully.',
-        ]);
+        return response()->json(['status' => 'success', 'message' => 'Shift application withdrawn successfully.']);
     }
 }

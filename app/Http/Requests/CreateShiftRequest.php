@@ -14,6 +14,8 @@ class CreateShiftRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'title'           => 'nullable|string|max:100',
+            'notes'           => 'nullable|string|max:1000',
             'start_time'      => 'required|date_format:Y-m-d H:i:s',
             'end_time'        => 'required|date_format:Y-m-d H:i:s|after:start_time',
             'required_skills' => 'nullable|array',

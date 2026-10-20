@@ -22,7 +22,8 @@ class UpdateEventRequest extends FormRequest
             'start_date'      => 'sometimes|date',
             'end_date'        => 'sometimes|date|after_or_equal:start_date',
             'status'          => 'sometimes|in:upcoming,ongoing,completed,cancelled',
-            'geofence_radius' => 'sometimes|integer|min:50|max:5000',
+            'geofence_radius' => 'sometimes|integer|min:30|max:5000',
+            'cancel_reason'   => 'sometimes|nullable|string|max:500',
         ];
     }
 }

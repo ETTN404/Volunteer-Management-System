@@ -15,6 +15,10 @@ class VolunteerResource extends JsonResource
         return [
             'id'            => $this->id,
             'skills'        => $this->skills ?? [],
+            'skills_verification' => (object) ($this->skills_verification ?? []),
+            'date_of_birth' => $this->date_of_birth?->toDateString(),
+            'is_minor'      => $this->isMinor(),
+            'parental_consent_verified' => (bool) $this->parental_consent_verified,
             'availability'  => $this->availability ?? [],
             'bio'           => $this->bio,
             'total_hours'   => (float) $this->total_hours,

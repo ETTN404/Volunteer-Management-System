@@ -15,10 +15,11 @@ class CheckInRequest extends FormRequest
     {
         return [
             'shift_id'          => 'required|exists:shifts,id',
-            'qr_code_signature' => 'required|string',
+            'qr_code_signature' => 'nullable|string|max:200',
             'latitude'          => 'required|numeric|between:-90,90',
             'longitude'         => 'required|numeric|between:-180,180',
             'client_timestamp'  => 'required|date',
+            'accuracy'          => 'nullable|numeric|min:0|max:100000',
         ];
     }
 

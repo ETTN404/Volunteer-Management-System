@@ -15,10 +15,14 @@ class ShiftResource extends JsonResource
         return [
             'id'                 => $this->id,
             'event_id'           => $this->event_id,
+            'title'              => $this->title,
+            'notes'              => $this->notes,
             'start_time'         => $this->start_time,
             'end_time'           => $this->end_time,
             'required_skills'    => $this->required_skills ?? [],
             'capacity'           => $this->capacity,
+            'confirmed_count'    => $this->confirmed_count ?? $this->shiftAssignments()->where('status', 'confirmed')->count(),
+            'pending_count'      => $this->when(isset($this->pending_count), fn () => (int) $this->pending_count),
             'qr_expires_at'      => $this->qr_expires_at,
             'created_at'         => $this->created_at->toDateTimeString(),
 

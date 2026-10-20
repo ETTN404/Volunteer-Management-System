@@ -16,7 +16,7 @@ class CertificateIssuedNotification extends Notification implements ShouldQueue
 
     public function via(object $notifiable): array
     {
-        return ['mail', 'database'];
+        return config('vms.notify_mail') ? ['database', 'mail'] : ['database'];
     }
 
     public function toMail(object $notifiable): MailMessage
@@ -35,6 +35,9 @@ class CertificateIssuedNotification extends Notification implements ShouldQueue
     {
         return [
             'type'            => 'certificate_issued',
+            'title'           => 'New certificate: ' . (float) $this->certificate->milestone_hours . ' hours',
+            'body'            => 'You earned a certificate of appreciation. Download it or share the verification link.',
+            'action_url'      => '/v/certificates',
             'certificate_id'  => $this->certificate->id,
             'milestone_hours' => $this->certificate->milestone_hours,
             'download_url'    => url($this->certificate->file_path),

@@ -15,6 +15,8 @@ class GenerateReportRequest extends FormRequest
     {
         return [
             'period' => 'required|string|max:50',
+            'from'   => 'nullable|date',
+            'to'     => 'nullable|date|after_or_equal:from',
             'async'  => 'nullable|boolean',
         ];
     }

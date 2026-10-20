@@ -14,7 +14,11 @@ class ForceCheckInRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'signature_data' => 'required|string', // base64-encoded drawn signature
+            // No phone / no data / no GPS: the coordinator confirms identity in person.
+            'signature_data' => 'nullable|string|max:300000|required_without:id_verified',
+            'id_verified'    => 'nullable|boolean',
+            'note'           => 'nullable|string|max:500',
+            'time'           => 'nullable|date',
         ];
     }
 

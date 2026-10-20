@@ -16,7 +16,7 @@ class ShiftBroadcastNotification extends Notification implements ShouldQueue
 
     public function via(object $notifiable): array
     {
-        return ['mail', 'database'];
+        return config('vms.notify_mail') ? ['database', 'mail'] : ['database'];
     }
 
     public function toMail(object $notifiable): MailMessage
@@ -41,7 +41,10 @@ class ShiftBroadcastNotification extends Notification implements ShouldQueue
     public function toArray(object $notifiable): array
     {
         return [
-            'type'        => 'urgent_shift_broadcast',
+            'type'        => 'shift_broadcast',
+            'title'       => 'Urgent: volunteers needed for ' . $this->shift->event->title,
+            'body'        => 'A shift on ' . $this->shift->start_time?->toDateTimeString() . ' UTC still has open places. Apply if you can help.',
+            'action_url'  => '/v/opportunities/' . $this->shift->event_id,
             'shift_id'    => $this->shift->id,
             'event_title' => $this->shift->event->title,
             'start_time'  => $this->shift->start_time,

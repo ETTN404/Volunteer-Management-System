@@ -17,12 +17,17 @@ class ShiftAssignmentResource extends JsonResource
             'shift_id'     => $this->shift_id,
             'volunteer_id' => $this->volunteer_id,
             'status'       => $this->status,
+            'decline_reason' => in_array($this->status, ['rejected', 'cancelled', 'removed'], true) ? $this->coordinator_feedback : null,
+            'match_score'  => $this->match_score,
             'applied_at'   => $this->created_at->toDateTimeString(),
 
             // Conditionally load nested shift if eager-loaded
             'shift'        => $this->whenLoaded('shift', fn () =>
                 new ShiftResource($this->shift)
             ),
+
+            // Volunteer's own attendance on this shift (schedule view)
+            'attendance'   => $this->when(isset($this->attendance_summary), fn () => $this->attendance_summary),
 
             // Conditionally load volunteer if eager-loaded
             'volunteer'    => $this->whenLoaded('volunteer', fn () =>

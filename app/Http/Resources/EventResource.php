@@ -26,6 +26,15 @@ class EventResource extends JsonResource
             'start_date'       => $this->start_date?->toDateString(),
             'end_date'         => $this->end_date?->toDateString(),
             'status'           => $this->status,
+            'organization'     => $this->whenLoaded('organization', fn () => $this->organization ? [
+                'id'                  => $this->organization->id,
+                'name'                => $this->organization->name,
+                'logo_url'            => app(\App\Services\FileStore::class)->url($this->organization->logo_path),
+                'primary_color'       => $this->organization->primary_color,
+                'city'                => $this->organization->city,
+                'country'             => $this->organization->country,
+                'verification_status' => $this->organization->verification_status,
+            ] : null),
             'created_at'       => $this->created_at->toDateTimeString(),
 
             // Conditionally include shifts if eager-loaded

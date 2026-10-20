@@ -16,7 +16,7 @@ class ShiftApprovedNotification extends Notification implements ShouldQueue
 
     public function via(object $notifiable): array
     {
-        return ['mail', 'database'];
+        return config('vms.notify_mail') ? ['database', 'mail'] : ['database'];
     }
 
     public function toMail(object $notifiable): MailMessage
@@ -38,6 +38,9 @@ class ShiftApprovedNotification extends Notification implements ShouldQueue
     {
         return [
             'type'        => 'shift_approved',
+            'title'       => 'You\'re confirmed for ' . $this->shift->event->title,
+            'body'        => 'Shift starts ' . $this->shift->start_time?->toDateTimeString() . ' UTC. Arrive 15 minutes early to check in.',
+            'action_url'  => '/v/schedule',
             'shift_id'    => $this->shift->id,
             'event_title' => $this->shift->event->title,
             'start_time'  => $this->shift->start_time,

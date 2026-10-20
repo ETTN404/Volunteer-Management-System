@@ -15,9 +15,13 @@ class RegisterVolunteerRequest extends FormRequest
     {
         return [
             'org_id'       => 'nullable|exists:organizations,id',
-            'full_name'    => 'required|string|max:100',
+            'full_name'    => 'required_without:first_name|nullable|string|max:100',
+            'first_name'   => 'required_without:full_name|nullable|string|max:60',
+            'last_name'    => 'required_with:first_name|nullable|string|max:60',
+            'phone'        => ['nullable', 'string', 'regex:/^\+[1-9]\d{6,14}$/'],
+            'date_of_birth'=> 'nullable|date|before:today|after:1900-01-01',
             'email'        => 'required|string|email|max:100|unique:users,email',
-            'password'     => 'required|string|min:8',
+            'password'     => 'required|string|min:8|max:100',
             'skills'       => 'nullable|array',
             'skills.*'     => 'string|max:100',
             'availability'   => 'nullable|array',

@@ -16,7 +16,7 @@ class OrganizationSuspendedNotification extends Notification implements ShouldQu
 
     public function via(object $notifiable): array
     {
-        return ['mail', 'database'];
+        return config('vms.notify_mail') ? ['database', 'mail'] : ['database'];
     }
 
     public function toMail(object $notifiable): MailMessage
@@ -34,7 +34,10 @@ class OrganizationSuspendedNotification extends Notification implements ShouldQu
     public function toArray(object $notifiable): array
     {
         return [
-            'type'            => 'org_suspended',
+            'type'            => 'organization_suspended',
+            'title'           => 'Your organization was suspended',
+            'body'            => 'Contact the platform team to restore access.',
+            'action_url'      => null,
             'organization_id' => $this->organization->id,
             'message'         => 'Your organization account has been suspended.',
         ];

@@ -10,6 +10,7 @@ use App\Models\ShiftAssignment;
 use App\Services\GeminiService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use App\Models\ChatbotSession;
 use Illuminate\Support\Facades\Cache;
 
 class ChatbotController extends Controller
@@ -59,7 +60,7 @@ class ChatbotController extends Controller
             ->get();
 
         // Fetch organization-wide announcements
-        $announcements = Announcement::where('org_id', $user->org_id)
+        $announcements = Announcement::withoutGlobalScopes()->whereIn('org_id', $volunteer->engagedOrgIds() ?: [0])
             ->whereIn('target_audience', ['all', 'volunteers'])
             ->orderBy('created_at', 'desc')
             ->take(3)
@@ -89,27 +90,44 @@ class ChatbotController extends Controller
 
         $context = "SYSTEM_INSTRUCTION: You are VolunBot, the VMS AI assistant. RULES: 1. Answer concisely. 2. Base all answers strictly on the CONTEXT_JSON. Do not hallucinate dates/events. 3. Detect the user's prompt language and respond in the exact same language (e.g. Amharic, English). 4. Use localized date formatting. Current Server Time: {$currentTime}. CONTEXT_JSON=" . json_encode($contextData);
 
-        // 3. Query the Gemini Service with compiled context and Cache memory
-        $cacheKey = 'chat_session_' . $volunteer->id;
-        $history = Cache::get($cacheKey, []);
-        
-        // Discard frontend history and strictly use server-side memory
+        // 3. Conversation memory lives in chatbot_sessions (the cache is not persistent on Render).
+        $session = ChatbotSession::firstOrCreate(['volunteer_id' => $volunteer->id], ['started_at' => now(), 'context_data' => []]);
+        $history = $session->context_data['history'] ?? [];
+
         $aiMessage = $this->gemini->ask($request->message, $context, $history);
 
-        // 4. Update History in Cache (Maintain last 10 interactions = 20 total messages)
-        $history[] = ['role' => 'user', 'parts' => [['text' => $request->message]]];
-        $history[] = ['role' => 'model', 'parts' => [['text' => $aiMessage]]];
-        
-        if (count($history) > 20) {
-            $history = array_slice($history, -20);
-        }
-        
-        // Cache for 2 hours (7200 seconds)
-        Cache::put($cacheKey, $history, 7200);
+        $history[] = ['role' => 'user', 'parts' => [['text' => $request->message]], 'at' => now()->toIso8601String()];
+        $history[] = ['role' => 'model', 'parts' => [['text' => $aiMessage]], 'at' => now()->toIso8601String()];
+        $session->update([
+            'last_interaction' => now(),
+            'context_data'     => ['history' => array_slice($history, -40)],
+        ]);
 
         return new ChatbotResponseResource([
             'query'    => $request->message,
             'response' => $aiMessage,
         ]);
+    }
+
+    /** G11 */
+    public function history()
+    {
+        $session = ChatbotSession::where('volunteer_id', Auth::user()->volunteer->id)->first();
+        $history = $session?->context_data['history'] ?? [];
+
+        return response()->json([
+            'status' => 'success',
+            'data'   => collect($history)->map(fn ($m) => [
+                'role'       => $m['role'],
+                'content'    => $m['parts'][0]['text'] ?? '',
+                'created_at' => $m['at'] ?? null,
+            ])->values(),
+        ]);
+    }
+
+    public function clearHistory()
+    {
+        ChatbotSession::where('volunteer_id', Auth::user()->volunteer->id)->update(['context_data' => ['history' => []]]);
+        return response()->json(['status' => 'success', 'message' => 'Conversation cleared.']);
     }
 }

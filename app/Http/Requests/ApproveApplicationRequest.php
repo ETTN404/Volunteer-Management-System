@@ -14,7 +14,9 @@ class ApproveApplicationRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'status' => 'required|in:confirmed,cancelled',
+            // "cancelled" is accepted from older clients and stored as "rejected".
+            'status' => 'required|in:confirmed,rejected,cancelled',
+            'reason' => 'nullable|string|max:500',
         ];
     }
 

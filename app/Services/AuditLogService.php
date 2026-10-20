@@ -33,9 +33,16 @@ class AuditLogService
         try {
             $user = Auth::user();
 
+            // Which organization the entry belongs to: the actor's, or — for platform
+            // staff acting on a tenant — the organization being acted on.
+            $orgId = $user?->org_id;
+            if ($orgId === null && $model) {
+                $orgId = $model instanceof \App\Models\Organization ? $model->getKey() : ($model->getAttribute('org_id') ?? null);
+            }
+
             DB::table('audit_logs')->insert([
                 'user_id'    => $user?->id,
-                'org_id'     => $user?->org_id,
+                'org_id'     => $orgId,
                 'action'     => $action,
                 'model_type' => $model ? get_class($model) : null,
                 'model_id'   => $model?->getKey(),

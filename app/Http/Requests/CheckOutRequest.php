@@ -14,7 +14,11 @@ class CheckOutRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'shift_id' => 'required|exists:shifts,id',
+            'shift_id'  => 'required|exists:shifts,id',
+            'reason'    => 'nullable|string|max:500',
+            'latitude'  => 'nullable|numeric|between:-90,90',
+            'longitude' => 'nullable|numeric|between:-180,180',
+            'accuracy'  => 'nullable|numeric|min:0|max:100000',
         ];
     }
 }

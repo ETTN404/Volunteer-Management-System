@@ -14,6 +14,8 @@ class CertificateResource extends JsonResource
     {
         return [
             'id'              => $this->id,
+            'certificate_number' => $this->certificate_number ?: 'VMS-' . str_pad((string) $this->id, 5, '0', STR_PAD_LEFT),
+            'organization_name'  => $this->relationLoaded('organization') ? $this->organization?->name : null,
             'volunteer_id'    => $this->volunteer_id,
             'org_id'          => $this->org_id,
             'issued_date'     => $this->issued_date,
