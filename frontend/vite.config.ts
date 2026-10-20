@@ -2,10 +2,21 @@
 import path from 'node:path';
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
-import { defineConfig } from 'vite';
+import { defineConfig, type Plugin } from 'vite';
+
+// One id per build; dist/version.json lets open tabs notice a newer deploy (src/app/version.ts).
+const BUILD_ID = process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 12) || Date.now().toString(36);
+const buildVersion = (): Plugin => ({
+  name: 'vt-build-version',
+  apply: 'build',
+  generateBundle() {
+    this.emitFile({ type: 'asset', fileName: 'version.json', source: JSON.stringify({ id: BUILD_ID }) });
+  },
+});
 
 export default defineConfig({
-  plugins: [react(), tailwindcss()],
+  plugins: [react(), tailwindcss(), buildVersion()],
+  define: { __BUILD_ID__: JSON.stringify(BUILD_ID) },
   resolve: {
     alias: { '@': path.resolve(__dirname, 'src') },
   },

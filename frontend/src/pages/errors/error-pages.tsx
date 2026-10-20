@@ -1,7 +1,8 @@
 import { ArrowLeft, Compass, LockKeyhole, ShieldOff, TriangleAlert } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Link, isRouteErrorResponse, useLocation, useRouteError } from 'react-router';
-import { Button, LogoMark } from '@/shared/ui';
+import { Button, LogoMark, Spinner } from '@/shared/ui';
+import { hasNewerBuild, reloadOnce } from '@/app/version';
 import { useSession } from '@/features/auth/use-session';
 import { ROLE_HOME, useSessionStore } from '@/features/auth/session-store';
 
@@ -89,9 +90,31 @@ export function SuspendedPage() {
 
 export function RouteErrorPage() {
   const error = useRouteError();
-  if (isRouteErrorResponse(error) && error.status === 404) return <NotFoundPage />;
+  const notFound = isRouteErrorResponse(error) && error.status === 404;
   const message = error instanceof Error ? error.message : 'An unexpected error stopped this page from loading.';
-  const chunk = /dynamically imported module|Failed to fetch/i.test(message);
+  const chunk = /dynamically imported module|Failed to fetch|module script|Importing a module/i.test(message);
+  // Most crashes right after a deploy come from an old tab mixing old and new code:
+  // if a newer build exists, reload into it once instead of showing the error.
+  const [updating, setUpdating] = useState(chunk);
+  useEffect(() => {
+    let alive = true;
+    if (notFound) return;
+    void hasNewerBuild().then((n) => {
+      if (!alive) return;
+      if ((n || chunk) && reloadOnce()) return;
+      setUpdating(false);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [chunk, notFound]);
+  if (notFound) return <NotFoundPage />;
+  if (updating)
+    return (
+      <div className="grid min-h-dvh place-items-center bg-bg" aria-busy="true" aria-label="Updating VolunTrack">
+        <Spinner />
+      </div>
+    );
   return (
     <Shell
       icon={<TriangleAlert />}
