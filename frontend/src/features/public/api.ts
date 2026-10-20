@@ -1,6 +1,6 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { http, isApiError } from '@/shared/api/http';
-import type { CertificateVerification, OrgDocumentType, PlanDefinition, PublicOrganization, PublicStats } from '@/shared/types/api';
+import type { CertificateVerification, OrgDocumentType, PlanDefinition, PublicOrganization, PublicOrganizationProfile, PublicStats } from '@/shared/types/api';
 
 export type VerificationResult = { valid: true; data: CertificateVerification } | { valid: false; message: string };
 
@@ -22,6 +22,7 @@ export interface OrganizationSignupInput {
 
 export const publicApi = {
   organizations: async () => (await http.get<PublicOrganization[]>('/public/organizations')).data,
+  organization: async (id: number) => (await http.get<PublicOrganizationProfile>(`/public/organizations/${id}`, { skipAuthRedirect: true })).data,
   stats: async () => (await http.get<PublicStats>('/public/stats')).data,
   plans: async () => (await http.get<PlanDefinition[]>('/public/plans')).data,
   verifyCertificate: async (number: string): Promise<VerificationResult> => {
@@ -52,6 +53,7 @@ export const publicApi = {
 
 export const publicKeys = {
   organizations: ['public', 'organizations'] as const,
+  organization: (id: number) => ['public', 'organization', id] as const,
   stats: ['public', 'stats'] as const,
   plans: ['public', 'plans'] as const,
   verify: (n: string) => ['public', 'verify', n] as const,
@@ -59,6 +61,8 @@ export const publicKeys = {
 
 export const usePublicOrganizations = () =>
   useQuery({ queryKey: publicKeys.organizations, queryFn: publicApi.organizations, staleTime: 10 * 60_000 });
+export const usePublicOrganization = (id: number) =>
+  useQuery({ queryKey: publicKeys.organization(id), queryFn: () => publicApi.organization(id), enabled: Number.isFinite(id) && id > 0, staleTime: 5 * 60_000 });
 export const usePublicStats = () => useQuery({ queryKey: publicKeys.stats, queryFn: publicApi.stats, staleTime: 10 * 60_000 });
 export const usePublicPlans = () => useQuery({ queryKey: publicKeys.plans, queryFn: publicApi.plans, staleTime: 60 * 60_000 });
 export const useOrganizationSignup = () => useMutation({ mutationFn: publicApi.signup });

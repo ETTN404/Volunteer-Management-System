@@ -116,11 +116,11 @@ export const volunteerHandlers = [
       const shift = find.shift(shiftId);
       if (!shift) return fail('Target database resource not found.', 404);
       const v = actor.volunteer!;
-      if (db.t.assignments.some((a) => a.shift_id === shiftId && a.volunteer_id === v.id)) {
+      if (db.t.assignments.some((a) => a.shift_id === shiftId && a.volunteer_id === v.id && a.status !== 'cancelled')) {
         return fail('You have already applied for this shift.');
       }
       const overlap = db.t.assignments.find((a) => {
-        if (a.volunteer_id !== v.id || a.status === 'cancelled') return false;
+        if (a.volunteer_id !== v.id || a.shift_id === shiftId || !['pending', 'confirmed'].includes(a.status)) return false;
         const s = find.shift(a.shift_id);
         return s && s.start_time < shift.end_time && s.end_time > shift.start_time;
       });
@@ -129,9 +129,27 @@ export const volunteerHandlers = [
           conflict_shift_id: overlap.shift_id,
         });
       }
-      const row = { id: nextId(db.t.assignments), shift_id: shiftId, volunteer_id: v.id, status: 'pending' as const, assigned_at: null, decline_reason: null, created_at: nowIso() };
+      // Full shift → waitlist (mirrors VolunteerController::applyForShift).
+      const full = db.t.assignments.filter((a) => a.shift_id === shiftId && a.status === 'confirmed').length >= shift.capacity;
+      const row = {
+        id: nextId(db.t.assignments),
+        shift_id: shiftId,
+        volunteer_id: v.id,
+        status: full ? ('waitlisted' as const) : ('pending' as const),
+        waitlisted_at: full ? nowIso() : null,
+        assigned_at: null,
+        decline_reason: null,
+        created_at: nowIso(),
+      };
       db.t.assignments.push(row);
-      return ok(res.assignment(row), 'Application submitted successfully. Under coordinator review.', 201);
+      const out = res.assignment(row);
+      return ok(
+        out,
+        full
+          ? `This shift is full, so you're on the waitlist (#${out.waitlist_position}). If a place opens up you get it automatically and we'll tell you.`
+          : 'Application submitted successfully. Under coordinator review.',
+        201,
+      );
     }),
   ),
 
@@ -139,9 +157,22 @@ export const volunteerHandlers = [
     api('/volunteer/apply/:assignmentId'),
     authed(['Volunteer'], (ctx) => {
       const id = param(ctx, 'assignmentId');
-      const idx = db.t.assignments.findIndex((a) => a.id === id && a.volunteer_id === ctx.actor.volunteer!.id && a.status === 'pending');
+      const idx = db.t.assignments.findIndex((a) => a.id === id && a.volunteer_id === ctx.actor.volunteer!.id && ['pending', 'confirmed', 'waitlisted'].includes(a.status));
       if (idx < 0) return fail('Target database resource not found.', 404);
-      db.t.assignments.splice(idx, 1);
+      const row = db.t.assignments[idx]!;
+      if (row.status === 'confirmed') {
+        row.status = 'cancelled';
+        // A freed place goes to the first person on the waitlist.
+        const next = db.t.assignments
+          .filter((a) => a.shift_id === row.shift_id && a.status === 'waitlisted')
+          .sort((a, b) => (a.waitlisted_at ?? '').localeCompare(b.waitlisted_at ?? '') || a.id - b.id)[0];
+        if (next) {
+          next.status = 'confirmed';
+          next.assigned_at = nowIso();
+        }
+      } else {
+        db.t.assignments.splice(idx, 1);
+      }
       return json({ status: 'success', message: 'Shift application withdrawn successfully.' });
     }),
   ),

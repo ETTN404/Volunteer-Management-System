@@ -27,6 +27,10 @@ export interface UserRow {
   profile_photo_path: string | null;
   last_login: string | null;
   created_at: string;
+  phone?: string | null;
+  telegram_chat_id?: string | null;
+  sms_opt_in?: boolean;
+  locale?: 'en' | 'am';
 }
 
 export interface VolunteerRow {
@@ -74,7 +78,8 @@ export interface AssignmentRow {
   id: number;
   shift_id: number;
   volunteer_id: number;
-  status: 'pending' | 'confirmed' | 'rejected' | 'cancelled' | 'removed';
+  status: 'pending' | 'confirmed' | 'waitlisted' | 'rejected' | 'cancelled' | 'removed';
+  waitlisted_at?: string | null;
   assigned_at: string | null;
   decline_reason: string | null;
   created_at: string;

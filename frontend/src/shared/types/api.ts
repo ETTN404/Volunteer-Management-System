@@ -31,6 +31,7 @@ export interface Organization {
   city?: string | null;
   primary_color?: string | null;
   subdomain?: string | null;
+  about?: string | null;
   verification_status?: 'pending' | 'verified' | 'rejected';
   verified_at?: string | null;
   plan_expires_at?: string | null;
@@ -75,6 +76,9 @@ export interface User {
   phone?: string | null;
   must_change_password?: boolean;
   email_verified_at?: string | null;
+  telegram_linked?: boolean;
+  sms_opt_in?: boolean;
+  locale?: 'en' | 'am';
   email: string;
   role: Role;
   is_active: boolean;
@@ -164,7 +168,7 @@ export interface Shift {
   pending_count?: number;
 }
 
-export type AssignmentStatus = 'pending' | 'confirmed' | 'rejected' | 'cancelled' | 'removed';
+export type AssignmentStatus = 'pending' | 'confirmed' | 'waitlisted' | 'rejected' | 'cancelled' | 'removed';
 
 export interface ShiftAssignment {
   id: number;
@@ -176,6 +180,8 @@ export interface ShiftAssignment {
   volunteer?: Volunteer;
   decline_reason?: string | null;
   match_score?: number | null;
+  /** 1-based place in line when status is 'waitlisted'. */
+  waitlist_position?: number | null;
   /** Volunteer's own attendance on this shift (schedule endpoint only). */
   attendance?: Attendance | null;
 }
@@ -530,6 +536,32 @@ export interface OrganizationProfile {
   stats: { active_events: number; past_events: number; volunteers: number; verified_hours: number };
 }
 
+/** GET /public/organizations/{id} — shareable page, no contact details. */
+export interface PublicOrganizationProfile {
+  id: number;
+  name: string;
+  logo_url: string | null;
+  primary_color: string | null;
+  website: string | null;
+  city: string | null;
+  country: string | null;
+  about: string | null;
+  verified: boolean;
+  member_since: string;
+  stats: { active_events: number; past_events: number; volunteers: number; verified_hours: number };
+  upcoming_events: {
+    id: number;
+    title: string;
+    description: string;
+    location: string;
+    start_date: string;
+    end_date: string;
+    next_shift: string | null;
+    shifts: number;
+    open_places: number;
+  }[];
+}
+
 export interface PublicStats {
   organizations: number;
   volunteers: number;
@@ -588,6 +620,7 @@ export interface RosterMeta {
   checked_out: number;
   left_early: number;
   open_places: number;
+  waitlisted?: number;
   policy: AttendancePolicy;
 }
 

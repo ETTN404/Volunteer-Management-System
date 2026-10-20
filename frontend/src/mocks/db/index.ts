@@ -143,6 +143,10 @@ export const res = {
       profile_photo_url: u.profile_photo_path,
       last_login: u.last_login ? dateTimeString(u.last_login) : null,
       created_at: dateTimeString(u.created_at),
+      phone: u.phone ?? null,
+      telegram_linked: Boolean(u.telegram_chat_id),
+      sms_opt_in: Boolean(u.sms_opt_in),
+      locale: u.locale ?? 'en',
     };
     if (load.volunteer) {
       const v = find.volunteerByUser(u.id);
@@ -228,6 +232,10 @@ export const res = {
       status: a.status,
       applied_at: dateTimeString(a.created_at),
       decline_reason: a.decline_reason,
+      waitlist_position:
+        a.status === 'waitlisted'
+          ? db.t.assignments.filter((x) => x.shift_id === a.shift_id && x.status === 'waitlisted' && ((x.waitlisted_at ?? '') < (a.waitlisted_at ?? '') || ((x.waitlisted_at ?? '') === (a.waitlisted_at ?? '') && x.id < a.id))).length + 1
+          : null,
     };
     if (load.shift) {
       const s = find.shift(a.shift_id);

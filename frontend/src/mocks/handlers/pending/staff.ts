@@ -71,7 +71,8 @@ export const staffPending = [
       const isToday = (iso: string) => new Date(iso).toDateString() === now.toDateString();
       const monthKey = now.toISOString().slice(0, 7);
       return ok({
-        shifts_today: shifts.filter((s) => isToday(s.start_time)).length,
+        // Running right now counts as today too (a shift that began before midnight).
+        shifts_today: shifts.filter((s) => isToday(s.start_time) || (new Date(s.start_time) <= now && new Date(s.end_time) > now)).length,
         checked_in_now: db.t.attendances.filter((a) => shiftIds.includes(a.shift_id) && !a.check_out_time).length,
         pending_applications: db.t.assignments.filter((a) => shiftIds.includes(a.shift_id) && a.status === 'pending').length,
         underfilled_shifts: shifts.filter((s) => new Date(s.start_time) > now && confirmedCount(s.id) < s.capacity * 0.5).length,

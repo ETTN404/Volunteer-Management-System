@@ -21,6 +21,7 @@ export const routes: RouteObject[] = [
       { path: '/suspended', element: <SuspendedPage /> },
       { path: '/invite/:token', ...page(() => import('@/pages/auth/invite-page')) },
       { path: '/signup/organization', ...page(() => import('@/pages/public/org-signup-page')) },
+      { path: '/orgs/:orgId', ...page(() => import('@/pages/public/public-org-page')) },
       {
         element: <RedirectIfAuthed />,
         children: [

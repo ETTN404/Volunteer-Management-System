@@ -149,7 +149,7 @@ export function useUpdateProfile() {
 }
 
 /** Apply/withdraw change schedule + event capacity — refresh both. */
-function useScheduleMutation<TVars>(fn: (v: TVars) => Promise<unknown>) {
+function useScheduleMutation<TVars, TData>(fn: (v: TVars) => Promise<TData>) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: fn,

@@ -26,6 +26,7 @@ export interface OrganizationUpdate {
   website?: string | null;
   primary_color?: string | null;
   subdomain?: string | null;
+  about?: string | null;
   attendance?: Partial<AttendancePolicy>;
 }
 

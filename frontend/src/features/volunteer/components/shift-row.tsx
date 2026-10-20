@@ -1,9 +1,10 @@
-import { Check, Clock, Undo2 } from 'lucide-react';
+import { Check, Clock, ListOrdered, Undo2 } from 'lucide-react';
 import type { Shift, ShiftAssignment } from '@/shared/types/api';
 import { formatDay, formatTimeRange, parseApiDate } from '@/shared/lib/time';
 import { humanizeSkill } from '@/shared/lib/format';
 import { skillDiff } from '@/shared/lib/skills';
 import { errorMessage } from '@/shared/api/http';
+import { useT } from '@/shared/i18n';
 import { AssignmentBadge, Button, CapacityMeter, InlineAlert, notify } from '@/shared/ui';
 import { useApplyForShift, useWithdrawApplication } from '../api';
 import { MatchBadge } from './match-badge';
@@ -20,6 +21,7 @@ export function ShiftRow({
   /** e.g. minor without consent (BR-02) */
   blockedReason?: string | null;
 }) {
+  const t = useT();
   const apply = useApplyForShift();
   const withdraw = useWithdrawApplication();
   const start = parseApiDate(shift.start_time);
@@ -29,8 +31,9 @@ export function ShiftRow({
   const confirmed = shift.confirmed_count ?? 0;
   const full = confirmed >= shift.capacity;
   const error = apply.error ?? withdraw.error;
-  const active = assignment && (assignment.status === 'pending' || assignment.status === 'confirmed');
+  const active = assignment && ['pending', 'confirmed', 'waitlisted'].includes(assignment.status);
   const closed = assignment && !active;
+  const waitlisted = assignment?.status === 'waitlisted';
 
   return (
     <div className="min-w-0 rounded-lg bg-surface p-4 [box-shadow:inset_0_0_0_1px_var(--line)] sm:p-5">
@@ -47,7 +50,7 @@ export function ShiftRow({
           </div>
           {shift.notes && <p className="mt-2 text-[13px] text-muted wrap-anywhere">{shift.notes}</p>}
           <div className="mt-3 flex flex-wrap gap-1.5">
-            {shift.required_skills.length === 0 && <span className="text-[12.5px] text-faint">No specific skills needed</span>}
+            {shift.required_skills.length === 0 && <span className="text-[12.5px] text-faint">{t('No specific skills needed')}</span>}
             {matched.map((s) => (
               <span key={s} className="inline-flex items-center gap-1 rounded-md bg-success-soft px-2 py-1 text-[11.5px] font-medium text-success-text">
                 <Check className="size-3" /> {humanizeSkill(s)}
@@ -69,31 +72,42 @@ export function ShiftRow({
                 size="sm"
                 loading={withdraw.isPending}
                 onClick={() => {
-                  if (assignment.status === 'confirmed' && !window.confirm('Give up your confirmed place? The coordinator will be told so someone else can take it.')) return;
-                  withdraw.mutate(assignment.id, { onSuccess: () => notify.success('Application withdrawn') });
+                  if (assignment.status === 'confirmed' && !window.confirm(t('Give up your confirmed place? The coordinator will be told so someone else can take it.'))) return;
+                  withdraw.mutate(assignment.id, { onSuccess: () => notify.success(waitlisted ? t('You left the waitlist') : t('Application withdrawn')) });
                 }}
               >
-                <Undo2 /> Withdraw
+                <Undo2 /> {waitlisted ? t('Leave waitlist') : t('Withdraw')}
               </Button>
             )
           ) : closed ? null : (
             <Button
               size="sm"
-              disabled={past || full || Boolean(blockedReason)}
+              variant={full && !past ? 'secondary' : undefined}
+              disabled={past || Boolean(blockedReason)}
               loading={apply.isPending}
               onClick={() =>
                 apply.mutate(shift.id, {
-                  onSuccess: () => notify.success('Application sent', 'A coordinator will review it. You’ll get a notification when you’re confirmed.'),
+                  onSuccess: (a) =>
+                    a?.status === 'waitlisted'
+                      ? notify.success(t('You’re on the waitlist (#{n})', { n: a.waitlist_position ?? 1 }), t('If a place opens up, it’s yours automatically and we’ll let you know.'))
+                      : notify.success(t('Application sent'), t('A coordinator will review it. You’ll get a notification when you’re confirmed.')),
                 })
               }
             >
-              {full ? 'Full' : past ? 'Started' : 'Apply'}
+              {past ? t('Started') : full ? (<><ListOrdered /> {t('Join waitlist')}</>) : t('Apply')}
             </Button>
           )}
         </div>
       </div>
+      {waitlisted && assignment.waitlist_position != null && (
+        <p className="mt-3 rounded-md bg-info-soft px-3 py-2 text-[13px] text-info-text">
+          {t('You’re #{n} on the waitlist. If someone drops out, you get the place automatically.', { n: assignment.waitlist_position })}
+        </p>
+      )}
       {closed && assignment.decline_reason && (
-        <p className="mt-3 rounded-md bg-surface-2 px-3 py-2 text-[13px] break-words text-muted">Coordinator note: {assignment.decline_reason}</p>
+        <p className="mt-3 rounded-md bg-surface-2 px-3 py-2 text-[13px] break-words text-muted">
+          {t('Coordinator note:')} {assignment.decline_reason}
+        </p>
       )}
       {error && (
         <InlineAlert tone="danger" className="mt-3">

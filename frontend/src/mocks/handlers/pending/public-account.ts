@@ -4,7 +4,7 @@
  * Delete a handler once Laravel ships the endpoint.
  */
 import { http } from 'msw';
-import { db, find, nowIso } from '../../db';
+import { db, find, nowIso, res } from '../../db';
 import { api, authed, body, fail, json, latency, ok, validate } from '../utils';
 
 export const publicAccountPending = [
@@ -23,6 +23,77 @@ export const publicAccountPending = [
         })),
     );
   }),
+
+  // Shareable organization page (no login)
+  http.get(api('/public/organizations/:id'), async ({ params }) => {
+    await latency();
+    const o = db.t.organizations.find((x) => x.id === Number(params.id) && x.status === 'active');
+    if (!o) return fail('Target database resource not found.', 404);
+    const events = db.t.events.filter((e) => e.org_id === o.id);
+    const shiftIds = new Set(db.t.shifts.filter((s) => events.some((e) => e.id === s.event_id)).map((s) => s.id));
+    const now = nowIso();
+    const upcoming = events
+      .filter((e) => (e.status === 'upcoming' || e.status === 'ongoing') && e.end_date >= now.slice(0, 10))
+      .map((e) => {
+        const shifts = db.t.shifts.filter((s) => s.event_id === e.id && s.start_time > now).sort((a, b) => a.start_time.localeCompare(b.start_time));
+        const open = shifts.reduce((n, s) => n + Math.max(0, s.capacity - db.t.assignments.filter((a) => a.shift_id === s.id && a.status === 'confirmed').length), 0);
+        return { id: e.id, title: e.title, description: e.description ?? '', location: e.location, start_date: e.start_date, end_date: e.end_date, next_shift: shifts[0]?.start_time ?? null, shifts: shifts.length, open_places: open };
+      });
+    return ok({
+      id: o.id,
+      name: o.name,
+      logo_url: o.logo_path,
+      primary_color: (o as { primary_color?: string | null }).primary_color ?? null,
+      website: o.website ?? null,
+      city: (o as { city?: string | null }).city ?? null,
+      country: (o as { country?: string | null }).country ?? 'ET',
+      about: (o as { about?: string | null }).about ?? null,
+      verified: true,
+      member_since: o.created_at.slice(0, 10),
+      stats: {
+        active_events: upcoming.length,
+        past_events: events.filter((e) => e.status === 'completed').length,
+        volunteers: new Set(db.t.assignments.filter((a) => shiftIds.has(a.shift_id) && a.status === 'confirmed').map((a) => a.volunteer_id)).size,
+        verified_hours: Math.round(db.t.attendances.filter((a) => shiftIds.has(a.shift_id)).reduce((n, a) => n + (a.verified_hours ?? 0), 0) * 10) / 10,
+      },
+      upcoming_events: upcoming,
+    });
+  }),
+
+  // Account details & alert preferences
+  http.patch(
+    api('/account'),
+    authed('any', async ({ request, actor }) => {
+      const b = await body(request);
+      if (b.sms_opt_in && !(b.phone ?? actor.user.phone)) {
+        return json({ message: 'Add your phone number first.', errors: { phone: ['Add your phone number to receive SMS alerts.'] } }, 422);
+      }
+      if (typeof b.phone === 'string' || b.phone === null) actor.user.phone = (b.phone as string | null) || null;
+      if (typeof b.sms_opt_in === 'boolean') actor.user.sms_opt_in = b.sms_opt_in;
+      if (b.locale === 'en' || b.locale === 'am') actor.user.locale = b.locale;
+      if (typeof b.first_name === 'string' || typeof b.last_name === 'string') {
+        const [f, ...l] = actor.user.full_name.split(' ');
+        actor.user.full_name = `${(b.first_name as string) ?? f} ${(b.last_name as string) ?? l.join(' ')}`.trim();
+      }
+      return ok(res.user(actor.user, { volunteer: true, organization: true }), 'Account updated.');
+    }),
+  ),
+
+  // Telegram alerts: deep link (the mock links straight away so the UI can be tried)
+  http.post(
+    api('/account/telegram'),
+    authed('any', ({ actor }) => {
+      actor.user.telegram_chat_id = `mock-${actor.user.id}`;
+      return ok({ url: 'https://t.me/VolunTrackBot?start=mock' });
+    }),
+  ),
+  http.delete(
+    api('/account/telegram'),
+    authed('any', ({ actor }) => {
+      actor.user.telegram_chat_id = null;
+      return json({ status: 'success', message: 'Telegram disconnected.' });
+    }),
+  ),
 
   // G2 — landing page counters
   http.get(api('/public/stats'), async () => {

@@ -11,12 +11,14 @@ import { MatchBadge } from '@/features/volunteer/components/match-badge';
 import { bestMatch } from '@/features/volunteer/components/opportunity-card';
 import { OrgChip } from '@/features/volunteer/components/org-chip';
 import { ReportOrgDialog } from '@/features/volunteer/components/report-org-dialog';
+import { useT } from '@/shared/i18n';
 
 export default function OpportunityDetailPage() {
   const eventId = Number(useParams().eventId);
   const event = useOpportunity(eventId);
   const profile = useVolunteerProfile();
   const mine = useMyShifts();
+  const t = useT();
 
   useEffect(() => {
     if (event.data) document.title = `${event.data.title} · VolunTrack`;
@@ -35,14 +37,14 @@ export default function OpportunityDetailPage() {
 
   const e = event.data;
   const v = profile.data?.volunteer;
-  const blocked = v?.is_minor && !v.parental_consent_verified ? 'Volunteers under 18 need a verified parental consent form.' : null;
+  const blocked = v?.is_minor && !v.parental_consent_verified ? t('Volunteers under 18 need a verified parental consent form.') : null;
   const hasCoords = e.coordinates.latitude != null && e.coordinates.longitude != null;
   const shifts = [...(e.shifts ?? [])].sort((a, b) => a.start_time.localeCompare(b.start_time));
 
   return (
     <div className="min-w-0">
       <Link to="/v/opportunities" className="mb-6 inline-flex items-center gap-1.5 text-sm text-muted hover:text-text">
-        <ArrowLeft className="size-4" /> Opportunities
+        <ArrowLeft className="size-4" /> {t('Opportunities')}
       </Link>
       <PageHeader
         eyebrow={
@@ -56,7 +58,7 @@ export default function OpportunityDetailPage() {
           <div className="mt-3 flex flex-wrap items-center gap-3">
             <OrgChip org={e.organization} size="md" />
             <Link to={`/v/organizations/${e.organization.id}`} className="text-[13px] font-medium text-accent-text hover:underline">
-              See all their events
+              {t('See all their events')}
             </Link>
           </div>
         )}
@@ -70,7 +72,7 @@ export default function OpportunityDetailPage() {
             <MapPin className="size-4 shrink-0 text-faint" /> <span className="break-words">{e.location}</span>
           </span>
           <span className="inline-flex items-center gap-1.5">
-            <Ruler className="size-4 shrink-0 text-faint" /> Check-in within {e.geofence_radius} m
+            <Ruler className="size-4 shrink-0 text-faint" /> {t('Check-in within {n} m', { n: e.geofence_radius })}
           </span>
         </div>
       </PageHeader>
@@ -79,23 +81,23 @@ export default function OpportunityDetailPage() {
         <div className="min-w-0 space-y-6">
           {e.description && (
             <Card className="min-w-0 p-5 sm:p-6">
-              <h2 className="type-eyebrow mb-3">About this event</h2>
+              <h2 className="type-eyebrow mb-3">{t('About this event')}</h2>
               <p className="text-[15px] leading-relaxed whitespace-pre-line text-text wrap-anywhere">{e.description}</p>
             </Card>
           )}
           <section aria-labelledby="shifts-title" className="min-w-0">
             <h2 id="shifts-title" className="type-title mb-1 text-lg text-text">
-              Shifts
+              {t('Shifts')}
             </h2>
-            <p className="mb-4 text-sm text-muted">Skills you have are marked in green. A coordinator reviews every application.</p>
+            <p className="mb-4 text-sm text-muted">{t('Skills you have are marked in green. A coordinator reviews every application. Full shift? Join the waitlist.')}</p>
             {blocked && (
               <InlineAlert
                 tone="warning"
                 className="mb-4"
-                title="You can’t apply yet"
+                title={t('You can’t apply yet')}
                 action={
                   <Button asChild size="sm" variant="secondary">
-                    <Link to="/v/documents">Upload consent</Link>
+                    <Link to="/v/documents">{t('Upload consent')}</Link>
                   </Button>
                 }
               >
@@ -108,7 +110,7 @@ export default function OpportunityDetailPage() {
                   <ShiftRow shift={s} assignment={mine.rows.find((r) => r.shift.id === s.id)?.assignment} mySkills={v?.skills ?? []} blockedReason={blocked} />
                 </StaggerItem>
               ))}
-              {shifts.length === 0 && <Card className="p-6 text-sm text-muted">The coordinator hasn’t added shifts yet.</Card>}
+              {shifts.length === 0 && <Card className="p-6 text-sm text-muted">{t('The coordinator hasn’t added shifts yet.')}</Card>}
             </Stagger>
           </section>
         </div>
@@ -122,12 +124,12 @@ export default function OpportunityDetailPage() {
               label={e.location.split(',')[0]}
             />
           ) : (
-            <Card className="grid h-60 place-items-center p-6 text-center text-sm text-muted">This event has no map pin yet.</Card>
+            <Card className="grid h-60 place-items-center p-6 text-center text-sm text-muted">{t('This event has no map pin yet.')}</Card>
           )}
-          <p className="mt-3 text-[12.5px] text-faint">The dashed ring is the check-in area. Your phone must be inside it when you scan the coordinator’s QR code.</p>
+          <p className="mt-3 text-[12.5px] text-faint">{t('The dashed ring is the check-in area. Your phone must be inside it when you scan the coordinator’s QR code.')}</p>
           {e.organization && (
             <div className="mt-4 flex items-center justify-between rounded-lg bg-surface-2 px-4 py-3 text-[13px] text-muted">
-              <span>Something wrong with this organization?</span>
+              <span>{t('Something wrong with this organization?')}</span>
               <ReportOrgDialog orgId={e.organization.id} orgName={e.organization.name} eventId={e.id} />
             </div>
           )}

@@ -8,6 +8,7 @@ import { useNow } from '@/shared/hooks/use-now';
 import { AssignmentBadge, Badge, Button, Card, EmptyState, ErrorState, PageHeader, Segmented, SkeletonCard, notify } from '@/shared/ui';
 import { Stagger, StaggerItem } from '@/shared/motion';
 import { useWithdrawApplication } from '@/features/volunteer/api';
+import { useT } from '@/shared/i18n';
 import { shiftPhase, useMyShifts, type ScheduledShift } from '@/features/volunteer/derived';
 
 const HOURS_STATUS = {
@@ -18,6 +19,7 @@ const HOURS_STATUS = {
 } as const;
 
 function UpcomingRow({ s }: { s: ScheduledShift }) {
+  const t = useT();
   const now = useNow(15_000);
   const withdraw = useWithdrawApplication();
   const phase = shiftPhase(s, now);
@@ -51,28 +53,39 @@ function UpcomingRow({ s }: { s: ScheduledShift }) {
         {canCheckIn ? (
           <Button asChild className="w-full sm:w-auto">
             <Link to={`/v/check-in/${s.shift.id}`}>
-              <QrCode /> Check in
+              <QrCode /> {t('Check in')}
             </Link>
           </Button>
         ) : phase === 'on-shift' ? (
           <>
             <Badge tone="success" dot pulse>
-              Checked in {formatTime(s.attendance!.check_in_time)}
+              {t('Checked in {time}', { time: formatTime(s.attendance!.check_in_time) })}
             </Badge>
             <Button asChild size="sm" variant="secondary">
               <Link to={`/v/check-in/${s.shift.id}`}>
-                <LogOut /> Check out
+                <LogOut /> {t('Check out')}
               </Link>
             </Button>
           </>
         ) : phase === 'missed' ? (
-          <span className="text-[12.5px] text-warning-text">Check-in closed — the coordinator can check you in</span>
+          <span className="text-[12.5px] text-warning-text">{t('Check-in closed — the coordinator can check you in')}</span>
+        ) : s.assignment.status === 'waitlisted' ? (
+          <>
+            {s.assignment.waitlist_position != null && (
+              <Badge tone="info" size="sm">
+                {t('#{n} in line', { n: s.assignment.waitlist_position })}
+              </Badge>
+            )}
+            <Button variant="ghost" size="sm" loading={withdraw.isPending} onClick={() => withdraw.mutate(s.assignment.id, { onSuccess: () => notify.success(t('You left the waitlist')) })}>
+              <Undo2 /> {t('Leave waitlist')}
+            </Button>
+          </>
         ) : s.assignment.status === 'pending' ? (
-          <Button variant="ghost" size="sm" loading={withdraw.isPending} onClick={() => withdraw.mutate(s.assignment.id, { onSuccess: () => notify.success('Application withdrawn') })}>
-            <Undo2 /> Withdraw
+          <Button variant="ghost" size="sm" loading={withdraw.isPending} onClick={() => withdraw.mutate(s.assignment.id, { onSuccess: () => notify.success(t('Application withdrawn')) })}>
+            <Undo2 /> {t('Withdraw')}
           </Button>
         ) : phase === 'too-early' ? (
-          <span className="text-[12.5px] text-faint">Check-in opens {formatDay(opensAt).toLowerCase()} {formatTime(opensAt)}</span>
+          <span className="text-[12.5px] text-faint">{t('Check-in opens {when}', { when: `${formatDay(opensAt).toLowerCase()} ${formatTime(opensAt)}` })}</span>
         ) : null}
       </div>
     </Card>
@@ -82,9 +95,10 @@ function UpcomingRow({ s }: { s: ScheduledShift }) {
 export default function SchedulePage() {
   const { upcoming, past, isLoading, error, refetch } = useMyShifts();
   const [tab, setTab] = useState<'upcoming' | 'history'>('upcoming');
+  const t = useT();
   useEffect(() => {
-    document.title = 'My schedule · VolunTrack';
-  }, []);
+    document.title = `${t('My schedule')} · VolunTrack`;
+  }, [t]);
 
   const totals = useMemo(() => {
     const done = past.filter((p) => p.attendance?.check_out_time);
@@ -98,17 +112,17 @@ export default function SchedulePage() {
   return (
     <>
       <PageHeader
-        eyebrow="My schedule"
-        title="Shifts & attendance"
-        description="Everything you’ve applied for, been confirmed on, and attended."
+        eyebrow={t('My schedule')}
+        title={t('Shifts & attendance')}
+        description={t('Everything you’ve applied for, been confirmed on, and attended.')}
         actions={
           <Segmented
             value={tab}
             onValueChange={setTab}
-            aria-label="View"
+            aria-label={t('View')}
             options={[
-              { value: 'upcoming', label: `Upcoming${upcoming.length ? ` · ${upcoming.length}` : ''}` },
-              { value: 'history', label: 'History', icon: <History /> },
+              { value: 'upcoming', label: `${t('Upcoming')}${upcoming.length ? ` · ${upcoming.length}` : ''}` },
+              { value: 'history', label: t('History'), icon: <History /> },
             ]}
           />
         }
@@ -126,11 +140,11 @@ export default function SchedulePage() {
         upcoming.length === 0 ? (
           <EmptyState
             icon={<CalendarX2 />}
-            title="Nothing scheduled"
-            description="Apply for a shift — it appears here while it’s under review and once you’re confirmed."
+            title={t('Nothing scheduled')}
+            description={t('Apply for a shift — it appears here while it’s under review and once you’re confirmed.')}
             action={
               <Button asChild>
-                <Link to="/v/opportunities">Browse opportunities</Link>
+                <Link to="/v/opportunities">{t('Browse opportunities')}</Link>
               </Button>
             }
           />
@@ -147,23 +161,23 @@ export default function SchedulePage() {
         <>
           <div className="mb-5 grid grid-cols-2 gap-4 sm:max-w-md">
             <Card className="p-4">
-              <div className="type-eyebrow-sm">Shifts attended</div>
+              <div className="type-eyebrow-sm">{t('Shifts attended')}</div>
               <div className="type-data mt-1.5 text-2xl text-text">{totals.shifts}</div>
             </Card>
             <Card className="p-4">
-              <div className="type-eyebrow-sm">Verified hours</div>
+              <div className="type-eyebrow-sm">{t('Verified hours')}</div>
               <div className="type-data mt-1.5 text-2xl text-text">{formatHours(totals.hours)}</div>
-              {totals.pending > 0 && <div className="mt-1 text-[11.5px] text-faint">+{formatHours(totals.pending)} awaiting review</div>}
+              {totals.pending > 0 && <div className="mt-1 text-[11.5px] text-faint">{t('+{h} awaiting review', { h: formatHours(totals.pending) })}</div>}
             </Card>
           </div>
           <Card className="overflow-hidden">
             <table className="w-full text-sm">
               <thead className="border-b border-line bg-surface-2/60 text-left">
                 <tr className="text-[11.5px] uppercase tracking-wider text-faint">
-                  <th className="px-5 py-3 font-medium">Shift</th>
-                  <th className="hidden px-5 py-3 font-medium sm:table-cell">Check-in</th>
-                  <th className="px-5 py-3 font-medium">Hours</th>
-                  <th className="hidden px-5 py-3 font-medium md:table-cell">Status</th>
+                  <th className="px-5 py-3 font-medium">{t('Shift')}</th>
+                  <th className="hidden px-5 py-3 font-medium sm:table-cell">{t('Check-in')}</th>
+                  <th className="px-5 py-3 font-medium">{t('Hours')}</th>
+                  <th className="hidden px-5 py-3 font-medium md:table-cell">{t('Status')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-line">
@@ -176,28 +190,28 @@ export default function SchedulePage() {
                       <td className="px-5 py-3.5">
                         <div className="font-medium text-text wrap-anywhere">{p.event.title}</div>
                         <div className="text-[12.5px] text-faint">{formatDate(p.start, 'EEE d MMM yyyy')}</div>
-                        <div className="mt-1 md:hidden">{status ? <Badge tone={status.tone} size="sm">{status.label}</Badge> : <AssignmentBadge status={p.assignment.status} size="sm" />}</div>
-                        {a?.check_out_method === 'auto' && <div className="mt-1 text-[11.5px] text-faint">Closed automatically at shift end</div>}
-                        {a?.verification_note && <div className="mt-1 text-[11.5px] text-muted">Coordinator: {a.verification_note}</div>}
+                        <div className="mt-1 md:hidden">{status ? <Badge tone={status.tone} size="sm">{t(status.label)}</Badge> : <AssignmentBadge status={p.assignment.status} size="sm" />}</div>
+                        {a?.check_out_method === 'auto' && <div className="mt-1 text-[11.5px] text-faint">{t('Closed automatically at shift end')}</div>}
+                        {a?.verification_note && <div className="mt-1 text-[11.5px] text-muted">{t('Coordinator:')} {a.verification_note}</div>}
                       </td>
                       <td className="hidden px-5 py-3.5 text-muted sm:table-cell">
                         {a ? (
                           <span className="inline-flex items-center gap-1.5">
-                            {a.qr_verified ? <CheckCircle2 className="size-3.5 text-success" /> : <span className="text-[11px] text-warning-text">manual</span>}
+                            {a.qr_verified ? <CheckCircle2 className="size-3.5 text-success" /> : <span className="text-[11px] text-warning-text">{t('manual')}</span>}
                             {formatTime(a.check_in_time)} – {formatTime(a.check_out_time)}
                           </span>
                         ) : (
-                          <span className="text-faint">Didn’t attend</span>
+                          <span className="text-faint">{t('Didn’t attend')}</span>
                         )}
                       </td>
                       <td className="type-data px-5 py-3.5 text-text">{a?.verified_hours != null ? formatHours(a.verified_hours) : hrs ? formatHours(hrs) : '—'}</td>
-                      <td className="hidden px-5 py-3.5 md:table-cell">{status ? <Badge tone={status.tone} size="sm">{status.label}</Badge> : <AssignmentBadge status={p.assignment.status} size="sm" />}</td>
+                      <td className="hidden px-5 py-3.5 md:table-cell">{status ? <Badge tone={status.tone} size="sm">{t(status.label)}</Badge> : <AssignmentBadge status={p.assignment.status} size="sm" />}</td>
                     </tr>
                   );
                 })}
               </tbody>
             </table>
-            {past.length === 0 && <p className="p-8 text-center text-sm text-muted">Your attended shifts will be listed here.</p>}
+            {past.length === 0 && <p className="p-8 text-center text-sm text-muted">{t('Your attended shifts will be listed here.')}</p>}
           </Card>
         </>
       )}

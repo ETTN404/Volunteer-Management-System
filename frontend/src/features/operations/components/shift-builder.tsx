@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'motion/react';
-import { CalendarRange, Copy, Minus, Plus, Repeat, Trash2, Users } from 'lucide-react';
+import { CalendarClock, CalendarRange, Copy, Minus, Plus, Repeat, Trash2, Users } from 'lucide-react';
 import { eachDayOfInterval, format, parseISO } from 'date-fns';
 import { cn } from '@/shared/lib/cn';
 import { SKILL_CATALOGUE, normalizeSkill } from '@/shared/lib/skills';
@@ -31,6 +31,14 @@ export function ShiftBuilder({ value, onChange, startDate, endDate }: { value: S
   const repeatEveryDay = (d: ShiftDraft) => {
     const existing = new Set(value.filter((x) => x.start === d.start && x.end === d.end && x.title === d.title).map((x) => x.date));
     const copies = days.filter((day) => !existing.has(day)).map((day) => ({ ...d, key: newDraftKey(), date: day }));
+    onChange([...value, ...copies].sort((a, b) => (a.date + a.start).localeCompare(b.date + b.start)));
+  };
+
+  /** Same weekday and time every week until the event ends (e.g. every Saturday). */
+  const repeatWeekly = (d: ShiftDraft) => {
+    const weekday = parseISO(d.date).getDay();
+    const existing = new Set(value.filter((x) => x.start === d.start && x.end === d.end && x.title === d.title).map((x) => x.date));
+    const copies = days.filter((day) => day > d.date && parseISO(day).getDay() === weekday && !existing.has(day)).map((day) => ({ ...d, key: newDraftKey(), date: day }));
     onChange([...value, ...copies].sort((a, b) => (a.date + a.start).localeCompare(b.date + b.start)));
   };
 
@@ -94,6 +102,11 @@ export function ShiftBuilder({ value, onChange, startDate, endDate }: { value: S
                 <span className="grid size-6 place-items-center rounded-full bg-accent-soft text-[11px] font-bold text-accent-text">{i + 1}</span>
                 <Input value={d.title} onChange={(e) => set(d.key, { title: e.target.value })} placeholder="Shift name, e.g. Registration desk" inputSize="sm" className="min-w-0 flex-1 font-medium" aria-label="Shift name" />
                 <div className="ml-auto flex items-center gap-1">
+                  {days.length > 7 && days.some((day) => day > d.date && parseISO(day).getDay() === parseISO(d.date).getDay()) && (
+                    <Button type="button" size="xs" variant="ghost" onClick={() => repeatWeekly(d)} title={`Copy to every ${format(parseISO(d.date), 'EEEE')} until the event ends`}>
+                      <CalendarClock /> Weekly
+                    </Button>
+                  )}
                   {days.length > 1 && (
                     <Button type="button" size="xs" variant="ghost" onClick={() => repeatEveryDay(d)} title="Copy to every day of the event">
                       <Repeat /> Every day

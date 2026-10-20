@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { BadgeCheck, Check, Clock4, FileUp, ImageUp, Palette, ShieldCheck, Trash2 } from 'lucide-react';
+import { BadgeCheck, Check, Clock4, ExternalLink, FileUp, ImageUp, Palette, ShieldCheck, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { Controller, useForm } from 'react-hook-form';
@@ -29,6 +29,7 @@ import {
   Select,
   Skeleton,
   Switch,
+  Textarea,
   isValidPhone,
   notify,
 } from '@/shared/ui';
@@ -44,6 +45,7 @@ const schema = z
     address: z.string().trim().max(255),
     phone: z.string(),
     website: z.union([z.literal(''), z.string().trim().url('Enter a full URL, e.g. https://example.org')]),
+    about: z.string().max(1500, 'Keep it under 1,500 characters.'),
     primary_color: z.union([z.literal(''), z.string().regex(/^#[0-9A-Fa-f]{6}$/, 'Use a hex color like #E5483D')]),
     subdomain: z.union([z.literal(''), z.string().regex(/^[a-z0-9-]{3,40}$/, 'Lowercase letters, numbers and dashes only')]),
   })
@@ -205,6 +207,7 @@ export default function OrgSettingsPage() {
         address: o.address ?? '',
         phone: o.phone ?? '',
         website: o.website ?? '',
+        about: o.about ?? '',
         primary_color: o.primary_color ?? '',
         subdomain: o.subdomain ?? '',
       });
@@ -232,6 +235,7 @@ export default function OrgSettingsPage() {
         address: v.address || null,
         phone: v.phone || null,
         website: v.website || null,
+        about: v.about.trim() || null,
         ...(canBrand ? { primary_color: v.primary_color || null } : {}),
         ...(canSubdomain ? { subdomain: v.subdomain || null } : {}),
       },
@@ -288,6 +292,19 @@ export default function OrgSettingsPage() {
                     <Input type="url" {...register('website')} placeholder="https://" />
                   </Field>
                 </div>
+                <Field
+                  label="About"
+                  optional
+                  hint="Shown on your public page — what you do and who you help."
+                  error={formState.errors.about?.message}
+                  aside={
+                    <a href={`/orgs/${org.data.id}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[12.5px] font-medium text-accent-text hover:underline">
+                      Public page <ExternalLink className="size-3" />
+                    </a>
+                  }
+                >
+                  <Textarea rows={4} {...register('about')} placeholder="We run blood drives and first-aid training across Addis Ababa…" />
+                </Field>
                 <Field label="Email" hint="Contact the platform team (Messages) to change your organization’s email.">
                   <Input value={org.data.email} disabled readOnly />
                 </Field>
