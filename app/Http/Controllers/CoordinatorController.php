@@ -401,6 +401,10 @@ class CoordinatorController extends Controller
                 'attendance'    => isset($attendances[$a->volunteer_id]) ? $this->attendance->present($attendances[$a->volunteer_id]->setRelation('shift', $shift)) : null,
             ])->values(),
             'meta'   => [
+                'shift'           => (new ShiftResource($shift))->resolve() + ['event' => [
+                    'id' => $shift->event->id, 'title' => $shift->event->title, 'location' => $shift->event->location,
+                    'geofence_radius' => $shift->event->geofence_radius,
+                ]],
                 'capacity'        => $shift->capacity,
                 'confirmed'       => $assignments->where('status', 'confirmed')->count(),
                 'checked_in'      => $attendances->whereNull('check_out_time')->count(),
