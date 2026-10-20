@@ -114,11 +114,11 @@ export function CheckInDemo() {
             </svg>
             <div className="pointer-events-none absolute left-5 top-5 rounded-full bg-surface/90 px-3 py-1.5 text-[12px] font-semibold text-muted backdrop-blur [box-shadow:inset_0_0_0_1px_var(--line)]">Drag the volunteer</div>
           </div>
-          <div className="relative z-10 mx-6 -mt-6 rounded-2xl bg-[#0b1f1a] p-4 font-mono text-[12px] leading-relaxed text-white/80 shadow-2xl sm:mx-10" aria-live="polite">
+          <div className="relative z-10 mx-6 -mt-6 rounded-2xl bg-[#11152b] p-4 font-mono text-[12px] leading-relaxed text-white/80 shadow-2xl sm:mx-10" aria-live="polite">
             <div className="text-white/60">POST /api/volunteer/check-in</div>
             <AnimatePresence mode="wait">
               <motion.div key={failed?.key ?? 'ok'} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
-                {failed ? <span className="text-[#ff9b8a]">422 · {failed.fail}</span> : <span className="text-[#7fe0b9]">201 · Check-in verified successfully. Welcome to your shift!</span>}
+                {failed ? <span className="text-[#ff9b8a]">422 · {failed.fail}</span> : <span className="text-[#a9b2ff]">201 · Check-in verified successfully. Welcome to your shift!</span>}
               </motion.div>
             </AnimatePresence>
           </div>

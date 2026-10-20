@@ -26,8 +26,8 @@ export function LogoMark({ className }: { className?: string; animated?: boolean
     <svg viewBox="0 0 32 32" className={cn('size-8 shrink-0', className)} aria-hidden>
       <defs>
         <linearGradient id={`lg-${id}`} x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#17775a" />
-          <stop offset="1" stopColor="#0b4a36" />
+          <stop offset="0" stopColor="#4655d6" />
+          <stop offset="1" stopColor="#252f8f" />
         </linearGradient>
       </defs>
       <rect width="32" height="32" rx="9" fill={`url(#lg-${id})`} />
@@ -56,8 +56,8 @@ export function Logo({ className, compact }: { className?: string; compact?: boo
  * `tone` picks a palette tuned for light or dark backdrops.
  */
 export function DaisyOrnament({ className, tone = 'light' }: { className?: string; tone?: 'light' | 'dark' }) {
-  const stroke = tone === 'dark' ? 'rgba(196,222,211,0.16)' : 'rgba(16,94,69,0.13)';
-  const strong = tone === 'dark' ? 'rgba(196,222,211,0.28)' : 'rgba(16,94,69,0.22)';
+  const stroke = tone === 'dark' ? 'rgba(200, 206, 235,0.16)' : 'rgba(51, 65, 184,0.13)';
+  const strong = tone === 'dark' ? 'rgba(200, 206, 235,0.28)' : 'rgba(51, 65, 184,0.22)';
   const seed = tone === 'dark' ? '#f5b955' : '#f2a93b';
   return (
     <svg viewBox="0 0 600 600" className={cn('pointer-events-none', className)} aria-hidden>

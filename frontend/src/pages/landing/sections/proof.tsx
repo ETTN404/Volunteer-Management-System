@@ -92,9 +92,9 @@ function BotCard() {
   }, [inView, shown, reduce]);
 
   return (
-    <Reveal inView delay={0.1} className="flex flex-col rounded-[28px] bg-[#0b1f1a] p-7 text-white [box-shadow:var(--elev-3)] sm:p-9">
+    <Reveal inView delay={0.1} className="flex flex-col rounded-[28px] bg-[#11152b] p-7 text-white [box-shadow:var(--elev-3)] sm:p-9">
       <div ref={ref} className="flex items-center gap-3 border-b border-white/10 pb-5">
-        <span className="grid size-10 place-items-center rounded-2xl bg-gold text-[#0b1f1a]">
+        <span className="grid size-10 place-items-center rounded-2xl bg-gold text-[#11152b]">
           <Bot className="size-5" />
         </span>
         <div>
@@ -111,7 +111,7 @@ function BotCard() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.4 }}
               lang={m.am ? 'am' : undefined}
-              className={cn('max-w-[86%] rounded-2xl px-4 py-3 text-[14px] leading-relaxed', m.am && 'font-ethiopic', m.from === 'user' ? 'self-end rounded-br-md bg-[#5fd3a4] text-[#03140d]' : 'self-start rounded-bl-md bg-white/[0.07] text-white/90')}
+              className={cn('max-w-[86%] rounded-2xl px-4 py-3 text-[14px] leading-relaxed', m.am && 'font-ethiopic', m.from === 'user' ? 'self-end rounded-br-md bg-[#8b97ff] text-[#070a26]' : 'self-start rounded-bl-md bg-white/[0.07] text-white/90')}
             >
               {m.text}
             </motion.div>

@@ -28,11 +28,11 @@ export function AuthLayout({ children, aside }: { children: ReactNode; aside?: R
       </div>
       <div className="relative hidden p-3 lg:block">
         <div className="relative isolate flex h-full flex-col justify-end overflow-hidden rounded-[32px] bg-[#07130f] p-12">
-          <div className="absolute -left-32 -top-32 -z-10 size-[520px] rounded-full bg-[#105e45]/60 blur-[130px]" aria-hidden />
+          <div className="absolute -left-32 -top-32 -z-10 size-[520px] rounded-full bg-[#3341b8]/60 blur-[130px]" aria-hidden />
           <div className="absolute -bottom-40 right-0 -z-10 size-[420px] rounded-full bg-[#ef6a4c]/20 blur-[130px]" aria-hidden />
           <DaisyOrnament tone="dark" className="absolute -right-40 -top-24 -z-10 w-[760px] opacity-90" />
           <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3, duration: 0.8, ease: EASE_OUT_EXPO }} className="absolute left-12 top-28 flex items-center gap-3 rounded-2xl bg-white/[0.07] py-2.5 pl-2.5 pr-4 backdrop-blur [box-shadow:inset_0_0_0_1px_rgba(255,255,255,0.1)]">
-            <span className="grid size-9 place-items-center rounded-xl bg-[#5fd3a4]/15 text-[#7fe0b9]">
+            <span className="grid size-9 place-items-center rounded-xl bg-[#8b97ff]/15 text-[#a9b2ff]">
               <MapPin className="size-[18px]" />
             </span>
             <span>
@@ -59,7 +59,7 @@ export function AuthLayout({ children, aside }: { children: ReactNode; aside?: R
 export function AuthQuote() {
   return (
     <div className="max-w-md">
-      <p className="mb-4 text-[12px] font-semibold uppercase tracking-[0.16em] text-[#7fe0b9]">How hours are counted</p>
+      <p className="mb-4 text-[12px] font-semibold uppercase tracking-[0.16em] text-[#a9b2ff]">How hours are counted</p>
       <p className="text-[clamp(1.6rem,2.4vw,2.2rem)] font-bold leading-[1.15] tracking-[-0.035em] text-white" style={{ fontFamily: 'var(--font-display)' }}>
         A check-in only counts from inside the venue’s geofence — with a current QR code and a clock that matches the server.
       </p>

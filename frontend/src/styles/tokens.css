@@ -1,28 +1,28 @@
 /*
  * VolunTrack design tokens — "Highland Sunrise".
- * Light-first. Forest green carries actions; coral + sunrise gold carry warmth and highlights.
+ * Light-first. Abay indigo carries actions; coral + sunrise gold carry warmth and highlights.
  * Feature code never uses raw hex: only these semantic tokens via Tailwind utilities.
  */
 
 :root,
 [data-theme='light'] {
-  --bg: #f6f8f6;
-  --sunken: #eef2ef;
+  --bg: #f6f7fb;
+  --sunken: #eef0f7;
   --surface: #ffffff;
   --surface-2: #f3f6f4;
   --raised: #ffffff;
-  --line: #e1e8e4;
-  --line-strong: #c9d4ce;
+  --line: #e2e5f0;
+  --line-strong: #c9cede;
 
-  --text: #0b1f1a;
-  --text-muted: #4a5d57;
-  --text-faint: #5b6e68;
+  --text: #11152b;
+  --text-muted: #4b5170;
+  --text-faint: #5c627f;
 
-  --accent: #105e45;
+  --accent: #3341b8;
   --accent-fg: #ffffff;
-  --accent-text: #0d5a41;
-  --accent-soft: rgba(16, 94, 69, 0.08);
-  --accent-strong: #105e45;
+  --accent-text: #2c38a3;
+  --accent-soft: rgba(51, 65, 184, 0.08);
+  --accent-strong: #3341b8;
 
   --gold: #f2a93b;
   --gold-soft: rgba(242, 169, 59, 0.14);
@@ -43,38 +43,38 @@
   --info-text: #155d93;
   --info-soft: rgba(47, 127, 208, 0.09);
 
-  --focus: #105e45;
+  --focus: #3341b8;
 
-  --elev-1: 0 1px 2px rgba(11, 31, 26, 0.04), 0 1px 1px rgba(11, 31, 26, 0.02);
-  --elev-2: 0 12px 32px -12px rgba(11, 31, 26, 0.14), 0 2px 6px rgba(11, 31, 26, 0.04);
-  --elev-3: 0 40px 80px -24px rgba(11, 31, 26, 0.24), 0 10px 24px -8px rgba(11, 31, 26, 0.08);
+  --elev-1: 0 1px 2px rgba(17, 21, 43, 0.04), 0 1px 1px rgba(17, 21, 43, 0.02);
+  --elev-2: 0 12px 32px -12px rgba(17, 21, 43, 0.14), 0 2px 6px rgba(17, 21, 43, 0.04);
+  --elev-3: 0 40px 80px -24px rgba(17, 21, 43, 0.24), 0 10px 24px -8px rgba(17, 21, 43, 0.08);
 
-  --map-contour: rgba(11, 31, 26, 0.09);
-  --map-contour-strong: rgba(11, 31, 26, 0.18);
-  --map-bg: #eef3f0;
-  --grid-line: rgba(11, 31, 26, 0.045);
+  --map-contour: rgba(17, 21, 43, 0.09);
+  --map-contour-strong: rgba(17, 21, 43, 0.18);
+  --map-bg: #eef0f8;
+  --grid-line: rgba(17, 21, 43, 0.045);
 
-  --contour-texture: radial-gradient(circle at 1px 1px, rgba(11, 31, 26, 0.07) 1px, transparent 0);
+  --contour-texture: radial-gradient(circle at 1px 1px, rgba(17, 21, 43, 0.07) 1px, transparent 0);
 }
 
 [data-theme='dark'] {
-  --bg: #07110e;
-  --sunken: #050d0a;
-  --surface: #0c1814;
-  --surface-2: #11201b;
-  --raised: #142721;
-  --line: rgba(196, 222, 211, 0.1);
-  --line-strong: rgba(196, 222, 211, 0.2);
+  --bg: #080a16;
+  --sunken: #05070f;
+  --surface: #0e1122;
+  --surface-2: #141831;
+  --raised: #191e3b;
+  --line: rgba(200, 206, 235, 0.1);
+  --line-strong: rgba(200, 206, 235, 0.2);
 
-  --text: #ecf4f0;
-  --text-muted: #a3b7af;
-  --text-faint: #87a097;
+  --text: #eef0fa;
+  --text-muted: #a9aecb;
+  --text-faint: #8a90b0;
 
-  --accent: #5fd3a4;
-  --accent-fg: #03140d;
-  --accent-text: #7fe0b9;
-  --accent-soft: rgba(95, 211, 164, 0.1);
-  --accent-strong: #7fe0b9;
+  --accent: #8b97ff;
+  --accent-fg: #070a26;
+  --accent-text: #a9b2ff;
+  --accent-soft: rgba(139, 151, 255, 0.1);
+  --accent-strong: #a9b2ff;
 
   --gold: #f5b955;
   --gold-soft: rgba(245, 185, 85, 0.12);
@@ -82,9 +82,9 @@
   --coral-soft: rgba(255, 132, 102, 0.12);
   --sunrise: linear-gradient(95deg, #ff7a5e 0%, #ff9a5a 45%, #f5c060 100%);
 
-  --success: #5fd3a4;
-  --success-text: #7fe0b9;
-  --success-soft: rgba(95, 211, 164, 0.1);
+  --success: #4fd29a;
+  --success-text: #7ee0b6;
+  --success-soft: rgba(79, 210, 154, 0.12);
   --danger: #ff6a55;
   --danger-text: #ff8f7f;
   --danger-soft: rgba(255, 106, 85, 0.12);
@@ -95,16 +95,16 @@
   --info-text: #a6cfff;
   --info-soft: rgba(124, 184, 255, 0.1);
 
-  --focus: #7fe0b9;
+  --focus: #a9b2ff;
 
-  --elev-1: inset 0 1px 0 rgba(236, 244, 240, 0.03), 0 1px 2px rgba(0, 0, 0, 0.35);
-  --elev-2: inset 0 1px 0 rgba(236, 244, 240, 0.04), 0 16px 40px -12px rgba(0, 0, 0, 0.6);
-  --elev-3: inset 0 1px 0 rgba(236, 244, 240, 0.05), 0 40px 90px -20px rgba(0, 0, 0, 0.75);
+  --elev-1: inset 0 1px 0 rgba(238, 240, 250, 0.03), 0 1px 2px rgba(0, 0, 0, 0.35);
+  --elev-2: inset 0 1px 0 rgba(238, 240, 250, 0.04), 0 16px 40px -12px rgba(0, 0, 0, 0.6);
+  --elev-3: inset 0 1px 0 rgba(238, 240, 250, 0.05), 0 40px 90px -20px rgba(0, 0, 0, 0.75);
 
-  --map-contour: rgba(196, 222, 211, 0.08);
-  --map-contour-strong: rgba(196, 222, 211, 0.16);
-  --map-bg: #06100d;
-  --grid-line: rgba(196, 222, 211, 0.04);
+  --map-contour: rgba(200, 206, 235, 0.08);
+  --map-contour-strong: rgba(200, 206, 235, 0.16);
+  --map-bg: #070914;
+  --grid-line: rgba(200, 206, 235, 0.04);
 
-  --contour-texture: radial-gradient(circle at 1px 1px, rgba(196, 222, 211, 0.08) 1px, transparent 0);
+  --contour-texture: radial-gradient(circle at 1px 1px, rgba(200, 206, 235, 0.08) 1px, transparent 0);
 }

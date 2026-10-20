@@ -8,7 +8,7 @@ import { SectionHead, Shell } from './kit';
 
 function Phone({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
-    <div className={`relative w-[290px] rounded-[48px] bg-[#0b1f1a] p-2.5 shadow-[0_50px_100px_-30px_rgba(11,31,26,0.55)] ${className ?? ''}`}>
+    <div className={`relative w-[290px] rounded-[48px] bg-[#11152b] p-2.5 shadow-[0_50px_100px_-30px_rgba(17, 21, 43,0.55)] ${className ?? ''}`}>
       <div className="absolute left-1/2 top-4 z-10 h-6 w-24 -translate-x-1/2 rounded-full bg-black" />
       <div className="overflow-hidden rounded-[40px] bg-bg">{children}</div>
     </div>
@@ -94,7 +94,7 @@ export function Volunteers() {
                   </div>
                   <div className="mt-4 flex items-center justify-between">
                     <div className="font-mono text-[18px] font-semibold tabular-nums">00:04:12</div>
-                    <span className="flex shrink-0 items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-[12px] font-semibold text-[#0b1f1a]">
+                    <span className="flex shrink-0 items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-[12px] font-semibold text-[#11152b]">
                       <QrCode className="size-3.5" /> Check in
                     </span>
                   </div>

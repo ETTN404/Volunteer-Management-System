@@ -25,7 +25,7 @@ export function Trust() {
   return (
     <section className="px-3 sm:px-5" aria-labelledby="trust">
       <div className="relative isolate mx-auto max-w-[1400px] overflow-hidden rounded-[40px] bg-[#07130f] px-5 py-28 sm:px-8 sm:py-36">
-        <div className="absolute -left-40 -top-40 -z-10 size-[600px] rounded-full bg-[#105e45]/50 blur-[140px]" aria-hidden />
+        <div className="absolute -left-40 -top-40 -z-10 size-[600px] rounded-full bg-[#3341b8]/50 blur-[140px]" aria-hidden />
         <DaisyOrnament tone="dark" className="absolute -right-56 top-1/2 -z-10 w-[860px] -translate-y-1/2 opacity-90" />
         <div className="mx-auto max-w-[1180px]">
           <SectionHead
@@ -43,7 +43,7 @@ export function Trust() {
           <div className="mt-16 grid overflow-hidden rounded-[28px] border border-white/10 bg-[#07130f]/80 sm:grid-cols-2 lg:grid-cols-4">
             {TRUST.map(([Icon, title, body], i) => (
               <Reveal key={title} inView delay={i * 0.08} className={cn('p-7', i > 0 && 'border-white/10 max-lg:border-t lg:border-l', i === 2 && 'sm:max-lg:border-l-0')}>
-                <span className="mb-6 grid size-11 place-items-center rounded-2xl bg-white/[0.06] text-[#7fe0b9]">
+                <span className="mb-6 grid size-11 place-items-center rounded-2xl bg-white/[0.06] text-[#a9b2ff]">
                   <Icon className="size-5" />
                 </span>
                 <h3 className="text-[17px] font-semibold text-white">{title}</h3>
@@ -81,14 +81,14 @@ export function Plans() {
       <SectionHead align="center" eyebrow="Plans" title="Start with one programme. Grow into a network." />
       <div className="mt-16 grid gap-5 lg:grid-cols-3">
         {PLANS.map((p, i) => (
-          <Reveal key={p.name} inView delay={i * 0.08} className={cn('relative flex flex-col rounded-[28px] p-8', p.featured ? 'bg-[#0b1f1a] text-white [box-shadow:var(--elev-3)]' : 'bg-surface [box-shadow:inset_0_0_0_1px_var(--line)]')}>
-            {p.featured && <span className="absolute right-6 top-7 rounded-full bg-gold px-3 py-1 text-[11.5px] font-semibold text-[#0b1f1a]">Most chosen</span>}
+          <Reveal key={p.name} inView delay={i * 0.08} className={cn('relative flex flex-col rounded-[28px] p-8', p.featured ? 'bg-[#11152b] text-white [box-shadow:var(--elev-3)]' : 'bg-surface [box-shadow:inset_0_0_0_1px_var(--line)]')}>
+            {p.featured && <span className="absolute right-6 top-7 rounded-full bg-gold px-3 py-1 text-[11.5px] font-semibold text-[#11152b]">Most chosen</span>}
             <h3 className={cn('type-headline text-[32px]', p.featured ? 'text-white' : 'text-text')}>{p.name}</h3>
             <p className={cn('mt-2 text-[14.5px]', p.featured ? 'text-white/60' : 'text-muted')}>{p.tag}</p>
             <ul className="mt-8 flex-1 space-y-3.5">
               {p.features.map((f) => (
                 <li key={f} className={cn('flex gap-3 text-[14.5px]', p.featured ? 'text-white/90' : 'text-text')}>
-                  <span className={cn('mt-0.5 grid size-5 shrink-0 place-items-center rounded-full', p.featured ? 'bg-[#5fd3a4] text-[#03140d]' : 'bg-accent-soft text-accent-text')}>
+                  <span className={cn('mt-0.5 grid size-5 shrink-0 place-items-center rounded-full', p.featured ? 'bg-[#8b97ff] text-[#070a26]' : 'bg-accent-soft text-accent-text')}>
                     <Check className="size-3" strokeWidth={3} />
                   </span>
                   {f}
@@ -146,13 +146,13 @@ export function FinalCta() {
     <section className="px-3 py-3 sm:px-5 sm:py-5" aria-labelledby="cta-title">
       <div className="relative isolate mx-auto max-w-[1400px] overflow-hidden rounded-[40px] bg-[#07130f] px-6 py-28 text-center sm:py-36">
         <DaisyOrnament tone="dark" className="absolute left-1/2 top-1/2 -z-10 w-[980px] -translate-x-1/2 -translate-y-1/2 opacity-80" />
-        <div className="absolute bottom-0 left-1/2 -z-10 h-[420px] w-[820px] -translate-x-1/2 translate-y-1/2 rounded-full bg-[#105e45] blur-[140px]" aria-hidden />
+        <div className="absolute bottom-0 left-1/2 -z-10 h-[420px] w-[820px] -translate-x-1/2 translate-y-1/2 rounded-full bg-[#3341b8] blur-[140px]" aria-hidden />
         <h2 id="cta-title" className="type-display mx-auto max-w-[14ch] text-[clamp(2.6rem,6.6vw,5.4rem)] text-white">
-          Bring your volunteers online <span className="bg-[linear-gradient(100deg,#7fe0b9,#f5b955)] bg-clip-text text-transparent">this season.</span>
+          Bring your volunteers online <span className="bg-[linear-gradient(100deg,#a9b2ff,#f5b955)] bg-clip-text text-transparent">this season.</span>
         </h2>
         <p className="mx-auto mt-6 max-w-md text-[17px] text-white/65">Shifts, check-in, hours and certificates — in one calm place your coordinators will actually use.</p>
         <div className="mt-10 flex flex-wrap justify-center gap-3">
-          <Button asChild size="xl" className="bg-white text-[#0b1f1a] shadow-none hover:bg-white/90 hover:brightness-100">
+          <Button asChild size="xl" className="bg-white text-[#11152b] shadow-none hover:bg-white/90 hover:brightness-100">
             <Link to="/register">
               Join as a volunteer <ArrowRight />
             </Link>

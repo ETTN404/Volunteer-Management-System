@@ -20,7 +20,7 @@ export function ThemeSync() {
   const resolved = useResolvedTheme();
   useEffect(() => {
     document.documentElement.dataset.theme = resolved;
-    document.querySelector('meta[name="theme-color"]:not([media])')?.setAttribute('content', resolved === 'dark' ? '#07110E' : '#F6F8F6');
+    document.querySelector('meta[name="theme-color"]:not([media])')?.setAttribute('content', resolved === 'dark' ? '#080a16' : '#f6f7fb');
   }, [resolved]);
   return null;
 }
