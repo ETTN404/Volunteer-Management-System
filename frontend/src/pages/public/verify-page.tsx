@@ -41,7 +41,7 @@ export default function VerifyPage() {
         <p className="mx-auto mt-3 max-w-md text-center text-[15px] text-muted">Enter the number printed under the certificate’s QR code. No account needed.</p>
 
         <form onSubmit={submit} className="mx-auto mt-9 flex max-w-md gap-2">
-          <Input inputSize="lg" value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="VMS-00012" aria-label="Certificate number" className="type-data uppercase" leading={<SearchCheck />} />
+          <Input inputSize="lg" value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="VMS-00012" aria-label="Certificate number" className="type-code uppercase" leading={<SearchCheck />} />
           <Button type="submit" size="lg">
             Verify
           </Button>
@@ -87,7 +87,7 @@ export default function VerifyPage() {
                       Issued {formatDate(q.data.data.issued_date)}
                     </li>
                   </ul>
-                  <p className="type-data mt-6 text-xs text-faint">{q.data.data.certificate_number}</p>
+                  <p className="type-code mt-6 text-xs text-faint">{q.data.data.certificate_number}</p>
                 </div>
               </div>
               <p className="border-t border-line px-8 py-4 text-xs text-faint">The surname is shortened to protect the volunteer’s privacy.</p>

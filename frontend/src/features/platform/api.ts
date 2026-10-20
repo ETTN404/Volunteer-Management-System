@@ -166,7 +166,7 @@ export const usePlatformTimeseries = () => useQuery({ queryKey: platformKeys.tim
 export const usePlatformHealth = () => useQuery({ queryKey: platformKeys.health(), queryFn: platformApi.health, refetchInterval: 60_000 });
 export const useOrganizations = (query: OrgQuery = {}) =>
   useQuery({ queryKey: platformKeys.organizations(query), queryFn: () => platformApi.organizations(query), placeholderData: keepPreviousData });
-export const useAllOrganizations = () => useQuery({ queryKey: platformKeys.allOrganizations(), queryFn: platformApi.allOrganizations });
+export const useAllOrganizations = (enabled = true) => useQuery({ queryKey: platformKeys.allOrganizations(), queryFn: platformApi.allOrganizations, enabled });
 export const useOrganizationDetail = (id: number) =>
   useQuery({ queryKey: platformKeys.organization(id), queryFn: () => platformApi.organization(id), enabled: Number.isFinite(id) });
 export const usePlatformAudit = (query: AuditQuery = {}) =>

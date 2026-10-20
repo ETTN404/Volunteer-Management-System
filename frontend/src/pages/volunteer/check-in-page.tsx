@@ -291,7 +291,7 @@ export default function CheckInPage() {
                   }}
                   className="space-y-3"
                 >
-                  <Input value={code} onChange={(e) => setCode(e.target.value)} placeholder={t('Code shown under the QR')} className="type-data" aria-label={t('QR code')} inputSize="lg" />
+                  <Input value={code} onChange={(e) => setCode(e.target.value)} placeholder={t('Code shown under the QR')} className="type-code" aria-label={t('QR code')} inputSize="lg" />
                   <Button type="submit" className="w-full" size="lg" disabled={!code.trim() || !locationOk || (!position && Boolean(venue)) || phase !== 'check-in-open'} loading={checkIn.isPending}>
                     {t('Check in')}
                   </Button>

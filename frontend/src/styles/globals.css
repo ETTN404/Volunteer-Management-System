@@ -176,10 +176,19 @@
     text-transform: uppercase;
     color: var(--text-muted);
   }
+  /* Numbers: display sans with even-width digits (no "terminal" slashed zeros). */
   .type-data {
+    font-family: var(--font-display);
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum' 1, 'zero' 0;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+  }
+  /* Codes people type or compare character by character: certificate numbers, QR codes, references. */
+  .type-code {
     font-family: var(--font-mono);
     font-variant-numeric: tabular-nums;
-    letter-spacing: -0.01em;
+    letter-spacing: 0.01em;
   }
 
   /* Faint topographic texture used on empty states and auth backdrops. */

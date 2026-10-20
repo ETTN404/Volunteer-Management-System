@@ -349,7 +349,7 @@ export default function OrgSettingsPage() {
                           {color?.toLowerCase() === c.toLowerCase() && <Check className="size-4" style={{ color: onColor(c) }} strokeWidth={3} />}
                         </button>
                       ))}
-                      <Input {...register('primary_color')} placeholder="#3341B8" className="type-data ml-1 w-32 uppercase" inputSize="sm" aria-label="Hex color" />
+                      <Input {...register('primary_color')} placeholder="#3341B8" className="type-code ml-1 w-32 uppercase" inputSize="sm" aria-label="Hex color" />
                       <button type="button" className="text-[12.5px] text-faint hover:text-muted" onClick={() => setValue('primary_color', '', { shouldDirty: true })}>
                         Use default
                       </button>
@@ -359,7 +359,7 @@ export default function OrgSettingsPage() {
                 <PlanLocked locked={!canSubdomain} plan="Enterprise">
                   <Field label="Subdomain" optional hint="A short address for your volunteers." error={formState.errors.subdomain?.message}>
                     <div className="flex items-center">
-                      <Input {...register('subdomain')} placeholder="redcross" className="type-data rounded-r-none" />
+                      <Input {...register('subdomain')} placeholder="redcross" className="type-code rounded-r-none" />
                       <span className="type-data flex h-10 items-center rounded-r-md bg-surface-2 px-3 text-[13px] text-faint [box-shadow:inset_0_0_0_1px_var(--line)]">.voluntrack.org</span>
                     </div>
                   </Field>

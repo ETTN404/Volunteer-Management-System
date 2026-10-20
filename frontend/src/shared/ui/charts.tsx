@@ -6,7 +6,7 @@ import { Area, AreaChart, Bar, BarChart, CartesianGrid, PolarAngleAxis, PolarGri
 import type { ReactNode } from 'react';
 import { motion } from 'motion/react';
 
-const axis = { stroke: 'var(--text-faint)', fontSize: 11, fontFamily: 'var(--font-mono)', tickLine: false, axisLine: false } as const;
+const axis = { stroke: 'var(--text-faint)', fontSize: 11, fontFamily: 'var(--font-sans)', tickLine: false, axisLine: false } as const;
 
 function ChartTooltip({ active, payload, label, unit, labelFormat }: { active?: boolean; payload?: { value: number; name: string; color: string }[]; label?: string; unit?: string; labelFormat?: (l: string) => string }) {
   if (!active || !payload?.length) return null;

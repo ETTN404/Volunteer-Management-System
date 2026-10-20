@@ -178,7 +178,7 @@ export default function BillingPage() {
               </div>
             )}
             <Field label="Transaction reference" hint={m?.reference_hint}>
-              <Input value={ref} onChange={(e) => setRef(e.target.value)} className="type-data uppercase" placeholder="e.g. FT26123ABCDE" />
+              <Input value={ref} onChange={(e) => setRef(e.target.value)} className="type-code uppercase" placeholder="e.g. FT26123ABCDE" />
             </Field>
             {m?.needs_suffix && (
               <Field label="Last digits of the paying account" hint="Needed by this bank to look up the receipt.">

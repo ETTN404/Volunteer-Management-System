@@ -54,7 +54,7 @@ function CertificateCard({ c }: { c: Certificate }) {
         <div className="mt-6 flex items-end justify-between gap-4">
           <div className="text-[12.5px] text-muted">
             Issued {formatDate(c.issued_date)}
-            <div className="type-data mt-1 text-[11px] text-faint">{number}</div>
+            <div className="type-code mt-1 text-[11px] text-faint">{number}</div>
           </div>
           <div className="rounded-md bg-white p-1.5">
             <QRCodeSVG value={link} size={56} level="M" fgColor="#0c2426" title={`QR code for ${number} verification page`} />

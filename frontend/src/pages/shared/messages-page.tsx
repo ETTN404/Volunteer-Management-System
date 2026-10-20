@@ -10,7 +10,8 @@ import { useAllOrganizations } from '@/features/platform/api';
 
 function NewThreadDialog({ side, open, onOpenChange, onCreated }: { side: SupportSide; open: boolean; onOpenChange: (o: boolean) => void; onCreated: (id?: number) => void }) {
   const start = useStartThread(side);
-  const orgs = useAllOrganizations();
+  // Only the platform side picks an organization (org admins may not list them).
+  const orgs = useAllOrganizations(side === 'platform' && open);
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
   const [all, setAll] = useState(false);

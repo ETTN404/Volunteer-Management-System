@@ -132,7 +132,7 @@ export default function LoginPage() {
                 className="rounded-lg px-3 py-2.5 text-left transition-colors [box-shadow:inset_0_0_0_1px_var(--line)] hover:bg-surface-2"
               >
                 <span className="block text-[13px] font-medium text-text">{t(ROLE_LABEL[d.role])}</span>
-                <span className="type-data block truncate text-[11px] text-faint">{d.email}</span>
+                <span className="type-code block truncate text-[11px] text-faint">{d.email}</span>
               </button>
             ))}
           </div>
