@@ -24,6 +24,7 @@ import {
   Input,
   SignaturePad,
   Skeleton,
+  StatTile,
   Textarea,
   formatPhone,
   notify,
@@ -170,8 +171,10 @@ export default function LiveShiftPage() {
 
       <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div className="min-w-0">
-          <p className="type-eyebrow mb-2">Live shift</p>
-          <h1 className="type-headline text-[clamp(1.6rem,5vw,2.3rem)] text-text">
+          <span className="mb-3 inline-flex items-center gap-2 rounded-full bg-success-soft px-3 py-1 text-[12px] font-semibold text-success-text">
+            <span className="size-1.5 animate-pulse rounded-full bg-success" /> Live shift
+          </span>
+          <h1 className="text-[clamp(1.6rem,4.5vw,2.3rem)] font-extrabold leading-tight tracking-[-0.035em] text-text [font-family:var(--font-display)]">
             {shift?.title ?? 'Shift'} {shift && <span className="text-muted">· {formatDay(shift.start_time)} {formatTimeRange(shift.start_time, shift.end_time)}</span>}
           </h1>
         </div>
@@ -186,20 +189,13 @@ export default function LiveShiftPage() {
       </div>
 
       {meta && (
-        <dl className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-5">
-          {[
-            { label: 'Confirmed', value: `${meta.confirmed}/${meta.capacity}` },
-            { label: 'On shift now', value: meta.checked_in },
-            { label: 'Checked out', value: meta.checked_out },
-            { label: 'Left early', value: meta.left_early },
-            { label: 'Open places', value: meta.open_places },
-          ].map((k) => (
-            <div key={k.label} className="rounded-lg bg-surface px-4 py-3 [box-shadow:inset_0_0_0_1px_var(--line)]">
-              <dt className="text-xs text-muted">{k.label}</dt>
-              <dd className="type-data mt-1 text-xl font-semibold text-text">{k.value}</dd>
-            </div>
-          ))}
-        </dl>
+        <div className="mb-6 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-5">
+          <StatTile hue="indigo" icon={<Users />} label="Confirmed" value={meta.confirmed} suffix={`/${meta.capacity}`} />
+          <StatTile hue="emerald" icon={<LogIn />} label="On shift now" value={meta.checked_in} />
+          <StatTile hue="sky" icon={<LogOut />} label="Checked out" value={meta.checked_out} />
+          <StatTile hue="rose" icon={<UserMinus />} label="Left early" value={meta.left_early} />
+          <StatTile hue="amber" icon={<UserPlus />} label="Open places" value={meta.open_places} />
+        </div>
       )}
 
       {(leftEarly.length > 0 || (meta?.open_places ?? 0) > 0) && (

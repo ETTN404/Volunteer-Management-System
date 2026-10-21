@@ -101,15 +101,23 @@ export function SheetContent({
   side = 'right',
   className,
   width = 'md',
+  header,
+  footer,
+  bodyClassName,
 }: {
   title: ReactNode;
   description?: ReactNode;
   children: ReactNode;
   side?: 'right' | 'left' | 'bottom';
   className?: string;
-  width?: 'sm' | 'md' | 'lg';
+  width?: 'sm' | 'md' | 'lg' | 'xl';
+  /** Rich header (avatar, status, stepper) shown instead of the plain title; the title stays for screen readers. */
+  header?: ReactNode;
+  /** Sticky action bar at the bottom. */
+  footer?: ReactNode;
+  bodyClassName?: string;
 }) {
-  const w = { sm: 'sm:max-w-sm', md: 'sm:max-w-md', lg: 'sm:max-w-xl' }[width];
+  const w = { sm: 'sm:max-w-sm', md: 'sm:max-w-md', lg: 'sm:max-w-xl', xl: 'sm:max-w-[560px]' }[width];
   const pos =
     side === 'bottom'
       ? 'inset-x-0 bottom-0 max-h-[88dvh] rounded-t-2xl data-[state=open]:animate-[sheet-up_320ms_var(--ease-out-expo)]'
@@ -122,7 +130,7 @@ export function SheetContent({
         );
   return (
     <D.Portal>
-      <D.Overlay className={overlay} />
+      <D.Overlay className="fixed inset-0 z-50 bg-[rgba(17,21,43,0.18)] backdrop-blur-[10px] data-[state=open]:animate-[fade-in_200ms_ease-out] data-[state=closed]:animate-[fade-out_140ms_ease-in]" />
       <D.Content
         className={cn(
           'fixed z-50 flex flex-col bg-raised [box-shadow:var(--elev-3),inset_0_0_0_1px_var(--line)] focus:outline-none data-[state=closed]:animate-[fade-out_140ms_ease-in]',
@@ -130,20 +138,32 @@ export function SheetContent({
           className,
         )}
       >
-        <div className="flex items-start justify-between gap-4 border-b border-line px-6 py-5">
-          <div className="min-w-0">
-            <D.Title className="type-title text-lg text-text">{title}</D.Title>
-            {description ? (
-              <D.Description className="mt-1 text-sm text-muted">{description}</D.Description>
-            ) : (
-              <D.Description className="sr-only">{typeof title === 'string' ? title : 'Panel'}</D.Description>
-            )}
+        {header ? (
+          <div className="relative border-b border-line">
+            <D.Title className="sr-only">{title}</D.Title>
+            <D.Description className="sr-only">{typeof description === 'string' ? description : typeof title === 'string' ? title : 'Panel'}</D.Description>
+            {header}
+            <D.Close className="absolute right-4 top-4 grid size-9 place-items-center rounded-full bg-surface text-faint [box-shadow:inset_0_0_0_1px_var(--line)] hover:text-text" aria-label="Close">
+              <X className="size-4" />
+            </D.Close>
           </div>
-          <D.Close className="grid size-8 shrink-0 place-items-center rounded-md text-faint hover:bg-surface-2 hover:text-text" aria-label="Close">
-            <X className="size-4" />
-          </D.Close>
-        </div>
-        <div className="flex-1 overflow-y-auto px-6 py-5">{children}</div>
+        ) : (
+          <div className="flex items-start justify-between gap-4 border-b border-line px-6 py-5">
+            <div className="min-w-0">
+              <D.Title className="type-title text-lg text-text">{title}</D.Title>
+              {description ? (
+                <D.Description className="mt-1 text-sm text-muted">{description}</D.Description>
+              ) : (
+                <D.Description className="sr-only">{typeof title === 'string' ? title : 'Panel'}</D.Description>
+              )}
+            </div>
+            <D.Close className="grid size-8 shrink-0 place-items-center rounded-full text-faint hover:bg-surface-2 hover:text-text" aria-label="Close">
+              <X className="size-4" />
+            </D.Close>
+          </div>
+        )}
+        <div className={cn('flex-1 overflow-y-auto px-6 py-5', bodyClassName)}>{children}</div>
+        {footer && <div className="flex shrink-0 items-center gap-2 border-t border-line bg-surface px-5 py-4">{footer}</div>}
       </D.Content>
     </D.Portal>
   );
