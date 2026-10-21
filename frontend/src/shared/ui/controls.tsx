@@ -207,21 +207,21 @@ export function Segmented<T extends string>({
       value={value}
       aria-label={ariaLabel}
       onValueChange={(v) => v && onValueChange(v as T)}
-      className={cn('relative inline-flex rounded-lg bg-sunken p-1 shadow-[inset_0_0_0_1px_var(--line)]', className)}
+      className={cn('relative inline-flex rounded-full bg-sunken p-1 shadow-[inset_0_0_0_1px_var(--line)]', className)}
     >
       {options.map((o) => (
         <TG.Item
           key={o.value}
           value={o.value}
           className={cn(
-            'relative z-10 inline-flex items-center gap-1.5 rounded-md font-medium text-muted outline-none transition-colors data-[state=on]:text-text focus-visible:ring-2 focus-visible:ring-focus [&_svg]:size-3.5',
-            size === 'sm' ? 'h-7 px-2.5 text-xs' : 'h-8 px-3 text-[13px]',
+            'relative z-10 inline-flex items-center gap-1.5 rounded-full font-medium text-muted outline-none transition-colors hover:text-text data-[state=on]:text-bg focus-visible:ring-2 focus-visible:ring-focus [&_svg]:size-3.5',
+            size === 'sm' ? 'h-7 px-3 text-xs' : 'h-8 px-3.5 text-[13px]',
           )}
         >
           {value === o.value && (
             <motion.span
               layoutId={layoutId ?? fallbackId}
-              className="absolute inset-0 -z-10 rounded-md bg-raised [box-shadow:var(--elev-1),inset_0_0_0_1px_var(--line)]"
+              className="absolute inset-0 -z-10 rounded-full bg-text shadow-[0_4px_12px_-4px_rgba(17,21,43,0.45)]"
               transition={{ type: 'spring', stiffness: 500, damping: 38 }}
             />
           )}

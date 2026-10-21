@@ -18,11 +18,12 @@ export function PageHeader({
   children?: ReactNode;
 }) {
   return (
-    <Reveal as="header" className={cn('mb-7 flex flex-col gap-5 md:mb-9 md:flex-row md:items-end md:justify-between', className)}>
+    <Reveal as="header" className={cn('mb-7 flex flex-col gap-5 md:mb-8 md:flex-row md:items-end md:justify-between', className)}>
       <div className="min-w-0">
-        {eyebrow && <div className="type-eyebrow mb-3 flex items-center gap-2">{eyebrow}</div>}
-        <h1 className="type-headline text-[28px] text-text sm:text-[34px]">{title}</h1>
-        {description && <p className="mt-2.5 max-w-2xl text-[15px] text-muted">{description}</p>}
+        {/* A plain-text eyebrow repeats the top bar title, so only rich eyebrows (badges, dates) are shown. */}
+        {eyebrow && typeof eyebrow !== 'string' && <div className="mb-3 flex flex-wrap items-center gap-2">{eyebrow}</div>}
+        <h1 className="text-[28px] font-extrabold leading-[1.08] tracking-[-0.035em] text-text [font-family:var(--font-display)] sm:text-[36px]">{title}</h1>
+        {description && <p className="mt-2.5 max-w-2xl text-[15px] leading-relaxed text-muted">{description}</p>}
         {children}
       </div>
       {actions && <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>}

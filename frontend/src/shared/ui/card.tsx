@@ -4,7 +4,7 @@ import { cn } from '@/shared/lib/cn';
 type Tone = 'default' | 'sunken' | 'raised' | 'accent';
 
 const tones: Record<Tone, string> = {
-  default: 'bg-surface [box-shadow:var(--elev-1),inset_0_0_0_1px_var(--line)]',
+  default: 'bg-surface [box-shadow:0_1px_2px_rgba(17,21,43,0.03),0_8px_24px_-16px_rgba(17,21,43,0.12),inset_0_0_0_1px_var(--line)]',
   sunken: 'bg-sunken [box-shadow:inset_0_0_0_1px_var(--line)]',
   raised: 'bg-raised [box-shadow:var(--elev-2),inset_0_0_0_1px_var(--line)]',
   accent: 'bg-accent-soft [box-shadow:inset_0_0_0_1px_color-mix(in_oklab,var(--accent)_35%,transparent)]',
@@ -17,7 +17,7 @@ export const Card = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement> & 
       className={cn(
         'relative rounded-lg',
         tones[tone],
-        interactive && 'transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:[box-shadow:var(--elev-2),inset_0_0_0_1px_var(--line-strong)]',
+        interactive && 'transition-[transform,box-shadow] duration-300 ease-[var(--ease-out-expo)] hover:-translate-y-1 hover:[box-shadow:var(--elev-2),inset_0_0_0_1px_var(--line-strong)]',
         className,
       )}
       {...props}

@@ -2,7 +2,7 @@ import { forwardRef, type InputHTMLAttributes, type ReactNode, type TextareaHTML
 import { cn } from '@/shared/lib/cn';
 
 const base =
-  'w-full rounded-md bg-sunken text-text placeholder:text-faint shadow-[inset_0_0_0_1px_var(--line)] transition-[box-shadow,background-color] duration-150 hover:shadow-[inset_0_0_0_1px_var(--line-strong)] focus:outline-none focus-visible:outline-none focus:bg-surface focus:shadow-[inset_0_0_0_1px_var(--accent),0_0_0_4px_var(--accent-soft)] disabled:cursor-not-allowed disabled:opacity-50 aria-[invalid=true]:shadow-[inset_0_0_0_1px_var(--danger),0_0_0_4px_var(--danger-soft)]';
+  'w-full rounded-[12px] bg-sunken text-text placeholder:text-faint shadow-[inset_0_0_0_1px_var(--line)] transition-[box-shadow,background-color] duration-150 hover:shadow-[inset_0_0_0_1px_var(--line-strong)] focus:outline-none focus-visible:outline-none focus:bg-surface focus:shadow-[inset_0_0_0_1px_var(--accent),0_0_0_4px_var(--accent-soft)] disabled:cursor-not-allowed disabled:opacity-50 aria-[invalid=true]:shadow-[inset_0_0_0_1px_var(--danger),0_0_0_4px_var(--danger-soft)]';
 
 export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   leading?: ReactNode;

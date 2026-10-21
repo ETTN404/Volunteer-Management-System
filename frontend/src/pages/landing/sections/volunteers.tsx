@@ -8,7 +8,7 @@ import { SectionHead, Shell } from './kit';
 
 function Phone({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
-    <div className={`relative w-[290px] rounded-[48px] bg-[#11152b] p-2.5 shadow-[0_50px_100px_-30px_rgba(17, 21, 43,0.55)] ${className ?? ''}`}>
+    <div className={`relative w-[290px] rounded-[48px] bg-[#11152b] p-2.5 shadow-[0_50px_100px_-30px_rgba(17,21,43,0.55)] ${className ?? ''}`}>
       <div className="absolute left-1/2 top-4 z-10 h-6 w-24 -translate-x-1/2 rounded-full bg-black" />
       <div className="overflow-hidden rounded-[40px] bg-bg">{children}</div>
     </div>

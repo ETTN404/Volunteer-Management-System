@@ -25,7 +25,7 @@ describe('volunteer portal', () => {
     const { screen } = await renderApp('/v', { as: DEMO.volunteer });
     expect(await screen.findByRole('heading', { name: /good (morning|afternoon|evening)|working late/i }, T)).toBeInTheDocument();
     expect(await screen.findByRole('heading', { name: 'Meskel Square Blood Drive', level: 2 }, T)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /check in now/i })).toHaveAttribute('href', expect.stringMatching(/\/v\/check-in\/\d+/));
+    expect(screen.getAllByRole('link', { name: /check in now/i })[0]).toHaveAttribute('href', expect.stringMatching(/\/v\/check-in\/\d+/));
   });
 
   it('applies for a shift and can withdraw it', async () => {

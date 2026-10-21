@@ -193,7 +193,7 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        <Card className="lg:sticky lg:top-24 lg:self-start">
+        <Card className="lg:sticky lg:top-6 lg:self-start">
           <CardHeader title="Skill verification" description="Coordinators verify skills against your documents." />
           <CardBody>
             <ul className="space-y-2">

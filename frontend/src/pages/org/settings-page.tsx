@@ -387,7 +387,7 @@ export default function OrgSettingsPage() {
           <VerificationCard status={org.data.verification_status ?? 'verified'} />
         </div>
 
-        <div className="space-y-4 lg:sticky lg:top-24 lg:self-start">
+        <div className="space-y-4 lg:sticky lg:top-6 lg:self-start">
           <div className="type-eyebrow flex items-center gap-2">
             <Palette className="size-3.5" /> Preview
           </div>

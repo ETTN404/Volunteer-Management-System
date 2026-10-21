@@ -5,7 +5,7 @@ import { cn } from '@/shared/lib/cn';
 import { durationHours, formatDate, formatDay, formatTime, formatTimeRange } from '@/shared/lib/time';
 import { formatHours } from '@/shared/lib/format';
 import { useNow } from '@/shared/hooks/use-now';
-import { AssignmentBadge, Badge, Button, Card, EmptyState, ErrorState, PageHeader, Segmented, SkeletonCard, notify } from '@/shared/ui';
+import { AssignmentBadge, Badge, Button, Card, DistributionBar, EmptyState, ErrorState, FilterChips, PageHeader, SkeletonCard, StatTile, notify } from '@/shared/ui';
 import { Stagger, StaggerItem } from '@/shared/motion';
 import { useWithdrawApplication } from '@/features/volunteer/api';
 import { useT } from '@/shared/i18n';
@@ -28,10 +28,10 @@ function UpcomingRow({ s }: { s: ScheduledShift }) {
 
   return (
     <Card className={cn('flex min-w-0 flex-col gap-4 p-4 sm:flex-row sm:items-center sm:p-5', (canCheckIn || phase === 'on-shift') && '[box-shadow:var(--elev-2),inset_0_0_0_1.5px_var(--accent)]')}>
-      <div className="hidden w-16 shrink-0 sm:flex flex-col items-center rounded-lg bg-surface-2 py-2.5 text-center">
-        <span className="type-eyebrow-sm">{formatDate(s.start, 'MMM')}</span>
-        <span className="type-display text-2xl leading-none text-text">{formatDate(s.start, 'd')}</span>
-        <span className="mt-0.5 text-[10.5px] text-faint">{formatDate(s.start, 'EEE')}</span>
+      <div className="hidden w-[68px] shrink-0 flex-col items-center overflow-hidden rounded-[16px] bg-surface text-center [box-shadow:0_6px_16px_-10px_rgba(17,21,43,0.3),inset_0_0_0_1px_var(--line)] sm:flex">
+        <span className="w-full bg-accent py-1 text-[10.5px] font-bold uppercase tracking-wider text-accent-fg">{formatDate(s.start, 'MMM')}</span>
+        <span className="pt-1.5 text-[26px] font-extrabold leading-none tracking-[-0.03em] text-text [font-family:var(--font-display)]">{formatDate(s.start, 'd')}</span>
+        <span className="pb-2 pt-0.5 text-[11px] text-faint">{formatDate(s.start, 'EEE')}</span>
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
@@ -108,6 +108,14 @@ export default function SchedulePage() {
       pending: done.filter((p) => p.attendance?.hours_status === 'pending').reduce((n, p) => n + (p.attendance?.hours ?? 0), 0),
     };
   }, [past]);
+  const counts = useMemo(
+    () => ({
+      confirmed: upcoming.filter((u) => u.assignment.status === 'confirmed').length,
+      pending: upcoming.filter((u) => u.assignment.status === 'pending').length,
+      waitlisted: upcoming.filter((u) => u.assignment.status === 'waitlisted').length,
+    }),
+    [upcoming],
+  );
 
   return (
     <>
@@ -116,17 +124,40 @@ export default function SchedulePage() {
         title={t('Shifts & attendance')}
         description={t('Everything you’ve applied for, been confirmed on, and attended.')}
         actions={
-          <Segmented
-            value={tab}
-            onValueChange={setTab}
-            aria-label={t('View')}
-            options={[
-              { value: 'upcoming', label: `${t('Upcoming')}${upcoming.length ? ` · ${upcoming.length}` : ''}` },
-              { value: 'history', label: t('History'), icon: <History /> },
-            ]}
-          />
+          <Button asChild variant="secondary">
+            <Link to="/v/opportunities">
+              <History /> {t('Browse opportunities')}
+            </Link>
+          </Button>
         }
       />
+
+      <div className="mb-6 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
+        <StatTile hue="indigo" icon={<CheckCircle2 />} label={t('Confirmed')} value={isLoading ? undefined : counts.confirmed} hint={t('places held for you')} />
+        <StatTile hue="amber" icon={<Clock />} label={t('Awaiting review')} value={isLoading ? undefined : counts.pending} hint={t('a coordinator will decide')} />
+        <StatTile hue="sky" icon={<Undo2 />} label={t('On waitlist')} value={isLoading ? undefined : counts.waitlisted} hint={t('first in line gets the place')} />
+        <StatTile hue="emerald" icon={<History />} label={t('Verified hours')} value={isLoading ? undefined : totals.hours} decimals={totals.hours % 1 ? 1 : 0} suffix="h" hint={t('{n} shifts attended', { n: totals.shifts })} />
+      </div>
+
+      <Card className="mb-5 space-y-4 p-4 sm:p-5">
+        <DistributionBar
+          segments={[
+            { value: counts.confirmed, hue: 'indigo', label: t('Confirmed') },
+            { value: counts.pending, hue: 'amber', label: t('Awaiting review') },
+            { value: counts.waitlisted, hue: 'sky', label: t('On waitlist') },
+            { value: past.length, hue: 'emerald', label: t('History') },
+          ]}
+        />
+        <FilterChips
+          value={tab}
+          onChange={setTab}
+          aria-label={t('View')}
+          options={[
+            { value: 'upcoming', label: t('Upcoming'), count: upcoming.length },
+            { value: 'history', label: t('History'), count: past.length, hue: 'emerald' },
+          ]}
+        />
+      </Card>
 
       {isLoading ? (
         <div className="space-y-3">
@@ -159,17 +190,7 @@ export default function SchedulePage() {
         )
       ) : (
         <>
-          <div className="mb-5 grid grid-cols-2 gap-4 sm:max-w-md">
-            <Card className="p-4">
-              <div className="type-eyebrow-sm">{t('Shifts attended')}</div>
-              <div className="type-data mt-1.5 text-2xl text-text">{totals.shifts}</div>
-            </Card>
-            <Card className="p-4">
-              <div className="type-eyebrow-sm">{t('Verified hours')}</div>
-              <div className="type-data mt-1.5 text-2xl text-text">{formatHours(totals.hours)}</div>
-              {totals.pending > 0 && <div className="mt-1 text-[11.5px] text-faint">{t('+{h} awaiting review', { h: formatHours(totals.pending) })}</div>}
-            </Card>
-          </div>
+          {totals.pending > 0 && <p className="mb-3 text-[13px] text-muted">{t('+{h} awaiting review', { h: formatHours(totals.pending) })}</p>}
           <Card className="overflow-hidden">
             <table className="w-full text-sm">
               <thead className="border-b border-line bg-surface-2/60 text-left">

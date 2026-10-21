@@ -115,7 +115,7 @@ export default function OpportunityDetailPage() {
           </section>
         </div>
 
-        <div className="min-w-0 lg:sticky lg:top-24 lg:self-start">
+        <div className="min-w-0 lg:sticky lg:top-6 lg:self-start">
           {hasCoords ? (
             <VenueMap
               venue={{ latitude: e.coordinates.latitude!, longitude: e.coordinates.longitude! }}

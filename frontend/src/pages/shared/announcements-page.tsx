@@ -34,7 +34,7 @@ export default function AnnouncementsPage() {
       ) : list.error ? (
         <ErrorState error={list.error} onRetry={() => list.refetch()} />
       ) : list.data?.items.length ? (
-        <Stagger className="mx-auto max-w-3xl space-y-4">
+        <Stagger className="max-w-4xl space-y-4">
           {list.data.items.map((a) => (
             <StaggerItem key={a.id}>
               <Card className={a.kind === 'urgent' ? 'min-w-0 p-5 sm:p-6 [box-shadow:inset_0_0_0_1.5px_var(--danger)]' : 'min-w-0 p-5 sm:p-6'}>

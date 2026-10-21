@@ -84,7 +84,7 @@ export default function DocumentsReviewPage() {
           </ul>
 
           {selected && (
-            <Card className="overflow-hidden lg:sticky lg:top-24 lg:self-start">
+            <Card className="overflow-hidden lg:sticky lg:top-6 lg:self-start">
               <div className="grid h-80 place-items-center bg-sunken">
                 {selected.mime_type.startsWith('image/') ? (
                   <img src={selected.file_url} alt={selected.title} className="max-h-full max-w-full object-contain" />

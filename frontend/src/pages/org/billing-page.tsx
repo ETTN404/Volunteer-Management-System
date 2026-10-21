@@ -142,7 +142,7 @@ export default function BillingPage() {
           </Card>
         </div>
 
-        <Card className="lg:sticky lg:top-24 lg:self-start">
+        <Card className="lg:sticky lg:top-6 lg:self-start">
           <CardHeader title="Upgrade" description="Pay with telebirr or a bank transfer, then paste the transaction reference." />
           <CardBody className="space-y-4">
             <Segmented

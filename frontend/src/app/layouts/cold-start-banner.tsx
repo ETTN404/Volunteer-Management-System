@@ -14,7 +14,7 @@ export function ColdStartBanner() {
           initial={{ height: 0, opacity: 0 }}
           animate={{ height: 'auto', opacity: 1 }}
           exit={{ height: 0, opacity: 0 }}
-          className="overflow-hidden bg-accent-soft text-accent-text"
+          className="mx-3 mt-3 overflow-hidden rounded-[16px] bg-accent-soft text-accent-text sm:mx-5 sm:mt-5"
           role="status"
         >
           <div className="flex items-center justify-center gap-2.5 px-4 py-2 text-[13px] font-medium">

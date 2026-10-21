@@ -30,8 +30,8 @@ export function ActiveShiftBanner() {
     <>
       <AnimatePresence>
         {active && !result && (
-          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden border-b border-success/25 bg-success-soft">
-            <div className="mx-auto flex max-w-[1320px] items-center gap-3 px-4 py-2.5 sm:px-6 lg:px-10">
+          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="mx-3 mt-3 overflow-hidden rounded-[16px] bg-success-soft [box-shadow:inset_0_0_0_1px_color-mix(in_oklab,var(--success)_25%,transparent)] sm:mx-5 sm:mt-5">
+            <div className="flex items-center gap-3 px-4 py-2.5">
               <span className="relative flex size-2.5 shrink-0">
                 <span className="absolute inset-0 animate-ping-ring rounded-full bg-success" />
                 <span className="relative size-2.5 rounded-full bg-success" />

@@ -3,7 +3,7 @@ import { Link } from 'react-router';
 import { cn } from '@/shared/lib/cn';
 import { countdownTo, formatDay, formatTimeRange } from '@/shared/lib/time';
 import { useNow } from '@/shared/hooks/use-now';
-import { Badge, Button, Card, EmptyState } from '@/shared/ui';
+import { Badge, Button, Card, EmptyState, VenueMap } from '@/shared/ui';
 import { shiftPhase, type ScheduledShift } from '../derived';
 import { useT } from '@/shared/i18n';
 
@@ -53,19 +53,22 @@ export function NextShiftCard({ next, className }: { next: ScheduledShift | unde
   const elapsedMin = checkedInAt ? Math.max(0, Math.floor((now.getTime() - checkedInAt.getTime()) / 60_000)) : 0;
 
   return (
-    <Card tone={onShift || open ? 'accent' : 'default'} className={cn('relative min-w-0 overflow-hidden p-5 sm:p-7', className)}>
+    <Card className={cn('relative flex min-w-0 flex-col overflow-hidden p-5 sm:p-7', (onShift || open) && '[box-shadow:0_24px_48px_-28px_color-mix(in_oklab,var(--accent)_60%,transparent),inset_0_0_0_1.5px_color-mix(in_oklab,var(--accent)_45%,transparent)]', className)}>
       <div className="pointer-events-none absolute -top-16 -right-16 size-64 rounded-full border border-dashed border-accent/40" aria-hidden />
       <div className="pointer-events-none absolute -top-4 -right-4 size-40 rounded-full border border-accent/20" aria-hidden />
 
       <div className="relative flex flex-wrap items-center gap-2">
-        <span className="type-eyebrow">{onShift ? t('You’re on shift') : open ? t('Check-in is open') : t('Your next shift')}</span>
+        <span className="inline-flex items-center gap-2 rounded-full bg-accent-soft px-3 py-1 text-[12px] font-semibold text-accent-text">
+          <span className="size-1.5 rounded-full bg-accent" />
+          {onShift ? t('You’re on shift') : open ? t('Check-in is open') : t('Your next shift')}
+        </span>
         {(onShift || open) && (
           <Badge tone="success" size="sm" dot pulse>
             {onShift ? t('Checked in') : t('Live now')}
           </Badge>
         )}
       </div>
-      <h2 className="type-title relative mt-3 max-w-lg text-[clamp(1.25rem,5vw,1.75rem)] text-text wrap-anywhere">{next.event.title}</h2>
+      <h2 className="relative mt-4 max-w-lg text-[clamp(1.35rem,4vw,1.9rem)] font-extrabold leading-tight tracking-[-0.03em] text-text [font-family:var(--font-display)] wrap-anywhere">{next.event.title}</h2>
       <div className="relative mt-3 flex min-w-0 flex-col gap-1.5 text-sm text-muted sm:flex-row sm:flex-wrap sm:gap-x-5">
         <span className="inline-flex items-center gap-1.5">
           <Clock className="size-4 shrink-0 text-faint" /> {formatDay(next.start)} · {formatTimeRange(next.shift.start_time, next.shift.end_time)}
@@ -123,7 +126,15 @@ export function NextShiftCard({ next, className }: { next: ScheduledShift | unde
         )}
       </div>
 
-      <ul className="relative mt-6 flex flex-wrap gap-2 border-t border-line pt-5 text-[12.5px] text-muted">
+      {next.event.coordinates.latitude != null && next.event.coordinates.longitude != null && (
+        <VenueMap
+          venue={{ latitude: next.event.coordinates.latitude, longitude: next.event.coordinates.longitude }}
+          radius={next.event.geofence_radius}
+          label={next.event.location.split(',')[0]}
+          className="relative mt-6 min-h-44 flex-1 overflow-hidden rounded-[18px]"
+        />
+      )}
+      <ul className="relative mt-5 flex flex-wrap gap-2 text-[12.5px] text-muted">
         <li className="inline-flex items-center gap-1.5 rounded-md bg-surface-2/70 px-2.5 py-1.5">
           <MapPin className="size-3.5 text-accent-text" /> {t('Within {n} m of the venue', { n: next.event.geofence_radius })}
         </li>

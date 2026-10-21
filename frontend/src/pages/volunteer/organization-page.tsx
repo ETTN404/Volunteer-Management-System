@@ -2,8 +2,8 @@ import { ArrowLeft, BadgeCheck, Building2, CalendarCheck2, Clock, Globe, Mail, M
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { formatDate } from '@/shared/lib/time';
-import { formatNumber } from '@/shared/lib/format';
-import { Button, Card, EmptyState, ErrorState, Segmented, Skeleton, SkeletonCard, countryName, formatPhone } from '@/shared/ui';
+import { Button, Card, EmptyState, ErrorState, Segmented, Skeleton, SkeletonCard, StatTile, countryName, formatPhone } from '@/shared/ui';
+import { useT } from '@/shared/i18n';
 import { Stagger, StaggerItem } from '@/shared/motion';
 import { useOpportunities, useOrganizationProfile } from '@/features/volunteer/api';
 import { useMyShifts } from '@/features/volunteer/derived';
@@ -19,6 +19,7 @@ export default function OrganizationPage() {
   const events = useOpportunities({ org_id: orgId, when, page, per_page: 12 });
   const mine = useMyShifts();
   const applied = useMemo(() => new Set(mine.rows.map((r) => r.shift.id)), [mine.rows]);
+  const t = useT();
 
   useEffect(() => {
     if (org.data) document.title = `${org.data.name} · VolunTrack`;
@@ -77,21 +78,12 @@ export default function OrganizationPage() {
           <ReportOrgDialog orgId={o.id} orgName={o.name} />
         </div>
 
-        <dl className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          {[
-            { icon: CalendarCheck2, label: 'Open events', value: o.stats.active_events },
-            { icon: Clock, label: 'Past events', value: o.stats.past_events },
-            { icon: Users, label: 'Volunteers', value: o.stats.volunteers },
-            { icon: BadgeCheck, label: 'Verified hours', value: o.stats.verified_hours },
-          ].map(({ icon: Icon, label, value }) => (
-            <div key={label} className="rounded-lg bg-surface-2 px-4 py-3">
-              <dt className="flex items-center gap-1.5 text-xs text-muted">
-                <Icon className="size-3.5" /> {label}
-              </dt>
-              <dd className="type-data mt-1 text-xl font-semibold text-text">{formatNumber(value)}</dd>
-            </div>
-          ))}
-        </dl>
+        <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <StatTile hue="indigo" icon={<CalendarCheck2 />} label={t('Open events')} value={o.stats.active_events} />
+          <StatTile hue="amber" icon={<Clock />} label={t('Past events')} value={o.stats.past_events} />
+          <StatTile hue="rose" icon={<Users />} label={t('Volunteers')} value={o.stats.volunteers} />
+          <StatTile hue="emerald" icon={<BadgeCheck />} label={t('Verified hours')} value={o.stats.verified_hours} />
+        </div>
       </Card>
 
       <div className="mt-8 mb-4 flex flex-wrap items-center justify-between gap-3">

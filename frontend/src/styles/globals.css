@@ -38,6 +38,13 @@
   --color-info-text: var(--info-text);
   --color-info-soft: var(--info-soft);
   --color-focus: var(--focus);
+  --color-panel: var(--panel);
+  --color-hue-indigo: var(--hue-indigo);
+  --color-hue-sky: var(--hue-sky);
+  --color-hue-rose: var(--hue-rose);
+  --color-hue-amber: var(--hue-amber);
+  --color-hue-emerald: var(--hue-emerald);
+  --color-hue-violet: var(--hue-violet);
 
   --font-display: 'Inter Tight Variable', 'Geist Variable', 'Noto Sans Ethiopic Variable', system-ui, sans-serif;
   --font-sans: 'Geist Variable', 'Noto Sans Ethiopic Variable', system-ui, sans-serif;
@@ -47,8 +54,8 @@
   --radius-xs: 4px;
   --radius-sm: 6px;
   --radius-md: 10px;
-  --radius-lg: 16px;
-  --radius-xl: 22px;
+  --radius-lg: 18px;
+  --radius-xl: 24px;
   --radius-2xl: 30px;
 
   --shadow-card: var(--elev-1);
@@ -111,6 +118,8 @@
 
   body {
     @apply bg-bg text-text font-sans antialiased;
+    background-image: var(--canvas-glow);
+    background-attachment: fixed;
     font-feature-settings: 'ss01';
     min-height: 100dvh;
   }
@@ -174,6 +183,21 @@
     font-weight: 600;
     letter-spacing: 0.14em;
     text-transform: uppercase;
+    color: var(--text-muted);
+  }
+  /* Inside the workspace, labels are calm sentence case (premium, not "terminal"). */
+  #main .type-eyebrow,
+  [role='dialog'] .type-eyebrow {
+    font-size: 0.8rem;
+    letter-spacing: 0;
+    text-transform: none;
+    color: var(--text-muted);
+  }
+  #main .type-eyebrow-sm,
+  [role='dialog'] .type-eyebrow-sm {
+    font-size: 0.75rem;
+    letter-spacing: 0;
+    text-transform: none;
     color: var(--text-muted);
   }
   /* Numbers: display sans with even-width digits (no "terminal" slashed zeros). */

@@ -6,13 +6,36 @@
 
 :root,
 [data-theme='light'] {
-  --bg: #f6f7fb;
-  --sunken: #eef0f7;
+  --bg: #f3f5fa;
+  --sunken: #eef2f8;
   --surface: #ffffff;
-  --surface-2: #f3f6f4;
+  --surface-2: #f4f6fb;
   --raised: #ffffff;
-  --line: #e2e5f0;
-  --line-strong: #c9cede;
+  --line: #e5e9f2;
+  --line-strong: #cdd3e1;
+
+  /* Canvas behind the floating panels: faint dots + soft colour glows. */
+  --canvas-glow:
+    radial-gradient(60rem 30rem at 100% -10%, rgba(194, 69, 143, 0.08), transparent 60%),
+    radial-gradient(50rem 28rem at -10% 0%, rgba(29, 139, 201, 0.08), transparent 60%),
+    radial-gradient(40rem 30rem at 60% 120%, rgba(240, 160, 32, 0.06), transparent 60%);
+  --panel: rgba(255, 255, 255, 0.86);
+  --panel-ring: rgba(17, 21, 43, 0.06);
+  --panel-shadow: 0 1px 2px rgba(17, 21, 43, 0.04), 0 12px 32px -18px rgba(17, 21, 43, 0.18);
+
+  /* One hue per metric / category (stat tiles, chips, charts). */
+  --hue-indigo: #3341b8;
+  --hue-indigo-soft: rgba(51, 65, 184, 0.1);
+  --hue-sky: #1b86c2;
+  --hue-sky-soft: rgba(27, 134, 194, 0.11);
+  --hue-rose: #c2458f;
+  --hue-rose-soft: rgba(194, 69, 143, 0.1);
+  --hue-amber: #e9951b;
+  --hue-amber-soft: rgba(233, 149, 27, 0.13);
+  --hue-emerald: #17996a;
+  --hue-emerald-soft: rgba(23, 153, 106, 0.11);
+  --hue-violet: #7556d6;
+  --hue-violet-soft: rgba(117, 86, 214, 0.1);
 
   --text: #11152b;
   --text-muted: #4b5170;
@@ -59,12 +82,32 @@
 
 [data-theme='dark'] {
   --bg: #080a16;
-  --sunken: #05070f;
+  --sunken: #0b0e1d;
   --surface: #0e1122;
   --surface-2: #141831;
   --raised: #191e3b;
   --line: rgba(200, 206, 235, 0.1);
   --line-strong: rgba(200, 206, 235, 0.2);
+
+  --canvas-glow:
+    radial-gradient(60rem 30rem at 100% -10%, rgba(214, 102, 170, 0.1), transparent 60%),
+    radial-gradient(50rem 28rem at -10% 0%, rgba(80, 160, 230, 0.08), transparent 60%);
+  --panel: rgba(14, 17, 34, 0.82);
+  --panel-ring: rgba(200, 206, 235, 0.09);
+  --panel-shadow: 0 1px 0 rgba(238, 240, 250, 0.03) inset, 0 16px 40px -18px rgba(0, 0, 0, 0.7);
+
+  --hue-indigo: #8b97ff;
+  --hue-indigo-soft: rgba(139, 151, 255, 0.13);
+  --hue-sky: #6cc0f2;
+  --hue-sky-soft: rgba(108, 192, 242, 0.12);
+  --hue-rose: #f08cc8;
+  --hue-rose-soft: rgba(240, 140, 200, 0.12);
+  --hue-amber: #f5b955;
+  --hue-amber-soft: rgba(245, 185, 85, 0.13);
+  --hue-emerald: #4fd29a;
+  --hue-emerald-soft: rgba(79, 210, 154, 0.12);
+  --hue-violet: #b19cff;
+  --hue-violet-soft: rgba(177, 156, 255, 0.12);
 
   --text: #eef0fa;
   --text-muted: #a9aecb;

@@ -31,7 +31,7 @@ export default function AnnouncementsManagerPage() {
     <>
       <PageHeader eyebrow="Outreach" title="Announcements" description="Post updates to your organization. VolunBot also reads the latest ones when volunteers ask questions." />
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
-        <Card className="lg:sticky lg:top-24 lg:self-start">
+        <Card className="lg:sticky lg:top-6 lg:self-start">
           <CardHeader title="New announcement" />
           <CardBody>
             <form

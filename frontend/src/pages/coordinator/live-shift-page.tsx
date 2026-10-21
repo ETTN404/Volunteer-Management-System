@@ -297,7 +297,7 @@ export default function LiveShiftPage() {
           )}
         </Card>
 
-        <div className="space-y-6 lg:sticky lg:top-24 lg:self-start">
+        <div className="space-y-6 lg:sticky lg:top-6 lg:self-start">
           <QrPanel shiftId={shiftId} enabled={qrEnabled} />
           <Card className="p-5 text-[13px] text-muted">
             <div className="mb-2 flex items-center gap-2 font-medium text-text">

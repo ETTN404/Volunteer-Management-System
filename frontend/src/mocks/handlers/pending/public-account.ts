@@ -60,6 +60,37 @@ export const publicAccountPending = [
     });
   }),
 
+  // Organization profile for signed-in volunteers (same data + contact details)
+  http.get(
+    api('/volunteer/organizations/:id'),
+    authed('any', ({ params }) => {
+      const o = db.t.organizations.find((x) => x.id === Number(params.id) && x.status === 'active');
+      if (!o) return fail('Target database resource not found.', 404);
+      const events = db.t.events.filter((e) => e.org_id === o.id);
+      const shiftIds = new Set(db.t.shifts.filter((s) => events.some((e) => e.id === s.event_id)).map((s) => s.id));
+      return ok({
+        id: o.id,
+        name: o.name,
+        logo_url: o.logo_path,
+        primary_color: (o as { primary_color?: string | null }).primary_color ?? null,
+        website: o.website ?? null,
+        email: o.email,
+        phone: o.phone ?? null,
+        city: 'Addis Ababa',
+        country: 'ET',
+        address: o.address,
+        verified: true,
+        member_since: o.created_at.slice(0, 10),
+        stats: {
+          active_events: events.filter((e) => e.status === 'upcoming' || e.status === 'ongoing').length,
+          past_events: events.filter((e) => e.status === 'completed').length,
+          volunteers: new Set(db.t.assignments.filter((x) => shiftIds.has(x.shift_id) && x.status === 'confirmed').map((x) => x.volunteer_id)).size,
+          verified_hours: Math.round(db.t.attendances.filter((x) => shiftIds.has(x.shift_id)).reduce((n, x) => n + (x.verified_hours ?? 0), 0)),
+        },
+      });
+    }),
+  ),
+
   // Account details & alert preferences
   http.patch(
     api('/account'),
