@@ -1,12 +1,12 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { BadgeCheck, Check, Clock4, ExternalLink, FileUp, ImageUp, Palette, ShieldCheck, Trash2 } from 'lucide-react';
+import { Clock4, ExternalLink, FileUp, ImageUp, Palette, ShieldCheck, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { Controller, useForm } from 'react-hook-form';
 import { z } from 'zod';
 import type { AttendancePolicy, OrgDocumentType } from '@/shared/types/api';
 import { cn } from '@/shared/lib/cn';
-import { BRAND_SWATCHES, isHex, onColor } from '@/shared/lib/color';
+import { isHex } from '@/shared/lib/color';
 import { formatBytes } from '@/shared/lib/format';
 import { formatDate } from '@/shared/lib/time';
 import { errorMessage, isApiError } from '@/shared/api/http';
@@ -23,7 +23,6 @@ import {
   FormError,
   InlineAlert,
   Input,
-  LogoMark,
   PageHeader,
   PhoneInput,
   Select,
@@ -34,6 +33,7 @@ import {
   notify,
 } from '@/shared/ui';
 import { useOrgDocuments, useOrganization, useRemoveLogo, useUpdateOrganization, useUploadLogo, useUploadOrgDocument } from '@/features/organization/api';
+import { ContrastCheck, PaletteGrid, PublicPagePreview } from '@/features/organization/brand-studio';
 import { PlanLocked } from '@/features/organization/plan-notice';
 import { ORG_DOC_TYPES } from '@/features/platform/org-onboard-form';
 
@@ -188,7 +188,6 @@ export default function OrgSettingsPage() {
   const form = useForm<Values>({ resolver: zodResolver(schema) });
   const { register, control, handleSubmit, reset, watch, setValue, formState, setError } = form;
   const color = watch('primary_color');
-  const name = watch('name');
   const country = watch('country');
   const features = org.data?.billing?.features ?? [];
   const canBrand = features.includes('branding');
@@ -251,7 +250,7 @@ export default function OrgSettingsPage() {
 
   return (
     <>
-      <PageHeader eyebrow="Organization" title="Settings & brand" description="How your organization appears to volunteers, and how check-in works at your events." />
+      <PageHeader title="Settings & brand" description="How your organization appears to volunteers, and how check-in works at your events." />
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
         <div className="space-y-6">
           <form onSubmit={onSubmit} noValidate className="space-y-6">
@@ -335,24 +334,17 @@ export default function OrgSettingsPage() {
                   </div>
                 </div>
                 <PlanLocked locked={!canBrand} plan="Pro">
-                  <Field label="Primary color" error={formState.errors.primary_color?.message}>
-                    <div className="flex flex-wrap items-center gap-2">
-                      {BRAND_SWATCHES.map((c) => (
-                        <button
-                          key={c}
-                          type="button"
-                          aria-label={`Use ${c}`}
-                          onClick={() => setValue('primary_color', c, { shouldDirty: true, shouldValidate: true })}
-                          className={cn('grid size-9 place-items-center rounded-full ring-offset-2 ring-offset-surface transition-transform hover:scale-110', color?.toLowerCase() === c.toLowerCase() && 'ring-2 ring-text')}
-                          style={{ background: c }}
-                        >
-                          {color?.toLowerCase() === c.toLowerCase() && <Check className="size-4" style={{ color: onColor(c) }} strokeWidth={3} />}
+                  <Field label="Your colour" hint="Buttons, highlights, emails and your public page." error={formState.errors.primary_color?.message}>
+                    <div className="space-y-4">
+                      <PaletteGrid value={color} onPick={(c) => setValue('primary_color', c, { shouldDirty: true, shouldValidate: true })} />
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="size-10 rounded-[12px] [box-shadow:inset_0_0_0_1px_rgba(0,0,0,0.08)]" style={{ background: preview }} />
+                        <Input {...register('primary_color')} placeholder="#3341B8" className="type-code w-32 uppercase" aria-label="Hex color" />
+                        <button type="button" className="text-[12.5px] text-faint hover:text-muted" onClick={() => setValue('primary_color', '', { shouldDirty: true })}>
+                          Use default
                         </button>
-                      ))}
-                      <Input {...register('primary_color')} placeholder="#3341B8" className="type-code ml-1 w-32 uppercase" inputSize="sm" aria-label="Hex color" />
-                      <button type="button" className="text-[12.5px] text-faint hover:text-muted" onClick={() => setValue('primary_color', '', { shouldDirty: true })}>
-                        Use default
-                      </button>
+                      </div>
+                      <ContrastCheck color={preview} />
                     </div>
                   </Field>
                 </PlanLocked>
@@ -388,33 +380,10 @@ export default function OrgSettingsPage() {
         </div>
 
         <div className="space-y-4 lg:sticky lg:top-6 lg:self-start">
-          <div className="type-eyebrow flex items-center gap-2">
-            <Palette className="size-3.5" /> Preview
+          <div className="flex items-center gap-2 text-[13px] font-semibold text-muted">
+            <Palette className="size-4" /> How volunteers see you
           </div>
-          <div className="overflow-hidden rounded-2xl bg-sunken [box-shadow:var(--elev-2),inset_0_0_0_1px_var(--line)]" style={{ ['--accent' as string]: preview, ['--accent-fg' as string]: onColor(preview) }}>
-            <div className="flex items-center gap-3 border-b border-line bg-surface px-4 py-3">
-              {org.data.logo_url ? <img src={org.data.logo_url} alt="" className="size-8 rounded-md object-contain" /> : <LogoMark className="size-8" />}
-              <div>
-                <div className="flex items-center gap-1 text-[13.5px] font-semibold text-text">
-                  {name || 'Organization'}
-                  {org.data.verification_status === 'verified' && <BadgeCheck className="size-3.5 text-accent-text" />}
-                </div>
-                <div className="type-eyebrow-sm">Volunteer</div>
-              </div>
-            </div>
-            <div className="space-y-3 p-4">
-              <div className="rounded-xl p-4" style={{ background: `color-mix(in oklab, ${preview} 14%, transparent)`, boxShadow: `inset 0 0 0 1px color-mix(in oklab, ${preview} 35%, transparent)` }}>
-                <div className="type-eyebrow-sm">Your next shift</div>
-                <div className="type-title mt-1.5 text-[15px] text-text">Community health fair</div>
-                <span className="mt-3 inline-flex rounded-md px-3 py-1.5 text-xs font-semibold" style={{ background: preview, color: onColor(preview) }}>
-                  Check in now
-                </span>
-              </div>
-              <div className="h-1.5 overflow-hidden rounded-full bg-line">
-                <div className="h-full w-2/3 rounded-full" style={{ background: preview }} />
-              </div>
-            </div>
-          </div>
+          <PublicPagePreview orgId={org.data.id} color={isHex(color) ? color : org.data.primary_color} />
           <p className="flex items-start gap-2 text-[12.5px] text-faint">
             <ShieldCheck className="mt-0.5 size-3.5 shrink-0" /> Plan: {org.data.billing?.plan_name ?? 'Free'}
             {org.data.plan_expires_at ? ` · renews by ${formatDate(org.data.plan_expires_at, 'd MMM yyyy')}` : ''}

@@ -1,7 +1,7 @@
 import { motion } from 'motion/react';
 import { ArrowRight, BadgeCheck, Building2, CalendarDays, Clock, Copy, Globe, MapPin, Share2, Users } from 'lucide-react';
 import { useEffect } from 'react';
-import { Link, useParams } from 'react-router';
+import { Link, useParams, useSearchParams } from 'react-router';
 import { formatDate, formatDay, formatTime } from '@/shared/lib/time';
 import { formatNumber } from '@/shared/lib/format';
 import { Button, Card, EmptyState, ErrorState, Logo, Skeleton, countryName, notify } from '@/shared/ui';
@@ -10,6 +10,7 @@ import { usePublicOrganization } from '@/features/public/api';
 import { useSession } from '@/features/auth/use-session';
 import { useT } from '@/shared/i18n';
 import { LanguageToggle } from '@/app/layouts/language-toggle';
+import { applyBrand, isHex } from '@/shared/lib/color';
 
 /** Shareable organization page — works without an account (link it from Telegram, posters, a website). */
 export default function PublicOrgPage() {
@@ -18,6 +19,14 @@ export default function PublicOrgPage() {
   const { role } = useSession();
   const t = useT();
   const o = org.data;
+  const [params] = useSearchParams();
+  // Brand studio preview passes an unsaved colour; otherwise use the organization's own.
+  const previewColor = params.get('preview_color');
+  const brand = isHex(previewColor) ? previewColor : o?.primary_color;
+  useEffect(() => {
+    applyBrand(brand, 'light');
+    return () => applyBrand(null, 'light');
+  }, [brand]);
 
   useEffect(() => {
     document.title = o ? `${o.name} · VolunTrack` : 'VolunTrack';
@@ -74,11 +83,11 @@ export default function PublicOrgPage() {
               transition={{ duration: 0.6, ease: EASE_OUT_EXPO }}
               className="relative overflow-hidden rounded-3xl bg-surface p-6 [box-shadow:var(--elev-2),inset_0_0_0_1px_var(--line)] sm:p-10"
             >
-              <div className="absolute inset-x-0 top-0 h-2" style={{ background: o.primary_color ?? 'var(--accent)' }} />
+              <div className="absolute inset-x-0 top-0 h-2" style={{ background: brand ?? 'var(--accent)' }} />
               <div className="flex flex-col gap-6 sm:flex-row sm:items-start">
                 <div
                   className="grid size-20 shrink-0 place-items-center overflow-hidden rounded-2xl bg-surface-2 text-faint ring-1 ring-line"
-                  style={o.primary_color && !o.logo_url ? { background: o.primary_color, color: '#fff' } : undefined}
+                  style={brand && !o.logo_url ? { background: brand, color: '#fff' } : undefined}
                 >
                   {o.logo_url ? <img src={o.logo_url} alt="" className="size-full object-cover" /> : <Building2 className="size-8" />}
                 </div>

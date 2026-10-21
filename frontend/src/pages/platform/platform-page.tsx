@@ -1,10 +1,10 @@
-import { ArrowRight, Building2, ShieldCheck, UserPlus, Users, UsersRound } from 'lucide-react';
+import { ArrowRight, BadgeCheck, Banknote, Building2, Flag, Receipt, ShieldCheck, UserPlus, Users, UsersRound } from 'lucide-react';
 import { useEffect } from 'react';
 import { Link } from 'react-router';
 import { formatDate, formatRelative } from '@/shared/lib/time';
-import { Badge, Button, Card, CardHeader, FieldMap, PageHeader, Skeleton } from '@/shared/ui';
+import { Badge, Button, Card, CardHeader, FieldMap, PageHeader, Skeleton, StatTile } from '@/shared/ui';
 import { AreaTrend, Bars, ChartCard } from '@/shared/ui/charts';
-import { CountUp, Stagger, StaggerItem } from '@/shared/motion';
+import { Stagger, StaggerItem } from '@/shared/motion';
 import { useAllOrganizations, usePlatformAudit, usePlatformMetrics, usePlatformTimeseries } from '@/features/platform/api';
 import { actionLabel } from '@/features/audit/audit-trail';
 
@@ -18,28 +18,21 @@ export default function PlatformPage() {
     document.title = 'Platform · VolunTrack';
   }, []);
 
-  const tiles = [
-    { icon: <Building2 />, label: 'Organizations', value: m.data?.total_organizations, sub: m.data ? `${m.data.active_organizations} active` : '' },
-    { icon: <Users />, label: 'Users', value: m.data?.total_users },
-    { icon: <UsersRound />, label: 'Volunteers', value: m.data?.total_volunteers },
-    { icon: <ShieldCheck />, label: 'Coordinators', value: m.data?.total_coordinators },
-  ];
 
   return (
     <>
-      <div className="relative -mx-4 -mt-7 mb-8 overflow-hidden border-b border-line sm:-mx-6 lg:-mx-10 lg:-mt-10">
+      <div className="relative mb-6 overflow-hidden rounded-[24px] bg-surface [box-shadow:0_10px_30px_-20px_rgba(17,21,43,0.3),inset_0_0_0_1px_var(--line)]">
         <div className="absolute inset-0" aria-hidden>
           <FieldMap
             venues={(orgs.data ?? []).filter((o) => o.status === 'active').slice(0, 5).map((o, i) => ({ id: o.id, x: 0.5 + (i % 3) * 0.17, y: 0.3 + Math.floor(i / 3) * 0.4 + (i % 2) * 0.08, radius: 30 + (5 - i) * 6, label: o.name.length > 18 ? o.name.split(' ')[0] : o.name }))}
             pingEvery={1600}
             intensity="calm"
           />
-          <div className="absolute inset-0 bg-[linear-gradient(90deg,var(--bg)_25%,color-mix(in_oklab,var(--bg)_30%,transparent)_70%,transparent)]" />
+          <div className="absolute inset-0 bg-[linear-gradient(90deg,var(--surface)_28%,color-mix(in_oklab,var(--surface)_30%,transparent)_70%,transparent)]" />
         </div>
-        <div className="relative px-4 py-10 sm:px-6 lg:px-10 lg:py-14">
+        <div className="relative px-6 py-9 sm:px-8 lg:py-12">
           <PageHeader
             className="mb-0 md:mb-0"
-            eyebrow="Platform command"
             title="Every organization, one view"
             description="Tenants, people and activity across VolunTrack. Each organization’s data stays isolated from the others."
             actions={
@@ -53,34 +46,32 @@ export default function PlatformPage() {
         </div>
       </div>
 
-      <Stagger className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        {tiles.map((t) => (
-          <StaggerItem key={t.label}>
-            <Card className="p-5">
-              <div className="flex items-center gap-2 text-muted [&_svg]:size-4">
-                {t.icon}
-                <span className="type-eyebrow-sm">{t.label}</span>
-              </div>
-              <div className="type-display mt-4 text-[38px] leading-none text-text">{t.value == null ? <Skeleton className="h-9 w-16" /> : <CountUp value={t.value} />}</div>
-              {t.sub && <div className="mt-2 text-[12.5px] text-faint">{t.sub}</div>}
-            </Card>
-          </StaggerItem>
-        ))}
+      <Stagger className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
+        <StaggerItem>
+          <StatTile hue="indigo" icon={<Building2 />} label="Organizations" value={m.data?.total_organizations} hint={m.data ? `${m.data.active_organizations} active` : undefined} to="/p/organizations" />
+        </StaggerItem>
+        <StaggerItem>
+          <StatTile hue="sky" icon={<Users />} label="Users" value={m.data?.total_users} hint="everyone with an account" to="/p/users" />
+        </StaggerItem>
+        <StaggerItem>
+          <StatTile hue="rose" icon={<UsersRound />} label="Volunteers" value={m.data?.total_volunteers} hint="across every organization" />
+        </StaggerItem>
+        <StaggerItem>
+          <StatTile hue="violet" icon={<ShieldCheck />} label="Coordinators" value={m.data?.total_coordinators} hint="running events" />
+        </StaggerItem>
+        <StaggerItem>
+          <StatTile hue="amber" icon={<BadgeCheck />} label="Awaiting verification" value={m.data ? (m.data.pending_verification ?? 0) : undefined} hint="organizations to check" to="/p/organizations?verification=pending" />
+        </StaggerItem>
+        <StaggerItem>
+          <StatTile hue="emerald" icon={<Receipt />} label="Payments to confirm" value={m.data ? (m.data.pending_payments ?? 0) : undefined} hint="receipts waiting" to="/p/payments" />
+        </StaggerItem>
+        <StaggerItem>
+          <StatTile hue="rose" icon={<Flag />} label="Open reports" value={m.data ? (m.data.open_reports ?? 0) : undefined} hint="from volunteers" to="/p/reports" />
+        </StaggerItem>
+        <StaggerItem>
+          <StatTile hue="indigo" icon={<Banknote />} label="Revenue this month" value={m.data ? (m.data.revenue_this_month ?? 0) : undefined} suffix="ETB" hint="confirmed payments" to="/p/payments" />
+        </StaggerItem>
       </Stagger>
-
-      <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {[
-          { to: '/p/organizations?verification=pending', label: 'Awaiting verification', value: m.data?.pending_verification ?? 0, warn: (m.data?.pending_verification ?? 0) > 0 },
-          { to: '/p/payments', label: 'Payments to confirm', value: m.data?.pending_payments ?? 0, warn: (m.data?.pending_payments ?? 0) > 0 },
-          { to: '/p/reports', label: 'Open reports', value: m.data?.open_reports ?? 0, warn: (m.data?.open_reports ?? 0) > 0 },
-          { to: '/p/payments', label: 'Revenue this month (ETB)', value: m.data?.revenue_this_month ?? 0, warn: false },
-        ].map((q) => (
-          <Link key={q.label} to={q.to} className={`rounded-lg px-4 py-3 transition-colors hover:bg-surface-2 ${q.warn ? 'bg-warning-soft' : 'bg-surface [box-shadow:inset_0_0_0_1px_var(--line)]'}`}>
-            <div className={`text-xs ${q.warn ? 'text-warning-text' : 'text-muted'}`}>{q.label}</div>
-            <div className="type-data mt-1 text-xl font-semibold text-text">{q.value.toLocaleString()}</div>
-          </Link>
-        ))}
-      </div>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
         <ChartCard title="Growth" description="Total users at the end of each month">

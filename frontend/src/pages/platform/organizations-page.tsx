@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import type { Organization } from '@/shared/types/api';
 import { formatDate } from '@/shared/lib/time';
-import { Badge, Button, Card, EmptyState, ErrorState, Input, Menu, MenuContent, MenuItem, MenuTrigger, PageHeader, Segmented, Skeleton } from '@/shared/ui';
+import { Badge, Button, Card, DistributionBar, EmptyState, ErrorState, FilterChips, Input, Menu, MenuContent, MenuItem, MenuTrigger, PageHeader, Skeleton } from '@/shared/ui';
 import { useAllOrganizations } from '@/features/platform/api';
 import { OrgStatusDialog } from '@/features/platform/org-status-dialog';
 
@@ -27,7 +27,6 @@ export default function OrganizationsPage() {
   return (
     <>
       <PageHeader
-        eyebrow="Tenants"
         title="Organizations"
         actions={
           <Button asChild>
@@ -37,20 +36,32 @@ export default function OrganizationsPage() {
           </Button>
         }
       />
-      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center">
-        <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name, email or city" leading={<Search />} className="sm:w-72" aria-label="Search organizations" />
-        <Segmented
-          value={status}
-          onValueChange={setStatus}
-          aria-label="Status"
-          options={[
-            { value: 'all', label: 'All' },
-            { value: 'active', label: 'Active' },
-            { value: 'suspended', label: 'Suspended' },
-            { value: 'inactive', label: 'Inactive' },
-          ]}
-        />
-      </div>
+      <Card className="mb-5 overflow-hidden">
+        <div className="space-y-4 p-4 sm:p-5">
+          <DistributionBar
+            segments={[
+              { value: (orgs.data ?? []).filter((o) => o.status === 'active').length, hue: 'emerald', label: 'Active' },
+              { value: (orgs.data ?? []).filter((o) => o.status === 'suspended').length, hue: 'rose', label: 'Suspended' },
+              { value: (orgs.data ?? []).filter((o) => o.status === 'inactive').length, hue: 'amber', label: 'Inactive' },
+            ]}
+          />
+          <FilterChips
+            value={status}
+            onChange={setStatus}
+            aria-label="Status"
+            options={[
+              { value: 'all', label: 'All', count: (orgs.data ?? []).length },
+              { value: 'active', label: 'Active', hue: 'emerald', count: (orgs.data ?? []).filter((o) => o.status === 'active').length },
+              { value: 'suspended', label: 'Suspended', hue: 'rose', count: (orgs.data ?? []).filter((o) => o.status === 'suspended').length },
+              { value: 'inactive', label: 'Inactive', hue: 'amber', count: (orgs.data ?? []).filter((o) => o.status === 'inactive').length },
+            ]}
+          />
+        </div>
+        <div className="flex flex-col gap-3 border-t border-line bg-surface-2/50 p-4 sm:flex-row sm:items-center sm:px-5">
+          <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name, email or city" leading={<Search />} className="sm:w-80" aria-label="Search organizations" />
+          <span className="text-[13px] text-muted sm:ml-auto">{list.length} shown</span>
+        </div>
+      </Card>
       {orgs.isLoading ? (
         <Skeleton className="h-96 rounded-xl" />
       ) : orgs.error ? (

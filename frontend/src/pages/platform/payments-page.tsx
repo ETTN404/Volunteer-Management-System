@@ -1,11 +1,11 @@
-import { Check, CircleDollarSign, RefreshCw, Search, X } from 'lucide-react';
+import { Banknote, Building2, Check, CircleDollarSign, Hourglass, RefreshCw, Search, ShieldCheck, X } from 'lucide-react';
 import { useDeferredValue, useEffect, useState } from 'react';
 import { Link } from 'react-router';
 import type { Payment } from '@/shared/types/api';
 import { formatDate } from '@/shared/lib/time';
 import { formatNumber } from '@/shared/lib/format';
 import { errorMessage } from '@/shared/api/http';
-import { Badge, Button, Card, CardBody, CardHeader, Dialog, DialogActions, DialogContent, EmptyState, ErrorState, Input, PageHeader, Segmented, Skeleton, Textarea, notify } from '@/shared/ui';
+import { Badge, Button, Card, CardBody, CardHeader, Dialog, DialogActions, DialogContent, EmptyState, ErrorState, FilterChips, Input, PageHeader, Skeleton, StatTile, Textarea, notify } from '@/shared/ui';
 import { Bars, ChartCard } from '@/shared/ui/charts';
 import { usePaymentSummary, usePayments, useRetryPayment, useReviewPayment } from '@/features/platform/api';
 
@@ -31,21 +31,13 @@ export default function PaymentsPage() {
 
   return (
     <>
-      <PageHeader eyebrow="Platform" title="Payments" description="Plan upgrades paid by telebirr or bank transfer. Receipts are checked with the bank automatically; anything uncertain waits here." />
+      <PageHeader title="Payments" description="Plan upgrades paid by telebirr or bank transfer. Receipts are checked with the bank automatically; anything uncertain waits here." />
 
-      <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-5">
-        {[
-          { l: 'Revenue this month', v: s ? `${formatNumber(s.revenue_this_month)} ETB` : '—' },
-          { l: 'Monthly recurring', v: s ? `${formatNumber(s.mrr)} ETB` : '—' },
-          { l: 'Paying organizations', v: s ? formatNumber(s.paying_organizations) : '—' },
-          { l: 'Waiting for review', v: s ? `${s.pending_count} · ${formatNumber(s.pending_amount)} ETB` : '—' },
-          { l: 'Checked automatically', v: s?.auto_verified_share != null ? `${s.auto_verified_share}%` : '—' },
-        ].map((k) => (
-          <Card key={k.l} className="p-4">
-            <div className="text-xs text-muted">{k.l}</div>
-            <div className="type-data mt-1 text-lg font-semibold text-text">{k.v}</div>
-          </Card>
-        ))}
+      <div className="mb-6 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
+        <StatTile hue="indigo" icon={<Banknote />} label="Revenue this month" value={s?.revenue_this_month} suffix="ETB" hint={s ? `${formatNumber(s.mrr)} ETB monthly recurring` : undefined} />
+        <StatTile hue="emerald" icon={<Building2 />} label="Paying organizations" value={s?.paying_organizations} hint="on Pro or Enterprise" />
+        <StatTile hue="amber" icon={<Hourglass />} label="Waiting for review" value={s?.pending_count} hint={s ? `${formatNumber(s.pending_amount)} ETB in total` : undefined} />
+        <StatTile hue="sky" icon={<ShieldCheck />} label="Checked automatically" value={s ? (s.auto_verified_share ?? 0) : undefined} suffix="%" hint="matched with the bank" />
       </div>
 
       <div className="mb-6 grid gap-6 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
@@ -78,18 +70,17 @@ export default function PaymentsPage() {
       </div>
 
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
-        <Segmented
+        <FilterChips
           value={status}
-          onValueChange={(v) => {
+          onChange={(v) => {
             setStatus(v);
             setPage(1);
           }}
-          size="sm"
           aria-label="Status"
           options={[
-            { value: 'pending', label: 'To review' },
-            { value: 'verified', label: 'Confirmed' },
-            { value: 'rejected', label: 'Rejected' },
+            { value: 'pending', label: 'To review', hue: 'amber', count: s?.pending_count },
+            { value: 'verified', label: 'Confirmed', hue: 'emerald' },
+            { value: 'rejected', label: 'Rejected', hue: 'rose' },
             { value: '', label: 'All' },
           ]}
         />

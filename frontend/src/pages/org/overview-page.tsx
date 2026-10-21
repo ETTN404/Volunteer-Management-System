@@ -1,30 +1,16 @@
-import { ArrowRight, CalendarRange, Clock4, UserPlus, Users, UsersRound } from 'lucide-react';
+import { ArrowRight, CalendarRange, Clock4, ExternalLink, Gem, Palette, UserPlus, Users, UsersRound } from 'lucide-react';
 import { useEffect } from 'react';
 import { Link } from 'react-router';
 import { formatDate } from '@/shared/lib/time';
 import { humanizeSkill } from '@/shared/lib/format';
-import { Button, Card, CardHeader, ErrorState, PageHeader, Skeleton } from '@/shared/ui';
+import { Card, CardHeader, ErrorState, HeroBand, Skeleton, StatTile, heroPill } from '@/shared/ui';
 import { AreaTrend, ChartCard, RankedBars } from '@/shared/ui/charts';
-import { CountUp, Stagger, StaggerItem } from '@/shared/motion';
+import { Stagger, StaggerItem } from '@/shared/motion';
 import { useOrgAnalytics, useOrganization } from '@/features/organization/api';
 import { useReports } from '@/features/people/api';
 import { useOrgAudit } from '@/features/organization/api';
 import { actionLabel } from '@/features/audit/audit-trail';
 import { formatRelative } from '@/shared/lib/time';
-
-function Tile({ icon, label, value, sub, to }: { icon: React.ReactNode; label: string; value?: number; sub?: string; to?: string }) {
-  const card = (
-    <Card interactive={Boolean(to)} className="h-full p-5">
-      <div className="flex items-center gap-2 text-muted [&_svg]:size-4">
-        {icon}
-        <span className="type-eyebrow-sm">{label}</span>
-      </div>
-      <div className="type-display mt-4 text-[38px] leading-none text-text">{value == null ? <Skeleton className="h-9 w-16" /> : <CountUp value={value} />}</div>
-      {sub && <div className="mt-2 text-[12.5px] text-faint">{sub}</div>}
-    </Card>
-  );
-  return to ? <Link to={to}>{card}</Link> : card;
-}
 
 export default function OrgOverviewPage() {
   const org = useOrganization();
@@ -41,36 +27,49 @@ export default function OrgOverviewPage() {
 
   return (
     <>
-      <PageHeader
-        eyebrow="Organization"
-        title={org.data?.name ?? 'Your organization'}
-        description={org.data ? `${org.data.subscription_plan ? org.data.subscription_plan[0]!.toUpperCase() + org.data.subscription_plan.slice(1) : 'Free'} plan · on VolunTrack since ${formatDate(org.data.created_at, 'MMMM yyyy')}` : undefined}
-        actions={
-          <>
-            <Button asChild variant="secondary">
-              <Link to="/o/settings">Settings & brand</Link>
-            </Button>
-            <Button asChild>
-              <Link to="/o/team">
-                <UserPlus /> Add a coordinator
-              </Link>
-            </Button>
-          </>
-        }
-      />
+      <HeroBand className="mb-5">
+        <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+          <div className="flex min-w-0 items-center gap-5">
+            <span className="grid size-16 shrink-0 place-items-center overflow-hidden rounded-[20px] bg-white text-[20px] font-extrabold text-[#11152b] shadow-xl">
+              {org.data?.logo_url ? <img src={org.data.logo_url} alt="" className="size-full object-cover" /> : (org.data?.name ?? 'VT').slice(0, 2).toUpperCase()}
+            </span>
+            <div className="min-w-0">
+              <span className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-[12px] font-semibold [box-shadow:inset_0_0_0_1px_rgba(255,255,255,0.2)]">
+                <Gem className="size-3.5" />
+                {org.data ? `${org.data.subscription_plan ? org.data.subscription_plan[0]!.toUpperCase() + org.data.subscription_plan.slice(1) : 'Free'} plan` : 'Plan'}
+              </span>
+              <h1 className="mt-3 truncate text-[clamp(1.8rem,4vw,2.7rem)] font-extrabold leading-[1.05] tracking-[-0.04em] [font-family:var(--font-display)]">{org.data?.name ?? 'Your organization'}</h1>
+              <p className="mt-1.5 text-[15px] opacity-85">{org.data ? `On VolunTrack since ${formatDate(org.data.created_at, 'MMMM yyyy')}` : '\u00a0'}</p>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Link to="/o/team" className="inline-flex h-10 items-center gap-2 rounded-full bg-white px-4 text-[13.5px] font-semibold text-[#11152b] shadow-lg transition-transform hover:-translate-y-0.5">
+              <UserPlus className="size-4" /> Add a coordinator
+            </Link>
+            <Link to="/o/settings" className={heroPill}>
+              <Palette /> Settings & brand
+            </Link>
+            {org.data && (
+              <a href={`/orgs/${org.data.id}`} target="_blank" rel="noreferrer" className={heroPill}>
+                <ExternalLink /> Public page
+              </a>
+            )}
+          </div>
+        </div>
+      </HeroBand>
 
-      <Stagger className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <Stagger className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         <StaggerItem>
-          <Tile icon={<Users />} label="Volunteers" value={d?.volunteers} sub={d ? `${d.active_volunteers} active` : undefined} to="/o/members" />
+          <StatTile hue="indigo" icon={<Users />} label="Volunteers" value={d?.volunteers} hint={d ? `${d.active_volunteers} active` : undefined} to="/o/members" />
         </StaggerItem>
         <StaggerItem>
-          <Tile icon={<UsersRound />} label="Coordinators" value={d?.coordinators} to="/o/team" />
+          <StatTile hue="rose" icon={<UsersRound />} label="Coordinators" value={d?.coordinators} hint="running your events" to="/o/team" />
         </StaggerItem>
         <StaggerItem>
-          <Tile icon={<CalendarRange />} label="Events" value={d?.events} sub={d ? `${d.upcoming_events} upcoming` : undefined} to="/c/events" />
+          <StatTile hue="amber" icon={<CalendarRange />} label="Events" value={d?.events} hint={d ? `${d.upcoming_events} upcoming` : undefined} to="/c/events" />
         </StaggerItem>
         <StaggerItem>
-          <Tile icon={<Clock4 />} label="Volunteer hours" value={d ? Math.round(d.total_hours) : undefined} sub="all time" />
+          <StatTile hue="emerald" icon={<Clock4 />} label="Volunteer hours" value={d ? Math.round(d.total_hours) : undefined} suffix="h" hint="all time" />
         </StaggerItem>
       </Stagger>
 
