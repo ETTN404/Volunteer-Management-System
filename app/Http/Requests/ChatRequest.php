@@ -16,6 +16,11 @@ class ChatRequest extends FormRequest
         return [
             'message' => 'required|string|max:1000',
             'history' => 'nullable|array',
+            'latitude' => 'nullable|numeric|between:-90,90|required_with:longitude',
+            'longitude' => 'nullable|numeric|between:-180,180|required_with:latitude',
+            'location_label' => 'nullable|string|max:120',
+            'location_source' => 'nullable|in:gps,map',
+            'forget_location' => 'nullable|boolean',
         ];
     }
 

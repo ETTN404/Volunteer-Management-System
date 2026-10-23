@@ -174,6 +174,9 @@ export interface ChatTurn {
   role: 'user' | 'model';
   text: string;
   at: string;
+  cards?: import('@/shared/types/api').ChatShiftCard[];
+  follow_ups?: string[];
+  ask_location?: boolean;
 }
 
 export interface Tables {

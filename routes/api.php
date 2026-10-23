@@ -217,7 +217,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/certificates', [VolunteerController::class, 'getCertificates']);
         Route::get('/certificates/{certificateId}/download', [CertificateController::class, 'downloadCertificate']);
 
-        Route::post('/chat', [ChatbotController::class, 'chat']);
+        Route::post('/chat', [ChatbotController::class, 'chat'])->middleware('throttle:20,1');
         Route::get('/chat/history', [ChatbotController::class, 'history']);
         Route::delete('/chat/history', [ChatbotController::class, 'clearHistory']);
     });

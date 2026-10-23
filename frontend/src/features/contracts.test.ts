@@ -122,7 +122,7 @@ describe('volunteer portal', () => {
     expect(reply.response).toContain('Meskel Square Blood Drive');
     const amharic = await chatApi.send('ቀጣይ ፈረቃዬ መቼ ነው?');
     expect(amharic.response).toMatch(/[ሀ-፿]/);
-    expect((await chatApi.history()).length).toBe(4);
+    expect((await chatApi.history()).messages.length).toBe(4);
   });
 
 });

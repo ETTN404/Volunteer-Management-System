@@ -70,6 +70,15 @@ describe('volunteer portal', () => {
     expect(db.t.volunteers[0]!.skills).toContain('medical');
   });
 
+  it('answers in VolunBot with live data and tappable shift cards', async () => {
+    const { screen, user } = await renderApp('/v/assistant', { as: DEMO.volunteer });
+    await user.click(await screen.findByRole('button', { name: /when is my next shift and how do i check in/i }, T));
+    expect(await screen.findByText(/check in from within/i, {}, T)).toBeInTheDocument();
+    const cards = await screen.findAllByRole('link', { name: /meskel square blood drive/i }, T);
+    expect(cards[0]).toHaveAttribute('href', '/v/schedule');
+    expect(screen.getByRole('button', { name: /how far is it from me/i })).toBeInTheDocument();
+  });
+
   it('lists earned and locked certificates', async () => {
     const { screen } = await renderApp('/v/certificates', { as: DEMO.volunteer });
     expect(await screen.findByText('VMS-00002', {}, T)).toBeInTheDocument();

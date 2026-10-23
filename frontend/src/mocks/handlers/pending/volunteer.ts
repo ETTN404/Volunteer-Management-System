@@ -61,11 +61,7 @@ export const volunteerPending = [
     }),
   ),
 
-  // G11 — chat history
-  http.get(
-    api('/volunteer/chat/history'),
-    authed(['Volunteer'], ({ actor }) => ok((db.t.chat[actor.volunteer!.id] ?? []).map((t) => ({ role: t.role, content: t.text, created_at: t.at })))),
-  ),
+  // G11 — chat history (GET lives with the chat handlers)
   http.delete(
     api('/volunteer/chat/history'),
     authed(['Volunteer'], ({ actor }) => {

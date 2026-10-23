@@ -467,12 +467,46 @@ export interface AiFeedback {
   ai_drafted_feedback: string;
 }
 
+/** A shift VolunBot refers to — rendered as a tappable card under the reply. */
+export interface ChatShiftCard {
+  shift_id: number;
+  event_id: number;
+  event_title: string;
+  shift_title?: string | null;
+  organization?: string | null;
+  org_color?: string | null;
+  start_time: string;
+  end_time: string;
+  location?: string | null;
+  latitude?: number;
+  longitude?: number;
+  distance_km?: number;
+  capacity: number;
+  confirmed: number;
+  /** Skill match 0–100 (open opportunities only). */
+  match?: number;
+  reasons?: string[];
+  /** Set when the volunteer is already on this shift. */
+  my_status?: 'pending' | 'confirmed' | 'waitlisted' | null;
+}
+
+export interface ChatLocation {
+  source: string;
+  label?: string | null;
+}
+
 export interface ChatReply {
   status: 'success';
   bot_name: string;
   query: string;
   response: string;
   timestamp: string;
+  cards?: ChatShiftCard[];
+  follow_ups?: string[];
+  ask_location?: boolean;
+  location?: ChatLocation | null;
+  /** True when the AI model was unavailable and a built-in responder answered from live data. */
+  degraded?: boolean;
 }
 
 export interface QrCode {
