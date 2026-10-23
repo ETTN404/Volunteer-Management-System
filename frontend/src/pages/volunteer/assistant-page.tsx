@@ -19,7 +19,7 @@ import {
   UserCheck,
   Zap,
 } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router';
 import { cn } from '@/shared/lib/cn';
@@ -52,6 +52,52 @@ function useIsDesktop() {
 type Recognition = { lang: string; interimResults: boolean; onresult: ((e: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null; onend: (() => void) | null; onerror: (() => void) | null; start: () => void; stop: () => void };
 const SpeechCtor = typeof window !== 'undefined' ? ((window as unknown as Record<string, unknown>).SpeechRecognition ?? (window as unknown as Record<string, unknown>).webkitSpeechRecognition) as (new () => Recognition) | undefined : undefined;
 
+/** Calls the latest version of a callback through a stable function (keeps memoised children still). */
+function useStable<A extends unknown[], R>(fn: (...args: A) => R) {
+  const ref = useRef(fn);
+  useLayoutEffect(() => {
+    ref.current = fn;
+  });
+  return useCallback((...args: A) => ref.current(...args), []);
+}
+
+/**
+ * Fits the chat exactly into the visible screen: on phones it follows the visual
+ * viewport (browser bars, on-screen keyboard); on desktop it fills the content panel
+ * below any banners — so the composer is never pushed off the bottom.
+ */
+function useFitHeight(desktop: boolean) {
+  const ref = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const vv = window.visualViewport;
+    const fit = () => {
+      if (desktop) {
+        const top = el.getBoundingClientRect().top + (el.closest('main')?.scrollTop ?? 0);
+        el.style.height = `${Math.max(480, Math.floor(window.innerHeight - top - 12))}px`;
+      } else {
+        el.style.height = `${Math.floor(vv?.height ?? window.innerHeight)}px`;
+        el.style.transform = vv && vv.offsetTop ? `translateY(${vv.offsetTop}px)` : '';
+      }
+    };
+    fit();
+    const ro = new ResizeObserver(fit);
+    const main = el.closest('main');
+    if (desktop && main?.firstElementChild) ro.observe(main.firstElementChild);
+    window.addEventListener('resize', fit);
+    vv?.addEventListener('resize', fit);
+    vv?.addEventListener('scroll', fit);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', fit);
+      vv?.removeEventListener('resize', fit);
+      vv?.removeEventListener('scroll', fit);
+    };
+  }, [desktop]);
+  return ref;
+}
+
 export default function AssistantPage() {
   const t = useT();
   const locale = useLocaleStore((s) => s.locale);
@@ -65,20 +111,16 @@ export default function AssistantPage() {
   const impact = useImpact();
   const profile = useVolunteerProfile();
 
-  const [draft, setDraft] = useState('');
   const [pending, setPending] = useState<SharedLocation | null>(null);
   const [mapOpen, setMapOpen] = useState(false);
-  const [listening, setListening] = useState(false);
   const lastInput = useRef<ChatSend | null>(null);
   const scroller = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLTextAreaElement>(null);
-  const recognition = useRef<Recognition | null>(null);
+  const frame = useFitHeight(desktop);
 
   const messages = useMemo(() => history.data?.messages ?? [], [history.data]);
   const serverLocation = history.data?.location ?? null;
   const hasLocation = Boolean(pending || serverLocation);
-  const lastBot = [...messages].reverse().find((m) => m.role === 'model');
-  const degraded = Boolean(lastBot?.degraded);
+  const degraded = Boolean([...messages].reverse().find((m) => m.role === 'model')?.degraded);
 
   useEffect(() => {
     document.title = 'VolunBot · VolunTrack';
@@ -96,13 +138,14 @@ export default function AssistantPage() {
 
   useEffect(() => {
     const el = scroller.current;
-    if (el) el.scrollTo?.({ top: el.scrollHeight, behavior: 'smooth' });
+    if (!el) return;
+    const id = requestAnimationFrame(() => el.scrollTo?.({ top: el.scrollHeight, behavior: 'smooth' }));
+    return () => cancelAnimationFrame(id);
   }, [messages.length, send.isPending]);
 
-  const ask = (text: string, loc: SharedLocation | null = pending) => {
+  const ask = useStable((text: string, loc: SharedLocation | null = pending) => {
     const message = text.trim();
     if (!message || send.isPending) return;
-    setDraft('');
     const input: ChatSend = { message };
     if (loc) {
       input.latitude = loc.latitude;
@@ -112,36 +155,21 @@ export default function AssistantPage() {
     }
     lastInput.current = input;
     send.mutate(input, { onSuccess: () => setPending(null) });
-  };
+  });
+  const askText = useStable((text: string) => ask(text));
 
   // Location shared from a "where are you?" card → answer the last question again with it.
-  const shareAndRetry = (loc: SharedLocation) => {
+  const shareAndRetry = useStable((loc: SharedLocation) => {
     const lastQuestion = [...messages].reverse().find((m) => m.role === 'user')?.content;
     setPending(loc);
     ask(lastQuestion ? lastQuestion : t('Which open shifts are closest to me?'), loc);
-  };
+  });
   const quickGps = useOneShotLocation((loc) => setPending(loc));
+  const onLocationButton = useStable(() => (hasLocation ? setMapOpen(true) : quickGps.request()));
 
   const forgetLocation = () => {
     setPending(null);
     send.mutate({ message: t('Please forget my location.'), forget_location: true });
-  };
-
-  const toggleMic = () => {
-    if (!SpeechCtor) return;
-    if (listening) {
-      recognition.current?.stop();
-      return;
-    }
-    const r = new SpeechCtor();
-    r.lang = locale === 'am' ? 'am-ET' : 'en-US';
-    r.interimResults = true;
-    r.onresult = (e) => setDraft(Array.from(e.results).map((x) => x[0]?.transcript ?? '').join(' '));
-    r.onend = () => setListening(false);
-    r.onerror = () => setListening(false);
-    recognition.current = r;
-    setListening(true);
-    r.start();
   };
 
   // ---- personalised starters ------------------------------------------------
@@ -153,55 +181,49 @@ export default function AssistantPage() {
   }, [schedule.data]);
   const v = profile.data?.volunteer;
   const missing = v ? [!v.bio && 'bio', !v.skills?.length && 'skills', !normalizeAvailability(v.availability).length && 'availability'].filter(Boolean).length : 0;
+  const nextTitle = next?.shift?.event?.title;
+  const milestone = impact.data?.next_milestone;
 
-  const starters: { icon: ReactNode; text: string; hue: string }[] = [
-    { icon: <Sparkles />, text: t('Suggest the best opportunities for me this week'), hue: 'indigo' },
-    next?.shift?.event
-      ? { icon: <MapPin />, text: t('How far is {event} from me?', { event: next.shift.event.title }), hue: 'sky' }
-      : { icon: <MapPin />, text: t('Which open shifts are closest to me?'), hue: 'sky' },
-    { icon: <CalendarClock />, text: t('When is my next shift and how do I check in?'), hue: 'amber' },
-    { icon: <Award />, text: impact.data?.next_milestone ? t('How do I reach my {n}-hour certificate faster?', { n: impact.data.next_milestone }) : t('How many hours until my next certificate?'), hue: 'emerald' },
-    { icon: <UserCheck />, text: missing ? t("What's missing from my profile?") : t('Which of my skills are most in demand?'), hue: 'violet' },
-    { icon: <Languages />, text: locale === 'am' ? 'What can you help me with?' : 'ለእኔ የሚስማሙ ዕድሎችን ጠቁመኝ', hue: 'rose' },
-  ];
+  const starters = useMemo<{ icon: ReactNode; text: string; hue: string }[]>(
+    () => [
+      { icon: <Sparkles />, text: t('Suggest the best opportunities for me this week'), hue: 'indigo' },
+      nextTitle ? { icon: <MapPin />, text: t('How far is {event} from me?', { event: nextTitle }), hue: 'sky' } : { icon: <MapPin />, text: t('Which open shifts are closest to me?'), hue: 'sky' },
+      { icon: <CalendarClock />, text: t('When is my next shift and how do I check in?'), hue: 'amber' },
+      { icon: <Award />, text: milestone ? t('How do I reach my {n}-hour certificate faster?', { n: milestone }) : t('How many hours until my next certificate?'), hue: 'emerald' },
+      { icon: <UserCheck />, text: missing ? t("What's missing from my profile?") : t('Which of my skills are most in demand?'), hue: 'violet' },
+      { icon: <Languages />, text: locale === 'am' ? 'What can you help me with?' : 'ለእኔ የሚስማሙ ዕድሎችን ጠቁመኝ', hue: 'rose' },
+    ],
+    [t, nextTitle, milestone, missing, locale],
+  );
 
   const first = firstName(user?.full_name);
   const empty = messages.length === 0 && !send.isPending;
   const lastIndex = messages.length - 1;
 
   const body = (
-    <div
-      className={cn(
-        'flex flex-col overflow-hidden',
-        desktop ? '-mx-9 -mb-9 -mt-8 h-[calc(100dvh-104px)] min-h-[560px]' : 'fixed inset-0 z-40 bg-bg',
-      )}
-      style={desktop ? undefined : { backgroundImage: 'var(--canvas-glow)' }}
-    >
+    <div ref={frame} className={cn('flex flex-col overflow-hidden', desktop ? '-mx-9 -mb-9 -mt-8 h-[calc(100dvh-104px)]' : 'fixed inset-x-0 top-0 z-40 h-dvh bg-bg')}>
       {/* Header */}
-      <header className={cn('relative z-10 flex shrink-0 items-center gap-3 border-b border-line bg-surface/80 px-3 backdrop-blur-xl sm:px-5', desktop ? 'h-[76px] px-7' : 'h-[64px] pt-[env(safe-area-inset-top)]')}>
+      <header className={cn('relative z-10 flex shrink-0 items-center gap-3 border-b border-line bg-surface px-3 sm:px-5', desktop ? 'h-[76px] px-7' : 'min-h-[60px] pt-[env(safe-area-inset-top)]')}>
         {!desktop && (
           <Button variant="ghost" size="icon" aria-label={t('Back')} onClick={() => (window.history.length > 1 ? navigate(-1) : navigate('/v'))}>
             <ArrowLeft />
           </Button>
         )}
-        <BotOrb size={desktop ? 42 : 36} thinking={send.isPending} glow />
+        <BotOrb size={desktop ? 42 : 36} thinking={send.isPending} />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <span className="text-[16px] font-extrabold tracking-[-0.02em] text-text [font-family:var(--font-display)]">VolunBot</span>
             <span className="rounded-full bg-accent-soft px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-wider text-accent-text">AI</span>
           </div>
           <div className="flex items-center gap-1.5 text-[12px] text-muted">
-            <span className={cn('size-1.5 rounded-full', send.isPending ? 'animate-pulse bg-[var(--hue-amber)]' : degraded ? 'bg-[var(--hue-amber)]' : 'bg-success')} />
+            <span className={cn('size-1.5 shrink-0 rounded-full', send.isPending || degraded ? 'bg-[var(--hue-amber)]' : 'bg-success')} />
             <span className="truncate">{send.isPending ? t('Looking at your latest data…') : degraded ? t('Quick mode · answering from your data') : t('Live · knows your profile, shifts and impact')}</span>
           </div>
         </div>
         <Menu>
           <MenuTrigger asChild>
             <button
-              className={cn(
-                'inline-flex h-9 items-center gap-1.5 rounded-full px-3 text-[12.5px] font-semibold transition-colors',
-                hasLocation ? 'bg-success-soft text-success-text' : 'bg-surface-2 text-muted hover:text-text',
-              )}
+              className={cn('inline-flex h-9 items-center gap-1.5 rounded-full px-3 text-[12.5px] font-semibold transition-colors', hasLocation ? 'bg-success-soft text-success-text' : 'bg-surface-2 text-muted hover:text-text')}
               aria-label={t('Location')}
             >
               {hasLocation ? <LocateFixed className="size-4" /> : <MapPin className="size-4" />}
@@ -230,135 +252,68 @@ export default function AssistantPage() {
       </header>
 
       <div className="flex min-h-0 flex-1">
-      <div className="flex min-w-0 flex-1 flex-col">
-      {/* Conversation */}
-      <div ref={scroller} className="vb-scroll relative flex-1 overflow-y-auto overscroll-contain" aria-live="polite" aria-label={t('Conversation')}>
-        <div className="mx-auto w-full max-w-[860px] px-4 pb-6 pt-5 sm:px-6">
-          {empty ? (
-            <Welcome
-              name={first}
-              loading={history.isLoading}
-              next={next}
-              hoursToNext={impact.data?.hours_to_next}
-              nextMilestone={impact.data?.next_milestone}
-              totalHours={impact.data?.total_hours}
-              skills={v?.skills ?? []}
-              starters={starters}
-              onAsk={(s) => ask(s)}
-            />
-          ) : (
-            <div className="flex flex-col gap-6">
-              <AnimatePresence initial={false}>
-                {messages.map((m, i) => (
-                  <Bubble
-                    key={`${i}-${m.created_at}`}
-                    m={m}
-                    userName={user?.full_name}
-                    userPhoto={user?.profile_photo_url}
-                    latest={i === lastIndex && !send.isPending}
-                    needsLocation={!hasLocation}
-                    onAsk={(s) => ask(s)}
-                    onShare={shareAndRetry}
-                  />
-                ))}
-                {send.isPending && <Thinking key="thinking" withLocation={hasLocation} />}
-              </AnimatePresence>
-              {send.error && (
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-wrap items-center gap-3 rounded-[16px] bg-danger-soft px-4 py-3 text-[13.5px] text-danger-text">
-                  <span className="flex-1">{errorMessage(send.error)}</span>
-                  {lastInput.current && (
-                    <Button size="sm" variant="secondary" onClick={() => lastInput.current && send.mutate(lastInput.current)}>
-                      <RotateCcw /> {t('Try again')}
-                    </Button>
+        <div className="flex min-w-0 flex-1 flex-col">
+          {/* Conversation */}
+          <div ref={scroller} className="vb-scroll relative min-h-0 flex-1 overflow-y-auto overscroll-contain" aria-live="polite" aria-label={t('Conversation')}>
+            <div className="mx-auto w-full max-w-[860px] px-4 pb-6 pt-5 sm:px-6">
+              {empty ? (
+                <Welcome
+                  name={first}
+                  loading={history.isLoading}
+                  next={next}
+                  hoursToNext={impact.data?.hours_to_next}
+                  nextMilestone={milestone}
+                  totalHours={impact.data?.total_hours}
+                  skills={v?.skills ?? []}
+                  starters={starters}
+                  onAsk={askText}
+                />
+              ) : (
+                <div className="flex flex-col gap-6">
+                  {messages.map((m, i) => (
+                    <Bubble
+                      key={`${i}-${m.created_at}`}
+                      m={m}
+                      userName={user?.full_name}
+                      userPhoto={user?.profile_photo_url}
+                      latest={i === lastIndex && !send.isPending}
+                      needsLocation={!hasLocation}
+                      onAsk={askText}
+                      onShare={shareAndRetry}
+                    />
+                  ))}
+                  <AnimatePresence>{send.isPending && <Thinking key="thinking" withLocation={hasLocation} />}</AnimatePresence>
+                  {send.error && (
+                    <div className="flex flex-wrap items-center gap-3 rounded-[16px] bg-danger-soft px-4 py-3 text-[13.5px] text-danger-text">
+                      <span className="flex-1">{errorMessage(send.error)}</span>
+                      {lastInput.current && (
+                        <Button size="sm" variant="secondary" onClick={() => lastInput.current && send.mutate(lastInput.current)}>
+                          <RotateCcw /> {t('Try again')}
+                        </Button>
+                      )}
+                    </div>
                   )}
-                </motion.div>
+                </div>
               )}
             </div>
-          )}
+          </div>
+
+          <Composer desktop={desktop} busy={send.isPending} hasLocation={hasLocation} locating={quickGps.locating} locale={locale} onSend={askText} onLocation={onLocationButton} />
         </div>
-      </div>
-
-      {/* Composer */}
-      <div className={cn('relative shrink-0 border-t border-line bg-surface/85 px-3 pt-3 backdrop-blur-xl sm:px-5', desktop ? 'pb-3' : 'pb-[max(12px,env(safe-area-inset-bottom))]')}>
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            ask(draft);
-          }}
-          className="mx-auto flex max-w-[860px] items-end gap-2 rounded-[24px] bg-surface p-1.5 pl-2 [box-shadow:0_10px_30px_-18px_rgba(17,21,43,0.45),inset_0_0_0_1px_var(--line-strong)] focus-within:[box-shadow:0_10px_30px_-18px_rgba(17,21,43,0.45),inset_0_0_0_2px_var(--accent)]"
-        >
-          <button
-            type="button"
-            onClick={() => (hasLocation ? setMapOpen(true) : quickGps.request())}
-            className={cn('grid size-10 shrink-0 place-items-center rounded-full transition-colors', hasLocation ? 'bg-success-soft text-success-text' : 'text-muted hover:bg-surface-2 hover:text-text')}
-            aria-label={hasLocation ? t('Change my location') : t('Share my location')}
-            title={hasLocation ? t('Location on') : t('Share my location')}
-          >
-            {quickGps.locating ? <span className="size-4 animate-spin rounded-full border-2 border-current border-t-transparent" /> : hasLocation ? <LocateFixed className="size-[18px]" /> : <MapPin className="size-[18px]" />}
-          </button>
-          <textarea
-            ref={inputRef}
-            value={draft}
-            onChange={(e) => {
-              setDraft(e.target.value);
-              e.target.style.height = 'auto';
-              e.target.style.height = `${Math.min(e.target.scrollHeight, 140)}px`;
-            }}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
-                e.preventDefault();
-                ask(draft);
-              }
-            }}
-            rows={1}
-            maxLength={1000}
-            placeholder={listening ? t('Listening…') : t('Ask VolunBot anything…')}
-            aria-label={t('Message VolunBot')}
-            lang={ETHIOPIC.test(draft) ? 'am' : undefined}
-            className={cn('max-h-[140px] min-h-10 flex-1 resize-none bg-transparent py-2.5 text-[15px] leading-5 text-text outline-none placeholder:text-faint', ETHIOPIC.test(draft) && 'font-ethiopic')}
+        {desktop && (
+          <ContextPanel
+            name={user?.full_name ?? ''}
+            photo={user?.profile_photo_url}
+            skills={v?.skills ?? []}
+            availability={v ? normalizeAvailability(v.availability) : []}
+            next={next}
+            hours={impact.data?.total_hours}
+            score={impact.data?.impact_score}
+            nextMilestone={milestone}
+            locationLabel={hasLocation ? (pending?.label ?? serverLocation?.label ?? t('Shared for this chat')) : null}
+            onLocation={() => setMapOpen(true)}
           />
-          {SpeechCtor && (
-            <button
-              type="button"
-              onClick={toggleMic}
-              className={cn('relative grid size-10 shrink-0 place-items-center rounded-full transition-colors', listening ? 'bg-danger-soft text-danger-text' : 'text-muted hover:bg-surface-2 hover:text-text')}
-              aria-label={listening ? t('Stop listening') : t('Speak your question')}
-            >
-              {listening && <span className="absolute inset-0 animate-[ping-ring_1.6s_ease-out_infinite] rounded-full ring-2 ring-[var(--danger)]" />}
-              <Mic className="size-[18px]" />
-            </button>
-          )}
-          <motion.button
-            type="submit"
-            whileTap={{ scale: 0.9 }}
-            disabled={!draft.trim() || send.isPending}
-            className="grid size-10 shrink-0 place-items-center rounded-full bg-[linear-gradient(135deg,var(--accent),color-mix(in_oklab,var(--accent)_55%,#a855f7))] text-accent-fg shadow-[0_8px_18px_-8px_var(--accent)] transition-opacity disabled:opacity-35"
-            aria-label={t('Send')}
-          >
-            {send.isPending ? <span className="size-4 animate-spin rounded-full border-2 border-white/80 border-t-transparent" /> : <ArrowUp className="size-5" strokeWidth={2.5} />}
-          </motion.button>
-        </form>
-        <p className="mx-auto mt-2 flex max-w-[860px] items-center justify-center gap-1.5 text-center text-[11px] text-faint">
-          <ShieldCheck className="size-3.5 shrink-0" />
-          {t('VolunBot only sees your own VolunTrack data. Double-check important details.')}
-        </p>
-      </div>
-
-      </div>
-      {desktop && (
-        <ContextPanel
-          name={user?.full_name ?? ''}
-          photo={user?.profile_photo_url}
-          skills={v?.skills ?? []}
-          availability={v ? normalizeAvailability(v.availability) : []}
-          next={next}
-          hours={impact.data?.total_hours}
-          score={impact.data?.impact_score}
-          nextMilestone={impact.data?.next_milestone}
-          locationLabel={hasLocation ? (pending?.label ?? serverLocation?.label ?? t('Shared for this chat')) : null}
-          onLocation={() => setMapOpen(true)}
-        />
-      )}
+        )}
       </div>
 
       <MapPickerDialog open={mapOpen} onOpenChange={setMapOpen} onPick={(l) => setPending(l)} />
@@ -368,6 +323,124 @@ export default function AssistantPage() {
   if (desktop) return body;
   return createPortal(body, document.body);
 }
+
+/** The message box keeps its own draft, so typing never re-renders the conversation. */
+const Composer = memo(function Composer({
+  desktop,
+  busy,
+  hasLocation,
+  locating,
+  locale,
+  onSend,
+  onLocation,
+}: {
+  desktop: boolean;
+  busy: boolean;
+  hasLocation: boolean;
+  locating: boolean;
+  locale: string;
+  onSend: (text: string) => void;
+  onLocation: () => void;
+}) {
+  const t = useT();
+  const [draft, setDraft] = useState('');
+  const [listening, setListening] = useState(false);
+  const recognition = useRef<Recognition | null>(null);
+  const box = useRef<HTMLTextAreaElement>(null);
+  const am = ETHIOPIC.test(draft);
+
+  // Grow with the text (up to 5 lines) — one measurement per frame at most.
+  useLayoutEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    el.style.height = '0px';
+    el.style.height = `${Math.min(el.scrollHeight, 132)}px`;
+  }, [draft]);
+
+  const submit = () => {
+    if (!draft.trim() || busy) return;
+    onSend(draft);
+    setDraft('');
+  };
+
+  const toggleMic = () => {
+    if (!SpeechCtor) return;
+    if (listening) {
+      recognition.current?.stop();
+      return;
+    }
+    const r = new SpeechCtor();
+    r.lang = locale === 'am' ? 'am-ET' : 'en-US';
+    r.interimResults = true;
+    r.onresult = (e) => setDraft(Array.from(e.results).map((x) => x[0]?.transcript ?? '').join(' '));
+    r.onend = () => setListening(false);
+    r.onerror = () => setListening(false);
+    recognition.current = r;
+    setListening(true);
+    r.start();
+  };
+
+  return (
+    <div className={cn('relative shrink-0 border-t border-line bg-surface px-3 pt-2.5 sm:px-5', desktop ? 'pb-3' : 'pb-[max(14px,calc(env(safe-area-inset-bottom)+8px))]')}>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          submit();
+        }}
+        className="mx-auto flex max-w-[860px] items-end gap-1.5 rounded-[24px] bg-surface p-1.5 [box-shadow:inset_0_0_0_1px_var(--line-strong)] focus-within:[box-shadow:inset_0_0_0_2px_var(--accent)]"
+      >
+        <button
+          type="button"
+          onClick={onLocation}
+          className={cn('grid size-10 shrink-0 place-items-center rounded-full transition-colors', hasLocation ? 'bg-success-soft text-success-text' : 'text-muted hover:bg-surface-2 hover:text-text')}
+          aria-label={hasLocation ? t('Change my location') : t('Share my location')}
+        >
+          {locating ? <span className="size-4 animate-spin rounded-full border-2 border-current border-t-transparent" /> : hasLocation ? <LocateFixed className="size-[18px]" /> : <MapPin className="size-[18px]" />}
+        </button>
+        <textarea
+          ref={box}
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+              e.preventDefault();
+              submit();
+            }
+          }}
+          rows={1}
+          maxLength={1000}
+          enterKeyHint="send"
+          placeholder={listening ? t('Listening…') : t('Ask VolunBot anything…')}
+          aria-label={t('Message VolunBot')}
+          lang={am ? 'am' : undefined}
+          className={cn('block h-10 min-w-0 flex-1 resize-none bg-transparent px-1 py-2.5 text-[16px] leading-5 text-text outline-none placeholder:text-faint', am && 'font-ethiopic')}
+        />
+        {SpeechCtor && (
+          <button
+            type="button"
+            onClick={toggleMic}
+            className={cn('grid size-10 shrink-0 place-items-center rounded-full transition-colors', listening ? 'bg-danger-soft text-danger-text' : 'text-muted hover:bg-surface-2 hover:text-text')}
+            aria-label={listening ? t('Stop listening') : t('Speak your question')}
+          >
+            <Mic className={cn('size-[18px]', listening && 'animate-pulse')} />
+          </button>
+        )}
+        <button
+          type="submit"
+          disabled={!draft.trim() || busy}
+          className="grid size-10 shrink-0 place-items-center rounded-full bg-[linear-gradient(135deg,var(--accent),color-mix(in_oklab,var(--accent)_55%,#a855f7))] text-accent-fg transition-[opacity,transform] active:scale-90 disabled:opacity-35"
+          aria-label={t('Send')}
+        >
+          {busy ? <span className="size-4 animate-spin rounded-full border-2 border-white/80 border-t-transparent" /> : <ArrowUp className="size-5" strokeWidth={2.5} />}
+        </button>
+      </form>
+      <p className="mx-auto mt-1.5 hidden max-w-[860px] items-center justify-center gap-1.5 text-center text-[11px] text-faint sm:flex">
+        <ShieldCheck className="size-3.5 shrink-0" />
+        {t('VolunBot only sees your own VolunTrack data. Double-check important details.')}
+      </p>
+    </div>
+  );
+});
 
 /* ------------------------------------------------------------------------- */
 
@@ -507,7 +580,7 @@ function Snapshot({ icon, label, value, hint, hue, progress, delay, onClick }: {
   );
 }
 
-function Bubble({
+const Bubble = memo(function Bubble({
   m,
   userName,
   userPhoto,
@@ -549,7 +622,7 @@ function Bubble({
   const cards = m.cards ?? [];
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }} className="flex gap-3">
-      <BotOrb size={30} className="mt-0.5" />
+      <BotOrb size={30} still className="mt-0.5" />
       <div className="min-w-0 flex-1">
         <div lang={am ? 'am' : undefined} className={cn('max-w-[640px] break-words text-[15px] leading-[1.65] text-text/90', am && 'font-ethiopic')}>
           <RichText text={content} />
@@ -614,5 +687,5 @@ function Bubble({
       </div>
     </motion.div>
   );
-}
+});
 

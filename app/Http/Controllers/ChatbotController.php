@@ -40,13 +40,14 @@ class ChatbotController extends Controller
         $location = $this->location($request, $data);
 
         $context = $this->contextBuilder->build($volunteer->load('user'), $location);
-        $turns = collect($history)->take(-14)->map(fn ($m) => ['role' => $m['role'], 'text' => $m['parts'][0]['text'] ?? ''])->all();
+        $turns = collect($history)->take(-10)->map(fn ($m) => ['role' => $m['role'], 'text' => $m['parts'][0]['text'] ?? ''])->all();
         $turns[] = ['role' => 'user', 'text' => $message];
 
+        $started = microtime(true);
         $answer = $this->gemini->json($this->system($context, $user->locale), $turns, $this->schema());
 
         // The volunteer named a place ("I'm near Bole") — find it on the map and answer again with distances.
-        if ($answer && !$location && filled($answer['place_query'] ?? null) && ($found = $this->geocoder->find($answer['place_query']))) {
+        if ($answer && !$location && microtime(true) - $started < 14 && filled($answer['place_query'] ?? null) && ($found = $this->geocoder->find($answer['place_query']))) {
             $location = $found + ['source' => 'typed', 'at' => now()->toIso8601String()];
             $context = $this->contextBuilder->build($volunteer, $location);
             $answer = $this->gemini->json($this->system($context, $user->locale), $turns, $this->schema()) ?? $answer;

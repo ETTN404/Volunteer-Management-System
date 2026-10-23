@@ -10,11 +10,11 @@ import type { ChatShiftCard } from '@/shared/types/api';
 export const ETHIOPIC = /[ሀ-፿]/;
 
 /** The VolunBot mark — a turning aurora orb. Spins faster while thinking. */
-export function BotOrb({ size = 36, thinking, glow, className }: { size?: number; thinking?: boolean; glow?: boolean; className?: string }) {
+export function BotOrb({ size = 36, thinking, glow, still, className }: { size?: number; thinking?: boolean; glow?: boolean; still?: boolean; className?: string }) {
   return (
     <span className={cn('relative inline-grid shrink-0 place-items-center', className)} style={{ width: size, height: size }} aria-hidden>
       {glow && <span className="vb-orb-glow" />}
-      <span className="vb-orb size-full" data-thinking={thinking ? 'true' : 'false'} />
+      <span className="vb-orb size-full" data-thinking={thinking ? 'true' : 'false'} data-still={still ? 'true' : undefined} />
     </span>
   );
 }

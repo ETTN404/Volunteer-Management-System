@@ -13,7 +13,10 @@ use Illuminate\Support\Facades\Log;
  */
 class GeminiService
 {
-    private const FALLBACK_MODELS = ['gemini-flash-latest', 'gemini-2.5-flash', 'gemini-flash-lite-latest', 'gemini-2.5-flash-lite'];
+    private const FALLBACK_MODELS = ['gemini-2.5-flash', 'gemini-flash-latest', 'gemini-2.5-flash-lite', 'gemini-flash-lite-latest'];
+
+    /** Whole-request budget, so the volunteer never waits past the app's timeout. */
+    private const BUDGET_SECONDS = 32;
 
     public function configured(): bool
     {
@@ -54,7 +57,7 @@ class GeminiService
             'contents'          => $contents,
             'generationConfig'  => [
                 'temperature'      => $temperature,
-                'maxOutputTokens'  => 4096,
+                'maxOutputTokens'  => 8192,
                 'responseMimeType' => 'application/json',
                 'responseSchema'   => $schema,
             ],
@@ -62,13 +65,24 @@ class GeminiService
 
         $started = microtime(true);
         foreach ($this->models() as $model) {
+            $left = self::BUDGET_SECONDS - (microtime(true) - $started);
+            if ($left < 6) {
+                break;
+            }
+            $body = $payload;
+            // Long "thinking" makes replies take 20–40 s; these answers come from ready-made facts, so keep it minimal.
+            if ($thinking = $this->thinking($model)) {
+                $body['generationConfig']['thinkingConfig'] = $thinking;
+            }
             try {
-                $res = Http::withHeaders(['x-goog-api-key' => config('services.gemini.key')])
-                    ->acceptJson()->timeout(40)->connectTimeout(8)
-                    ->post("https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent", $payload);
+                $res = $this->post($model, $body, $left);
+                if ($thinking && $res->status() === 400 && str_contains(strtolower((string) $res->body()), 'think')) {
+                    unset($body['generationConfig']['thinkingConfig']);
+                    $res = $this->post($model, $body, self::BUDGET_SECONDS - (microtime(true) - $started));
+                }
             } catch (\Throwable $e) {
-                $this->fail($model, 'connection: ' . $e->getMessage());
-                break; // network trouble affects every model equally
+                $this->fail($model, 'connection/timeout: ' . mb_strimwidth($e->getMessage(), 0, 160));
+                break; // a timeout or network problem would hit every model
             }
 
             if ($res->successful()) {
@@ -85,12 +99,31 @@ class GeminiService
             }
 
             $this->fail($model, $res->status() . ' ' . mb_strimwidth((string) $res->json('error.message', $res->body()), 0, 200));
-            // A bad key or quota hit will not be fixed by another model.
-            if (in_array($res->status(), [401, 403], true) || microtime(true) - $started > 45) {
+            // A bad key will not be fixed by another model.
+            if (in_array($res->status(), [401, 403], true)) {
                 break;
             }
         }
 
+        return null;
+    }
+
+    private function post(string $model, array $body, float $seconds)
+    {
+        return Http::withHeaders(['x-goog-api-key' => config('services.gemini.key')])
+            ->acceptJson()->timeout(max(5, (int) floor($seconds)))->connectTimeout(6)
+            ->post("https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent", $body);
+    }
+
+    private function thinking(string $model): ?array
+    {
+        if (str_contains($model, '2.5')) {
+            return str_contains($model, 'pro') ? ['thinkingBudget' => 128] : ['thinkingBudget' => 0];
+        }
+        // Gemini 3+ and the moving "latest" aliases think by default (slow, and it eats the output allowance).
+        if (preg_match('/gemini-[3-9]|latest/', $model)) {
+            return ['thinkingLevel' => str_contains($model, 'flash') ? 'minimal' : 'low'];
+        }
         return null;
     }
 
@@ -108,6 +141,11 @@ class GeminiService
         $data = json_decode($text, true);
         if (!is_array($data) && preg_match('/\{.*\}/s', $text, $m)) {
             $data = json_decode($m[0], true);
+        }
+        // Cut off mid-way (output limit): keep the reply text rather than losing the whole answer.
+        if (!is_array($data) && preg_match('/"reply"\s*:\s*"((?:[^"\\\\]|\\\\.)*)/s', $text, $m) && mb_strlen($m[1]) > 20) {
+            $reply = json_decode('"' . $m[1] . '"') ?? stripcslashes($m[1]);
+            $data = ['reply' => rtrim($reply) . (str_ends_with($text, '}') ? '' : '…'), 'shift_ids' => [], 'follow_ups' => [], 'ask_location' => false, 'place_query' => ''];
         }
         return is_array($data) ? $data : null;
     }

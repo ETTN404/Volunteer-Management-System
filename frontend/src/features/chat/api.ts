@@ -28,7 +28,9 @@ export interface ChatSend {
 
 export const chatApi = {
   /** POST /volunteer/chat — the backend rebuilds the volunteer's live context on every message. */
-  send: async (input: ChatSend | string) => (await http.post<ChatReply>('/volunteer/chat', typeof input === 'string' ? { message: input } : input)).data,
+  // AI replies can take a while; this is not a cold start, so no "waking up" banner and a longer wait.
+  send: async (input: ChatSend | string) =>
+    (await http.post<ChatReply>('/volunteer/chat', typeof input === 'string' ? { message: input } : input, { timeoutMs: 90_000, silent: true })).data,
   history: async (): Promise<ChatHistory> => {
     const res = await http.get<ChatMessage[]>('/volunteer/chat/history');
     return { messages: Array.isArray(res.data) ? res.data : [], location: (res.raw.location as ChatLocation | null | undefined) ?? null };

@@ -90,6 +90,24 @@ class VolunBotTest extends TestCase
             ->assertOk()->assertJsonPath('data.response', 'Hi Hana')->assertJsonPath('data.degraded', false);
     }
 
+    public function test_thinking_models_are_kept_fast_and_cut_off_replies_are_kept(): void
+    {
+        config(['services.gemini.key' => 'test-key', 'services.gemini.model' => 'gemini-3.8-flash']);
+        $calls = [];
+        Http::fake(function (HttpRequest $req) use (&$calls) {
+            $calls[] = $req->data();
+            return Http::response(['candidates' => [['finishReason' => 'MAX_TOKENS', 'content' => ['parts' => [['text' => '{"reply":"Your next shift is **Meal Day** tomorrow at Piassa, and the clinic']]]]]]);
+        });
+
+        $this->actingAs($this->user, 'sanctum')->postJson('/api/volunteer/chat', ['message' => 'When is my next shift?'])
+            ->assertOk()
+            ->assertJsonPath('data.degraded', false)
+            ->assertJsonPath('data.response', 'Your next shift is **Meal Day** tomorrow at Piassa, and the clinic…');
+
+        $this->assertCount(1, $calls); // no slow retry chain
+        $this->assertSame('minimal', $calls[0]['generationConfig']['thinkingConfig']['thinkingLevel']);
+    }
+
     public function test_without_ai_it_answers_from_real_data_only(): void
     {
         config(['services.gemini.key' => null]);
