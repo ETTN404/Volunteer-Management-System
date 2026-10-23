@@ -49,7 +49,7 @@ export default function UsersPage() {
       ) : !rows.length ? (
         <EmptyState icon={<Users />} title="No users match" />
       ) : (
-        <Card className="overflow-x-auto">
+        <Card className="vt-stack overflow-x-auto">
           <table className="w-full min-w-[720px] text-sm">
             <thead className="border-b border-line bg-surface-2/60 text-left text-[11.5px] uppercase tracking-wider text-faint">
               <tr>

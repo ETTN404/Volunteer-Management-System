@@ -251,7 +251,7 @@ export default function OrgSettingsPage() {
   return (
     <>
       <PageHeader title="Settings & brand" description="How your organization appears to volunteers, and how check-in works at your events." />
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
         <div className="space-y-6">
           <form onSubmit={onSubmit} noValidate className="space-y-6">
             <Card>

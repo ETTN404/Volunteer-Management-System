@@ -1,5 +1,5 @@
 import { Check, ExternalLink, Monitor, Smartphone, TriangleAlert } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { cn } from '@/shared/lib/cn';
 import { contrast, isHex, onColor } from '@/shared/lib/color';
 import { Segmented } from '@/shared/ui';
@@ -78,18 +78,30 @@ export function ContrastCheck({ color }: { color: string }) {
 
 /** Live preview of the organization's public page, in a desktop or phone frame. */
 export function PublicPagePreview({ orgId, color }: { orgId: number; color?: string | null }) {
-  const [device, setDevice] = useState<'desktop' | 'phone'>('desktop');
+  const [device, setDevice] = useState<'desktop' | 'phone'>(() => (typeof window !== 'undefined' && window.innerWidth < 640 ? 'phone' : 'desktop'));
   const [src, setSrc] = useState('');
+  const stage = useRef<HTMLDivElement>(null);
+  const [room, setRoom] = useState(0);
+  // Scale the frame to the space available, so it never overflows a phone screen.
+  useEffect(() => {
+    const el = stage.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([e]) => setRoom(e!.contentRect.width));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
   // Debounce colour changes so the frame doesn't reload on every keystroke.
   useEffect(() => {
     const id = window.setTimeout(() => setSrc(`/orgs/${orgId}?embed=1${isHex(color) ? `&preview_color=${encodeURIComponent(color)}` : ''}`), 350);
     return () => window.clearTimeout(id);
   }, [orgId, color]);
 
-  const frame = device === 'desktop' ? { w: 1280, h: 860, scale: 0.36 } : { w: 390, h: 800, scale: 0.52 };
+  const base = device === 'desktop' ? { w: 1280, h: 860, max: 0.36 } : { w: 390, h: 800, max: 0.52 };
+  const scale = room ? Math.min(base.max, (room - (device === 'phone' ? 12 : 2)) / base.w) : base.max;
+  const frame = { w: base.w, h: base.h, scale };
   return (
-    <div className="overflow-hidden rounded-[22px] bg-surface [box-shadow:var(--elev-2),inset_0_0_0_1px_var(--line)]">
-      <div className="flex items-center justify-between gap-3 border-b border-line px-4 py-3">
+    <div className="min-w-0 overflow-hidden rounded-[22px] bg-surface [box-shadow:var(--elev-2),inset_0_0_0_1px_var(--line)]">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-3 py-3 sm:px-4">
         <Segmented
           size="sm"
           value={device}
@@ -104,7 +116,7 @@ export function PublicPagePreview({ orgId, color }: { orgId: number; color?: str
           Open live page <ExternalLink className="size-3.5" />
         </a>
       </div>
-      <div className="bg-contours grid place-items-center bg-sunken px-4 py-6">
+      <div ref={stage} className="bg-contours grid place-items-center overflow-hidden bg-sunken px-3 py-5 sm:px-4 sm:py-6">
         <div
           className={cn('overflow-hidden bg-white shadow-2xl', device === 'phone' ? 'rounded-[28px] ring-[6px] ring-[#11152b]' : 'rounded-[12px] ring-1 ring-line')}
           style={{ width: frame.w * frame.scale, height: frame.h * frame.scale }}

@@ -44,9 +44,9 @@ const COLS = [
 
 function Kanban() {
   return (
-    <div className="grid h-full grid-cols-3 gap-3">
+    <div className="-mx-6 flex h-full snap-x snap-mandatory scroll-px-6 gap-3 overflow-x-auto px-6 pb-1 [scrollbar-width:none] sm:mx-0 sm:grid sm:grid-cols-3 sm:overflow-visible sm:px-0 sm:pb-0 [&::-webkit-scrollbar]:hidden">
       {COLS.map((c, ci) => (
-        <div key={c.title} className="flex flex-col gap-2 rounded-2xl bg-surface p-3 [box-shadow:inset_0_0_0_1px_var(--line)]">
+        <div key={c.title} className="flex w-[72%] shrink-0 snap-start flex-col gap-2 rounded-[16px] bg-surface p-3 [box-shadow:inset_0_0_0_1px_var(--line)] sm:w-auto">
           <div className="mb-1 flex items-center gap-2 px-1 text-[11.5px] font-semibold text-muted">
             <span className={cn('size-2 rounded-full', c.tone)} /> {c.title}
             <span className="ml-auto text-faint">{c.people.length}</span>
@@ -58,12 +58,12 @@ function Kanban() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ delay: 0.15 + ci * 0.12 + i * 0.08, duration: 0.6, ease: EASE_OUT_EXPO }}
-              className="flex items-center gap-2 rounded-xl bg-surface-2 p-2 [box-shadow:inset_0_0_0_1px_var(--line)]"
+              className="flex items-center gap-2 rounded-[12px] bg-surface-2 p-2 [box-shadow:inset_0_0_0_1px_var(--line)]"
             >
               <Avatar name={n} size="xs" />
               <div className="min-w-0 flex-1">
                 <div className="truncate text-[11.5px] font-semibold text-text">{n}</div>
-                <div className="text-[10px] text-faint">{m}% skill match</div>
+                <div className="truncate text-[10.5px] text-faint">{m}% skill match</div>
               </div>
             </motion.div>
           ))}
@@ -151,12 +151,12 @@ function Calendar() {
     Fri: [['Reading', 'bg-success-soft text-success-text'], ['Blood', 'bg-coral-soft text-danger-text']],
   };
   return (
-    <div className="grid h-full grid-cols-5 gap-2">
+    <div className="grid h-full gap-2 sm:grid-cols-5">
       {cells.map((d) => (
-        <div key={d} className="flex flex-col gap-1.5 rounded-xl bg-surface p-2 [box-shadow:inset_0_0_0_1px_var(--line)]">
-          <span className="text-center text-[10.5px] font-semibold text-faint">{d}</span>
+        <div key={d} className="flex items-center gap-1.5 rounded-[12px] bg-surface p-2 [box-shadow:inset_0_0_0_1px_var(--line)] sm:flex-col sm:items-stretch">
+          <span className="w-10 shrink-0 text-[11px] font-semibold text-faint sm:w-auto sm:text-center sm:text-[10.5px]">{d}</span>
           {plan[d]!.map(([t, c], i) => (
-            <span key={i} className={cn('rounded-lg px-1.5 py-2 text-center text-[10.5px] font-semibold', c)}>
+            <span key={i} className={cn('rounded-[8px] px-2.5 py-1.5 text-center text-[11px] font-semibold sm:px-1.5 sm:py-2 sm:text-[10.5px]', c)}>
               {t}
             </span>
           ))}

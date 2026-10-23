@@ -382,7 +382,7 @@ export function ApplicationsTable({
             )}
             <div
                 className={cn(
-                    'overflow-x-auto bg-surface',
+                    'vt-stack overflow-x-auto bg-surface',
                     !bare && 'rounded-[20px] [box-shadow:var(--elev-1),inset_0_0_0_1px_var(--line)]',
                 )}
             >
@@ -418,7 +418,7 @@ export function ApplicationsTable({
                                         selected.has(a.id) && 'bg-accent-soft/40',
                                     )}
                                 >
-                                    <td className="px-4 py-3">
+                                    <td className="vt-corner px-4 py-3">
                                         {a.status === 'pending' && (
                                             <Checkbox
                                                 aria-label={`Select ${v?.user?.full_name}`}

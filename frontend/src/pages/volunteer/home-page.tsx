@@ -5,6 +5,7 @@ import { Link } from 'react-router';
 import { greeting, formatRelative, formatDay } from '@/shared/lib/time';
 import { firstName, formatHours } from '@/shared/lib/format';
 import { nextMilestone, previousMilestone } from '@/shared/lib/skills';
+import { cn } from '@/shared/lib/cn';
 import { Button, Card, CardHeader, ErrorState, HeroBand, IconTile, InlineAlert, Skeleton, SkeletonCard, StatTile, heroPill } from '@/shared/ui';
 import { Stagger, StaggerItem } from '@/shared/motion';
 import { useSession } from '@/features/auth/use-session';
@@ -112,9 +113,9 @@ export default function VolunteerHomePage() {
                 : t('Here’s your volunteering at a glance.')}
             </p>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap [&>a]:justify-center">
             {canCheckIn && focus && (
-              <Link to={`/v/check-in/${focus.shift.id}`} className="inline-flex h-10 items-center gap-2 rounded-full bg-white px-4 text-[13.5px] font-semibold text-[#11152b] shadow-lg transition-transform hover:-translate-y-0.5">
+              <Link to={`/v/check-in/${focus.shift.id}`} className="col-span-2 inline-flex h-11 items-center gap-2 rounded-full bg-white sm:h-10 px-4 text-[13.5px] font-semibold text-[#11152b] shadow-lg transition-transform hover:-translate-y-0.5">
                 <QrCode className="size-4" /> {t('Check in now')}
               </Link>
             )}
@@ -124,7 +125,7 @@ export default function VolunteerHomePage() {
             <Link to="/v/schedule" className={heroPill}>
               <CalendarCheck2 /> {t('My schedule')}
             </Link>
-            <Link to="/v/impact" className={heroPill}>
+            <Link to="/v/impact" className={cn(heroPill, 'col-span-2 sm:col-span-1')}>
               <Gauge /> {t('See your impact')}
             </Link>
           </div>

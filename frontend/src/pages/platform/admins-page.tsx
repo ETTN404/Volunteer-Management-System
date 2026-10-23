@@ -27,7 +27,7 @@ export default function AdminsPage() {
       ) : list.length === 0 ? (
         <EmptyState icon={<ShieldCheck />} title="No admins match" />
       ) : (
-        <Card className="overflow-x-auto">
+        <Card className="vt-stack overflow-x-auto">
           <table className="w-full min-w-[680px] text-sm">
             <thead className="border-b border-line bg-surface-2/60 text-left text-[11.5px] uppercase tracking-wider text-faint">
               <tr>

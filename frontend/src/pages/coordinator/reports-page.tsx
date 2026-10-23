@@ -145,7 +145,7 @@ export default function ReportsPage() {
                   <Bars data={s.by_month} x="month" y="hours" unit=" h" height={180} />
                 </ChartCard>
               )}
-              <div className="overflow-x-auto">
+              <div className="vt-stack overflow-x-auto">
                 <table className="w-full min-w-[520px] text-sm">
                   <thead className="text-left text-[11.5px] tracking-wider text-faint uppercase">
                     <tr>
@@ -194,7 +194,7 @@ export default function ReportsPage() {
       ) : !list.length ? (
         <EmptyState icon={<FileSpreadsheet />} title="No reports yet" description="Generate your first report above." />
       ) : (
-        <Card className="overflow-x-auto">
+        <Card className="vt-stack overflow-x-auto">
           <table className="w-full min-w-[640px] text-sm">
             <thead className="border-b border-line bg-surface-2/60 text-left text-[11.5px] tracking-wider text-faint uppercase">
               <tr>

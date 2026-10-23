@@ -195,7 +195,7 @@ export default function EventsPage() {
                     })}
                 </Stagger>
             ) : (
-                <Card className="overflow-x-auto">
+                <Card className="vt-stack overflow-x-auto">
                     <table className="w-full min-w-[720px] text-sm">
                         <thead className="border-b border-line bg-surface-2/60 text-left text-[11.5px] tracking-wider text-faint uppercase">
                             <tr>

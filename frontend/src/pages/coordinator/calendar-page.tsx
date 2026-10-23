@@ -1,5 +1,5 @@
 import { addDays, addMonths, endOfMonth, endOfWeek, format, isSameDay, isSameMonth, startOfMonth, startOfWeek } from 'date-fns';
-import { ChevronLeft, ChevronRight, GripVertical } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Clock4, GripVertical, MapPin, Users } from 'lucide-react';
 import { useEffect, useMemo, useState, type DragEvent } from 'react';
 import { Link } from 'react-router';
 import { cn } from '@/shared/lib/cn';
@@ -9,6 +9,99 @@ import { useAllOrgEvents, useUpdateShift } from '@/features/operations/api';
 import type { Shift, VmsEvent } from '@/shared/types/api';
 
 type Item = { s: Shift; e: VmsEvent; start: Date; end: Date };
+
+function dot(s: Shift) {
+  const ratio = s.capacity ? (s.confirmed_count ?? 0) / s.capacity : 0;
+  return ratio >= 1 ? 'bg-danger' : ratio < 0.5 ? 'bg-warning' : 'bg-success';
+}
+
+/** Phones: a compact month with dots, and the chosen day's shifts as cards. */
+function MobileMonth({ month, days, items }: { month: Date; days: Date[]; items: Item[] }) {
+  const [picked, setPicked] = useState<Date>(() => (isSameMonth(new Date(), month) ? new Date() : month));
+  useEffect(() => {
+    setPicked(isSameMonth(new Date(), month) ? new Date() : month);
+  }, [month]);
+  const dayItems = items.filter((x) => isSameDay(x.start, picked)).sort((a, b) => a.start.getTime() - b.start.getTime());
+
+  return (
+    <div className="md:hidden">
+      <div className="rounded-[20px] bg-surface p-2.5 [box-shadow:inset_0_0_0_1px_var(--line)]">
+        <div className="grid grid-cols-7 text-center text-[11px] font-semibold text-faint">
+          {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((d, i) => (
+            <span key={i} className="py-1.5">
+              {d}
+            </span>
+          ))}
+        </div>
+        <div className="grid grid-cols-7 gap-y-1">
+          {days.map((day) => {
+            const list = items.filter((x) => isSameDay(x.start, day));
+            const on = isSameDay(day, picked);
+            const today = isSameDay(day, new Date());
+            return (
+              <button
+                key={day.toISOString()}
+                onClick={() => setPicked(day)}
+                aria-pressed={on}
+                aria-label={`${format(day, 'EEEE d MMMM')}, ${list.length} shifts`}
+                className={cn(
+                  'mx-auto flex h-12 w-full max-w-[46px] flex-col items-center justify-center gap-1 rounded-[12px] transition-colors',
+                  on ? 'bg-text text-bg' : today ? 'bg-accent-soft text-accent-text' : 'hover:bg-surface-2',
+                  !isSameMonth(day, month) && !on && 'opacity-40',
+                )}
+              >
+                <span className="type-data text-[14px] font-semibold leading-none">{format(day, 'd')}</span>
+                <span className="flex h-1.5 items-center gap-0.5">
+                  {list.slice(0, 3).map((x) => (
+                    <span key={x.s.id} className={cn('size-1.5 rounded-full', on ? 'bg-bg' : dot(x.s))} />
+                  ))}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="mb-2 mt-5 flex items-baseline justify-between px-1">
+        <h2 className="text-[15px] font-bold text-text">{format(picked, 'EEEE, d MMMM')}</h2>
+        <span className="text-[12.5px] text-muted">{dayItems.length ? `${dayItems.length} shift${dayItems.length === 1 ? '' : 's'}` : ''}</span>
+      </div>
+      {dayItems.length === 0 ? (
+        <p className="rounded-[18px] bg-surface px-4 py-8 text-center text-[13.5px] text-muted [box-shadow:inset_0_0_0_1px_var(--line)]">No shifts on this day.</p>
+      ) : (
+        <ul className="space-y-2.5">
+          {dayItems.map(({ s, e, start, end }) => {
+            const filled = s.confirmed_count ?? 0;
+            return (
+              <li key={s.id}>
+                <Link to={`/c/events/${e.id}`} className={cn('block rounded-[18px] p-4 transition-transform active:scale-[0.99]', tone(s))}>
+                  <div className="flex items-center gap-1.5 text-[12.5px] font-semibold">
+                    <Clock4 className="size-3.5" />
+                    <span className="type-data">
+                      {format(start, 'HH:mm')} – {format(end, 'HH:mm')}
+                    </span>
+                  </div>
+                  <div className="mt-1.5 text-[15px] font-bold text-text">{e.title}</div>
+                  {s.title && <div className="text-[13px] text-muted">{s.title}</div>}
+                  <div className="mt-3 flex items-center justify-between gap-3 text-[12.5px] text-muted">
+                    <span className="inline-flex min-w-0 items-center gap-1">
+                      <MapPin className="size-3.5 shrink-0" />
+                      <span className="truncate">{e.location}</span>
+                    </span>
+                    <span className="type-data inline-flex shrink-0 items-center gap-1 font-semibold text-text">
+                      <Users className="size-3.5" />
+                      {filled}/{s.capacity}
+                    </span>
+                  </div>
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
+  );
+}
 
 function tone(s: Shift) {
   const ratio = s.capacity ? (s.confirmed_count ?? 0) / s.capacity : 0;
@@ -66,7 +159,7 @@ export default function CalendarPage() {
       <PageHeader
         eyebrow="Calendar"
         title={format(month, 'MMMM yyyy')}
-        description="Drag a shift to another day to reschedule it. Colors show how full each shift is."
+        description={<><span className="hidden md:inline">Drag a shift to another day to reschedule it. </span>Colors show how full each shift is.</>}
         actions={
           <div className="flex items-center gap-1">
             <Button variant="secondary" size="icon-sm" aria-label="Previous month" onClick={() => setMonth((m) => addMonths(m, -1))}>
@@ -97,7 +190,9 @@ export default function CalendarPage() {
       ) : events.error ? (
         <ErrorState error={events.error} onRetry={() => events.refetch()} />
       ) : (
-        <div className="overflow-x-auto">
+        <>
+        <MobileMonth month={month} days={days} items={items} />
+        <div className="hidden overflow-x-auto md:block">
           <div className="grid min-w-[840px] grid-cols-7 overflow-hidden rounded-xl bg-line [box-shadow:inset_0_0_0_1px_var(--line)]" style={{ gap: 1 }}>
             {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((d) => (
               <div key={d} className="type-eyebrow-sm bg-surface-2 px-3 py-2.5">
@@ -145,6 +240,7 @@ export default function CalendarPage() {
             })}
           </div>
         </div>
+        </>
       )}
     </>
   );

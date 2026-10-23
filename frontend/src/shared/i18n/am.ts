@@ -529,4 +529,12 @@ export const am: Record<string, string> = {
   "VolunBot only answers about your volunteering. It never sees other volunteers’ details.": "VolunBot የሚመልሰው ስለ እርስዎ የበጎ ፈቃድ ስራ ብቻ ነው። የሌሎች በጎ ፈቃደኞችን መረጃ አያይም።",
   "What VolunBot can see": "VolunBot የሚያየው",
   "score {s}": "ውጤት {s}",
+  "Chat history": "የቻት ታሪክ",
+  "Earlier": "ቀደም ብሎ",
+  "Yesterday": "ትናንት",
+  "This week": "በዚህ ሳምንት",
+  "No conversations yet": "እስካሁን ምንም ውይይት የለም",
+  "Your chats with VolunBot are saved here so you can pick them up later.": "ከVolunBot ጋር ያደረጉት ቻት እዚህ ይቀመጣል፤ በኋላ ከቆሙበት መቀጠል ይችላሉ።",
+  "{n} messages": "{n} መልዕክቶች",
+  "Delete conversation": "ውይይቱን አጥፋ",
 };

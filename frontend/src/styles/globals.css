@@ -106,6 +106,72 @@
   to { opacity: 1; transform: none; }
 }
 
+/* Phones: a grid with no base column count is one column — keep it inside the screen
+   instead of letting its widest child (a long title, a table, a map) push it wider. */
+@media (max-width: 639.98px) {
+  .grid:not([class^='grid-cols-']):not([class*=' grid-cols-']):not([class*='grid-flow-col']):not([class*='grid-rows-']):not([class*='auto-cols']) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Phones: tables become one card per row; cells show their column name (data-label). */
+@media (max-width: 767px) {
+  .vt-stack { overflow-x: visible !important; background: transparent !important; box-shadow: none !important; }
+  .vt-stack table { min-width: 0 !important; display: block; }
+  .vt-stack thead { display: none; }
+  .vt-stack tbody { display: flex; flex-direction: column; gap: 10px; border: 0 !important; }
+  .vt-stack tbody > tr {
+    position: relative;
+    display: block;
+    padding: 12px 14px;
+    border-radius: 18px;
+    border: 0 !important;
+    background: var(--surface);
+    box-shadow: 0 1px 2px rgba(17, 21, 43, 0.04), inset 0 0 0 1px var(--line);
+  }
+  .vt-stack tbody > tr > td {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    width: auto !important;
+    min-width: 0 !important;
+    padding: 6px 0 !important;
+    border: 0 !important;
+    text-align: right;
+  }
+  .vt-stack tbody > tr > td > * { min-width: 0; }
+  .vt-stack tbody > tr > td::before {
+    content: attr(data-label);
+    flex-shrink: 0;
+    text-align: left;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--faint);
+    text-transform: none;
+    letter-spacing: 0;
+  }
+  .vt-stack tbody > tr > td:not([data-label])::before,
+  .vt-stack tbody > tr > td[data-label='']::before { display: none; }
+  .vt-stack tbody > tr > td:empty { display: none; }
+  /* First real column is the card's title. */
+  .vt-stack tbody > tr > td:first-child,
+  .vt-stack tbody > tr > td.vt-corner + td {
+    justify-content: flex-start;
+    text-align: left;
+    padding: 2px 0 10px !important;
+    margin-bottom: 4px;
+    border-bottom: 1px solid var(--line) !important;
+  }
+  .vt-stack tbody > tr > td:first-child::before,
+  .vt-stack tbody > tr > td.vt-corner + td::before { display: none; }
+  .vt-stack tbody > tr > td.vt-corner + td { padding-right: 36px !important; }
+  /* Selection checkbox sits in the card corner. */
+  .vt-stack tbody > tr > td.vt-corner { position: absolute; top: 10px; right: 10px; padding: 0 !important; margin: 0; border: 0 !important; }
+  .vt-stack tbody > tr > td:last-child:not(:first-child) { justify-content: flex-end; }
+  .vt-stack tbody > tr > td[colspan] { display: block; text-align: center; }
+}
+
 /* VolunBot orb: a slowly turning aurora with a soft glow; faster while thinking. */
 @keyframes orb-spin { to { transform: rotate(1turn); } }
 @keyframes orb-breathe {

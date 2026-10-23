@@ -8,7 +8,9 @@ use App\Services\GeminiService;
 use App\Services\VolunBot\ContextBuilder;
 use App\Services\VolunBot\Fallback;
 use App\Services\VolunBot\Geocoder;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Str;
 
 /**
  * VolunBot — a volunteer's personal assistant. Every message rebuilds the
@@ -18,6 +20,8 @@ use Illuminate\Support\Facades\Auth;
 class ChatbotController extends Controller
 {
     private const LOCATION_TTL_HOURS = 12;
+    private const MAX_THREADS = 25;
+    private const MAX_MESSAGES = 40;
 
     public function __construct(
         private GeminiService $gemini,
@@ -33,8 +37,15 @@ class ChatbotController extends Controller
         $message = trim($request->string('message'));
 
         $session = ChatbotSession::firstOrCreate(['volunteer_id' => $volunteer->id], ['started_at' => now(), 'context_data' => []]);
-        $data = $session->context_data ?? [];
-        $history = $data['history'] ?? [];
+        $data = $this->normalise($session->context_data ?? []);
+        $threadId = (string) $request->input('thread_id', '');
+        $index = collect($data['threads'])->search(fn ($t) => $t['id'] === $threadId);
+        if ($index === false) {
+            // A new conversation; earlier ones stay in the history list.
+            array_unshift($data['threads'], ['id' => (string) Str::ulid(), 'title' => $this->title($message), 'created_at' => now()->toIso8601String(), 'messages' => []]);
+            $index = 0;
+        }
+        $history = $data['threads'][$index]['messages'];
 
         // Location: fresh GPS from the phone wins; otherwise reuse what was shared recently.
         $location = $this->location($request, $data);
@@ -71,7 +82,13 @@ class ChatbotController extends Controller
         $history[] = ['role' => 'user', 'parts' => [['text' => $message]], 'at' => $at];
         $history[] = ['role' => 'model', 'parts' => [['text' => $reply]], 'at' => $at, 'cards' => $cards, 'follow_ups' => $followUps, 'ask_location' => $askLocation];
 
-        $data['history'] = array_slice($history, -40);
+        $thread = $data['threads'][$index];
+        $thread['messages'] = array_slice($history, -self::MAX_MESSAGES);
+        $thread['updated_at'] = $at;
+        // Most recent conversation first.
+        array_splice($data['threads'], $index, 1);
+        array_unshift($data['threads'], $thread);
+        $data['threads'] = array_slice($data['threads'], 0, self::MAX_THREADS);
         if ($location) {
             $data['location'] = $location;
         }
@@ -81,6 +98,8 @@ class ChatbotController extends Controller
             'data' => [
                 'status'       => 'success',
                 'bot_name'     => 'VolunBot',
+                'thread_id'    => $thread['id'],
+                'thread_title' => $thread['title'],
                 'query'        => $message,
                 'response'     => $reply,
                 'timestamp'    => $at,
@@ -93,15 +112,19 @@ class ChatbotController extends Controller
         ]);
     }
 
-    public function history()
+    /** Messages of one conversation (default: the most recent). */
+    public function history(Request $request)
     {
-        $session = ChatbotSession::where('volunteer_id', Auth::user()->volunteer->id)->first();
-        $data = $session?->context_data ?? [];
+        $data = $this->normalise($this->session()?->context_data ?? []);
+        $id = (string) $request->query('thread_id', '');
+        $thread = $id !== '' ? collect($data['threads'])->firstWhere('id', $id) : ($request->boolean('latest', true) ? ($data['threads'][0] ?? null) : null);
         $location = $this->freshLocation($data);
 
         return response()->json([
-            'status'   => 'success',
-            'data'     => collect($data['history'] ?? [])->map(fn ($m) => [
+            'status'    => 'success',
+            'thread_id' => $thread['id'] ?? null,
+            'title'     => $thread['title'] ?? null,
+            'data'      => collect($thread['messages'] ?? [])->map(fn ($m) => [
                 'role'         => $m['role'],
                 'content'      => $m['parts'][0]['text'] ?? '',
                 'created_at'   => $m['at'] ?? null,
@@ -109,14 +132,81 @@ class ChatbotController extends Controller
                 'follow_ups'   => $m['follow_ups'] ?? [],
                 'ask_location' => $m['ask_location'] ?? false,
             ])->values(),
-            'location' => $location ? ['source' => $location['source'] ?? 'gps', 'label' => $location['label'] ?? null] : null,
+            'location'  => $location ? ['source' => $location['source'] ?? 'gps', 'label' => $location['label'] ?? null] : null,
         ]);
     }
 
+    /** The volunteer's past conversations, newest first. */
+    public function threads()
+    {
+        $data = $this->normalise($this->session()?->context_data ?? []);
+
+        return response()->json([
+            'status' => 'success',
+            'data'   => collect($data['threads'])->map(function ($t) {
+                $last = collect($t['messages'])->last();
+                return [
+                    'id'             => $t['id'],
+                    'title'          => $t['title'],
+                    'preview'        => mb_strimwidth(str_replace('**', '', (string) ($last['parts'][0]['text'] ?? '')), 0, 90, '…'),
+                    'messages_count' => count($t['messages']),
+                    'created_at'     => $t['created_at'] ?? null,
+                    'updated_at'     => $t['updated_at'] ?? ($last['at'] ?? null),
+                ];
+            })->values(),
+        ]);
+    }
+
+    public function deleteThread(string $threadId)
+    {
+        $session = $this->session();
+        if ($session) {
+            $data = $this->normalise($session->context_data ?? []);
+            $data['threads'] = array_values(array_filter($data['threads'], fn ($t) => $t['id'] !== $threadId));
+            $session->update(['context_data' => $data]);
+        }
+        return response()->json(['status' => 'success', 'message' => 'Conversation deleted.']);
+    }
+
+    /** Deletes every conversation. */
     public function clearHistory()
     {
-        ChatbotSession::where('volunteer_id', Auth::user()->volunteer->id)->update(['context_data' => ['history' => []]]);
-        return response()->json(['status' => 'success', 'message' => 'Conversation cleared.']);
+        $session = $this->session();
+        if ($session) {
+            $data = $this->normalise($session->context_data ?? []);
+            $data['threads'] = [];
+            $session->update(['context_data' => $data]);
+        }
+        return response()->json(['status' => 'success', 'message' => 'All conversations deleted.']);
+    }
+
+    private function session(): ?ChatbotSession
+    {
+        return ChatbotSession::where('volunteer_id', Auth::user()->volunteer->id)->first();
+    }
+
+    /** Older sessions kept one flat history; turn it into the first conversation. */
+    private function normalise(array $data): array
+    {
+        $data['threads'] ??= [];
+        if (!empty($data['history'])) {
+            $first = collect($data['history'])->firstWhere('role', 'user');
+            array_unshift($data['threads'], [
+                'id'         => (string) Str::ulid(),
+                'title'      => $this->title($first['parts'][0]['text'] ?? 'Earlier chat'),
+                'created_at' => $data['history'][0]['at'] ?? now()->toIso8601String(),
+                'updated_at' => end($data['history'])['at'] ?? null,
+                'messages'   => $data['history'],
+            ]);
+        }
+        unset($data['history']);
+        return $data;
+    }
+
+    private function title(string $message): string
+    {
+        $t = trim(preg_replace('/\s+/u', ' ', $message));
+        return mb_strimwidth($t === '' ? 'New chat' : mb_strtoupper(mb_substr($t, 0, 1)) . mb_substr($t, 1), 0, 60, '…');
     }
 
     private function location(ChatRequest $request, array &$data): ?array

@@ -66,6 +66,7 @@ export const volunteerPending = [
     api('/volunteer/chat/history'),
     authed(['Volunteer'], ({ actor }) => {
       delete db.t.chat[actor.volunteer!.id];
+      void import('../implemented/chat').then((m) => m.clearMockThreads(actor.volunteer!.id));
       return json({ status: 'success', message: 'Conversation cleared.' });
     }),
   ),

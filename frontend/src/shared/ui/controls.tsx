@@ -207,14 +207,14 @@ export function Segmented<T extends string>({
       value={value}
       aria-label={ariaLabel}
       onValueChange={(v) => v && onValueChange(v as T)}
-      className={cn('relative inline-flex rounded-full bg-sunken p-1 shadow-[inset_0_0_0_1px_var(--line)]', className)}
+      className={cn('relative inline-flex max-w-full overflow-x-auto rounded-full bg-sunken p-1 shadow-[inset_0_0_0_1px_var(--line)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden', className)}
     >
       {options.map((o) => (
         <TG.Item
           key={o.value}
           value={o.value}
           className={cn(
-            'relative z-10 inline-flex items-center gap-1.5 rounded-full font-medium text-muted outline-none transition-colors hover:text-text data-[state=on]:text-bg focus-visible:ring-2 focus-visible:ring-focus [&_svg]:size-3.5',
+            'relative z-10 inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full font-medium text-muted outline-none transition-colors hover:text-text data-[state=on]:text-bg focus-visible:ring-2 focus-visible:ring-focus [&_svg]:size-3.5',
             size === 'sm' ? 'h-7 px-3 text-xs' : 'h-8 px-3.5 text-[13px]',
           )}
         >

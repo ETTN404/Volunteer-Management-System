@@ -23,6 +23,7 @@ import { LanguageToggle } from './language-toggle';
 import { ColdStartBanner } from './cold-start-banner';
 import { ActiveShiftBanner } from '@/features/volunteer/components/active-shift-banner';
 import { applyBrand } from '@/shared/lib/color';
+import { useStackedTables } from '@/shared/hooks/use-stacked-tables';
 import { useResolvedTheme } from '../providers/theme';
 
 function useCoordinatorBadges(enabled: boolean): NavBadges {
@@ -71,6 +72,7 @@ export function WorkspaceLayout({ slot }: { slot?: ReactNode }) {
   const location = useLocation();
   const t = useT();
   const mainRef = useRef<HTMLElement>(null);
+  useStackedTables(mainRef);
   // Captured per render so the exiting page keeps its own content during the transition.
   const outlet = useOutlet();
 

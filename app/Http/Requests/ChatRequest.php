@@ -21,6 +21,7 @@ class ChatRequest extends FormRequest
             'location_label' => 'nullable|string|max:120',
             'location_source' => 'nullable|in:gps,map',
             'forget_location' => 'nullable|boolean',
+            'thread_id' => 'nullable|string|max:40',
         ];
     }
 

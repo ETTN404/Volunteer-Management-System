@@ -2,6 +2,7 @@ import { AnimatePresence, motion } from 'motion/react';
 import {
   ArrowLeft,
   ArrowUp,
+  History,
   Award,
   CalendarClock,
   Check,
@@ -21,7 +22,7 @@ import {
 } from 'lucide-react';
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { useNavigate } from 'react-router';
+import { useNavigate, useSearchParams } from 'react-router';
 import { cn } from '@/shared/lib/cn';
 import { countdownTo, formatDay, formatTime, greeting, parseApiDate } from '@/shared/lib/time';
 import { errorMessage } from '@/shared/api/http';
@@ -31,7 +32,9 @@ import { useLocaleStore, useT } from '@/shared/i18n';
 import { Avatar, Button, Menu, MenuContent, MenuItem, MenuTrigger } from '@/shared/ui';
 import { ContextPanel } from '@/features/chat/components/context-panel';
 import { useSession } from '@/features/auth/use-session';
-import { useChatHistory, useClearChat, useSendChat, type ChatMessage, type ChatSend } from '@/features/chat/api';
+import { chatKeys, useChatHistory, useSendChat, type ChatMessage, type ChatSend } from '@/features/chat/api';
+import { ThreadsSheet } from '@/features/chat/components/threads-sheet';
+import { useQueryClient } from '@tanstack/react-query';
 import { BotOrb, ETHIOPIC, RichText, ShiftCard, Thinking } from '@/features/chat/components/parts';
 import { LocationRequest, MapPickerDialog, useOneShotLocation, type SharedLocation } from '@/features/chat/components/location-request';
 import { useImpact, useSchedule, useVolunteerProfile } from '@/features/volunteer/api';
@@ -104,9 +107,14 @@ export default function AssistantPage() {
   const navigate = useNavigate();
   const desktop = useIsDesktop();
   const { user } = useSession();
-  const history = useChatHistory();
-  const send = useSendChat();
-  const clear = useClearChat();
+  const qc = useQueryClient();
+  // The open conversation lives in the URL (?c=…), so back/forward and reloads keep it.
+  const [params, setParams] = useSearchParams();
+  const thread = params.get('c') ?? 'latest';
+  const openThread = useCallback((id: string, replace = false) => setParams({ c: id }, { replace }), [setParams]);
+  const history = useChatHistory(thread);
+  const send = useSendChat(thread, (id) => openThread(id, true));
+  const [historyOpen, setHistoryOpen] = useState(false);
   const schedule = useSchedule();
   const impact = useImpact();
   const profile = useVolunteerProfile();
@@ -125,6 +133,13 @@ export default function AssistantPage() {
   useEffect(() => {
     document.title = 'VolunBot · VolunTrack';
   }, []);
+
+  const latestId = thread === 'latest' ? history.data?.threadId : null;
+  useEffect(() => {
+    if (!latestId || !history.data) return;
+    qc.setQueryData(chatKeys.history(latestId), history.data);
+    openThread(latestId, true);
+  }, [latestId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Full-screen on phones: keep the page behind from scrolling.
   useEffect(() => {
@@ -147,6 +162,8 @@ export default function AssistantPage() {
     const message = text.trim();
     if (!message || send.isPending) return;
     const input: ChatSend = { message };
+    const id = history.data?.threadId ?? (thread !== 'latest' && thread !== 'new' ? thread : null);
+    if (id) input.thread_id = id;
     if (loc) {
       input.latitude = loc.latitude;
       input.longitude = loc.longitude;
@@ -169,7 +186,8 @@ export default function AssistantPage() {
 
   const forgetLocation = () => {
     setPending(null);
-    send.mutate({ message: t('Please forget my location.'), forget_location: true });
+    const id = history.data?.threadId;
+    send.mutate({ message: t('Please forget my location.'), forget_location: true, ...(id ? { thread_id: id } : {}) });
   };
 
   // ---- personalised starters ------------------------------------------------
@@ -205,7 +223,7 @@ export default function AssistantPage() {
       {/* Header */}
       <header className={cn('relative z-10 flex shrink-0 items-center gap-3 border-b border-line bg-surface px-3 sm:px-5', desktop ? 'h-[76px] px-7' : 'min-h-[60px] pt-[env(safe-area-inset-top)]')}>
         {!desktop && (
-          <Button variant="ghost" size="icon" aria-label={t('Back')} onClick={() => (window.history.length > 1 ? navigate(-1) : navigate('/v'))}>
+          <Button variant="ghost" size="icon" aria-label={t('Back')} onClick={() => navigate('/v')}>
             <ArrowLeft />
           </Button>
         )}
@@ -244,8 +262,11 @@ export default function AssistantPage() {
             )}
           </MenuContent>
         </Menu>
+        <Button variant="ghost" size={desktop ? 'sm' : 'icon'} onClick={() => setHistoryOpen(true)} aria-label={t('Chat history')}>
+          <History /> {desktop && t('History')}
+        </Button>
         {messages.length > 0 && (
-          <Button variant="ghost" size={desktop ? 'sm' : 'icon'} onClick={() => clear.mutate()} loading={clear.isPending} aria-label={t('New chat')}>
+          <Button variant="ghost" size={desktop ? 'sm' : 'icon'} onClick={() => openThread('new')} aria-label={t('New chat')}>
             <SquarePen /> {desktop && t('New chat')}
           </Button>
         )}
@@ -317,6 +338,7 @@ export default function AssistantPage() {
       </div>
 
       <MapPickerDialog open={mapOpen} onOpenChange={setMapOpen} onPick={(l) => setPending(l)} />
+      <ThreadsSheet open={historyOpen} onOpenChange={setHistoryOpen} activeId={history.data?.threadId ?? null} onPick={(id) => openThread(id)} onNew={() => openThread('new')} />
     </div>
   );
 

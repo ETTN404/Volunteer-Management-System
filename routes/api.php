@@ -220,5 +220,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/chat', [ChatbotController::class, 'chat'])->middleware('throttle:20,1');
         Route::get('/chat/history', [ChatbotController::class, 'history']);
         Route::delete('/chat/history', [ChatbotController::class, 'clearHistory']);
+        Route::get('/chat/threads', [ChatbotController::class, 'threads']);
+        Route::delete('/chat/threads/{threadId}', [ChatbotController::class, 'deleteThread']);
     });
 });

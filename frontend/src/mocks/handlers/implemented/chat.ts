@@ -4,11 +4,20 @@ import { api, authed, body, json, validate } from '../utils';
 import { CERTIFICATE_MILESTONES, matchScore } from '@/shared/lib/skills';
 import { distanceMeters } from '@/shared/lib/geo';
 import type { ChatShiftCard } from '@/shared/types/api';
+import type { ChatTurn } from '../../db/schema';
 
 const ETHIOPIC = /[ሀ-፿]/;
 
 type Loc = { latitude: number; longitude: number; label?: string | null; source: string };
 const locations: Record<number, Loc | undefined> = {};
+
+type Thread = { id: string; title: string; created_at: string; updated_at: string; turns: ChatTurn[] };
+const threads: Record<number, Thread[]> = {};
+let seq = 0;
+const listOf = (volunteerId: number) => (threads[volunteerId] ??= []);
+export const clearMockThreads = (volunteerId: number) => {
+  threads[volunteerId] = [];
+};
 
 function card(shiftId: number, loc: Loc | undefined, skills: string[], status?: ChatShiftCard['my_status']): ChatShiftCard | null {
   const s = find.shift(shiftId);
@@ -137,24 +146,54 @@ export const chatHandlers = [
       }
       const r = reply(String(b.message), v.id);
       const at = nowIso();
-      const history = (db.t.chat[v.id] ??= []);
-      history.push({ role: 'user', text: String(b.message), at }, { role: 'model', text: r.response, at, cards: r.cards, follow_ups: r.follow_ups, ask_location: r.ask_location });
-      if (history.length > 40) db.t.chat[v.id] = history.slice(-40);
+      const list = listOf(v.id);
+      let th = list.find((x) => x.id === b.thread_id);
+      if (!th) {
+        const text = String(b.message).trim();
+        th = { id: `mock-${++seq}-${Date.now()}`, title: text.charAt(0).toUpperCase() + text.slice(1, 60), created_at: at, updated_at: at, turns: [] };
+      } else {
+        list.splice(list.indexOf(th), 1);
+      }
+      th.turns.push({ role: 'user', text: String(b.message), at }, { role: 'model', text: r.response, at, cards: r.cards, follow_ups: r.follow_ups, ask_location: r.ask_location });
+      th.turns = th.turns.slice(-40);
+      th.updated_at = at;
+      list.unshift(th);
       const loc = locations[v.id];
       return json({
-        data: { status: 'success', bot_name: 'VolunBot', query: b.message, timestamp: at, degraded: false, location: loc ? { source: loc.source, label: loc.label } : null, ...r },
+        data: { status: 'success', bot_name: 'VolunBot', thread_id: th.id, thread_title: th.title, query: b.message, timestamp: at, degraded: false, location: loc ? { source: loc.source, label: loc.label } : null, ...r },
       });
     }),
   ),
   http.get(
     api('/volunteer/chat/history'),
-    authed(['Volunteer'], ({ actor }) => {
+    authed(['Volunteer'], ({ request, actor }) => {
+      const id = new URL(request.url).searchParams.get('thread_id');
+      const list = listOf(actor.volunteer!.id);
+      const th = id ? list.find((x) => x.id === id) : list[0];
       const loc = locations[actor.volunteer!.id];
       return json({
         status: 'success',
-        data: (db.t.chat[actor.volunteer!.id] ?? []).map((t) => ({ role: t.role, content: t.text, created_at: t.at, cards: t.cards ?? [], follow_ups: t.follow_ups ?? [], ask_location: t.ask_location ?? false })),
+        thread_id: th?.id ?? null,
+        title: th?.title ?? null,
+        data: (th?.turns ?? []).map((t) => ({ role: t.role, content: t.text, created_at: t.at, cards: t.cards ?? [], follow_ups: t.follow_ups ?? [], ask_location: t.ask_location ?? false })),
         location: loc ? { source: loc.source, label: loc.label } : null,
       });
+    }),
+  ),
+  http.get(
+    api('/volunteer/chat/threads'),
+    authed(['Volunteer'], ({ actor }) =>
+      json({
+        status: 'success',
+        data: listOf(actor.volunteer!.id).map((t) => ({ id: t.id, title: t.title, preview: (t.turns.at(-1)?.text ?? '').replace(/\*\*/g, '').slice(0, 90), messages_count: t.turns.length, created_at: t.created_at, updated_at: t.updated_at })),
+      }),
+    ),
+  ),
+  http.delete(
+    api('/volunteer/chat/threads/:id'),
+    authed(['Volunteer'], ({ params, actor }) => {
+      threads[actor.volunteer!.id] = listOf(actor.volunteer!.id).filter((t) => t.id !== params.id);
+      return json({ status: 'success', message: 'Conversation deleted.' });
     }),
   ),
 ];

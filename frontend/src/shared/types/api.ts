@@ -498,6 +498,8 @@ export interface ChatLocation {
 export interface ChatReply {
   status: 'success';
   bot_name: string;
+  thread_id?: string;
+  thread_title?: string;
   query: string;
   response: string;
   timestamp: string;

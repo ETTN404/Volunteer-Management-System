@@ -40,13 +40,13 @@ export function CardHeader({
   className?: string;
 }) {
   return (
-    <div className={cn('flex items-start justify-between gap-4 px-5 pt-5', className)}>
-      <div className="min-w-0">
+    <div className={cn('flex flex-wrap items-start justify-between gap-x-4 gap-y-3 px-5 pt-5', className)}>
+      <div className="min-w-[min(100%,9rem)] flex-1">
         {eyebrow && <div className="type-eyebrow mb-1.5">{eyebrow}</div>}
         <h3 className="type-title text-[17px] text-text">{title}</h3>
         {description && <p className="mt-1 text-[13px] text-muted">{description}</p>}
       </div>
-      {action && <div className="shrink-0">{action}</div>}
+      {action && <div className="flex max-w-full shrink-0 grow justify-end sm:grow-0">{action}</div>}
     </div>
   );
 }

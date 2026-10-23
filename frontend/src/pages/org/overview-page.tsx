@@ -29,8 +29,8 @@ export default function OrgOverviewPage() {
     <>
       <HeroBand className="mb-5">
         <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-          <div className="flex min-w-0 items-center gap-5">
-            <span className="grid size-16 shrink-0 place-items-center overflow-hidden rounded-[20px] bg-white text-[20px] font-extrabold text-[#11152b] shadow-xl">
+          <div className="flex min-w-0 items-center gap-4 sm:gap-5">
+            <span className="grid size-14 shrink-0 place-items-center overflow-hidden rounded-[18px] sm:size-16 sm:rounded-[20px] bg-white text-[20px] font-extrabold text-[#11152b] shadow-xl">
               {org.data?.logo_url ? <img src={org.data.logo_url} alt="" className="size-full object-cover" /> : (org.data?.name ?? 'VT').slice(0, 2).toUpperCase()}
             </span>
             <div className="min-w-0">
@@ -38,7 +38,7 @@ export default function OrgOverviewPage() {
                 <Gem className="size-3.5" />
                 {org.data ? `${org.data.subscription_plan ? org.data.subscription_plan[0]!.toUpperCase() + org.data.subscription_plan.slice(1) : 'Free'} plan` : 'Plan'}
               </span>
-              <h1 className="mt-3 truncate text-[clamp(1.8rem,4vw,2.7rem)] font-extrabold leading-[1.05] tracking-[-0.04em] [font-family:var(--font-display)]">{org.data?.name ?? 'Your organization'}</h1>
+              <h1 className="mt-3 line-clamp-2 break-words text-[clamp(1.6rem,4vw,2.7rem)] sm:truncate font-extrabold leading-[1.05] tracking-[-0.04em] [font-family:var(--font-display)]">{org.data?.name ?? 'Your organization'}</h1>
               <p className="mt-1.5 text-[15px] opacity-85">{org.data ? `On VolunTrack since ${formatDate(org.data.created_at, 'MMMM yyyy')}` : '\u00a0'}</p>
             </div>
           </div>

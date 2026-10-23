@@ -120,9 +120,10 @@ describe('volunteer portal', () => {
     expect(n.unread).toBeGreaterThan(0);
     const reply = await chatApi.send('When is my next shift?');
     expect(reply.response).toContain('Meskel Square Blood Drive');
-    const amharic = await chatApi.send('ቀጣይ ፈረቃዬ መቼ ነው?');
+    const amharic = await chatApi.send({ message: 'ቀጣይ ፈረቃዬ መቼ ነው?', thread_id: reply.thread_id });
     expect(amharic.response).toMatch(/[ሀ-፿]/);
     expect((await chatApi.history()).messages.length).toBe(4);
+    expect((await chatApi.threads())[0]?.messages_count).toBe(4);
   });
 
 });

@@ -46,7 +46,7 @@ export default function MembersPage() {
       ) : vols.length === 0 ? (
         <EmptyState icon={<Users />} title="No volunteers match" />
       ) : (
-        <Card className="overflow-x-auto">
+        <Card className="vt-stack overflow-x-auto">
           <table className="w-full min-w-[640px] text-sm">
             <thead className="border-b border-line bg-surface-2/60 text-left text-[11.5px] uppercase tracking-wider text-faint">
               <tr>

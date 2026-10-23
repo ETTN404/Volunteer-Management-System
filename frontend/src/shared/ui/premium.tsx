@@ -51,15 +51,15 @@ export function StatTile({ icon, label, value, hue = 'indigo', hint, suffix, dec
         <IconTile hue={hue}>{icon}</IconTile>
         {to && <ArrowUpRight className="size-4 text-faint opacity-0 transition-all duration-300 group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-[var(--h)] group-hover:opacity-100" />}
       </div>
-      <div className="relative mt-4 truncate text-[14px] font-medium text-muted">{label}</div>
+      <div className="relative mt-4 line-clamp-2 text-[13.5px] font-medium leading-snug text-muted sm:text-[14px]">{label}</div>
       <div className="relative mt-1 flex items-baseline gap-1 text-[clamp(1.75rem,3.2vw,2.25rem)] font-extrabold leading-none tracking-[-0.03em] text-text tabular-nums [font-family:var(--font-display)]">
         {value == null ? <Skeleton className="h-9 w-20" /> : <CountUp value={value} decimals={decimals} />}
         {value != null && suffix && <span className="text-[15px] font-semibold text-faint">{suffix}</span>}
       </div>
       {hint && (
-        <div className="relative mt-3 flex min-w-0 items-center gap-2 text-[12.5px] text-muted">
-          <span className="h-[3px] w-5 shrink-0 rounded-full bg-[var(--h)]" />
-          <span className="truncate">{hint}</span>
+        <div className="relative mt-3 flex min-w-0 items-start gap-2 text-[12.5px] leading-snug text-muted">
+          <span className="mt-[0.5em] h-[3px] w-5 shrink-0 rounded-full bg-[var(--h)]" />
+          <span className="line-clamp-2">{hint}</span>
         </div>
       )}
     </>

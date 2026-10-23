@@ -70,12 +70,32 @@ class VolunBotTest extends TestCase
 
         // Something changes mid-chat → the next message sees it.
         $this->mine->update(['title' => 'Packing']);
-        $this->actingAs($this->user, 'sanctum')->postJson('/api/volunteer/chat', ['message' => 'And now?'])->assertOk();
+        $thread = $res->json('data.thread_id');
+        $this->actingAs($this->user, 'sanctum')->postJson('/api/volunteer/chat', ['message' => 'And now?', 'thread_id' => $thread])->assertOk()->assertJsonPath('data.thread_id', $thread);
         $this->assertStringContainsString('Packing', $seen['systemInstruction']['parts'][0]['text']);
         $this->assertStringContainsString('phone GPS', $seen['systemInstruction']['parts'][0]['text']); // location remembered
 
         $this->actingAs($this->user, 'sanctum')->getJson('/api/volunteer/chat/history')
             ->assertOk()->assertJsonCount(4, 'data')->assertJsonPath('data.1.cards.0.shift_id', $this->mine->id);
+    }
+
+    public function test_new_chats_keep_earlier_conversations_in_history(): void
+    {
+        config(['services.gemini.key' => null]);
+        $as = $this->actingAs($this->user, 'sanctum');
+        $first = $as->postJson('/api/volunteer/chat', ['message' => 'when is my next shift?'])->json('data.thread_id');
+        $as->postJson('/api/volunteer/chat', ['message' => 'and my hours?', 'thread_id' => $first])->assertOk();
+        $second = $as->postJson('/api/volunteer/chat', ['message' => 'how do I check in?'])->json('data.thread_id');
+        $this->assertNotSame($first, $second);
+
+        $as->getJson('/api/volunteer/chat/threads')->assertOk()->assertJsonCount(2, 'data')
+            ->assertJsonPath('data.0.id', $second)
+            ->assertJsonPath('data.1.title', 'When is my next shift?')
+            ->assertJsonPath('data.1.messages_count', 4);
+        $as->getJson("/api/volunteer/chat/history?thread_id={$first}")->assertOk()->assertJsonCount(4, 'data');
+
+        $as->deleteJson("/api/volunteer/chat/threads/{$first}")->assertOk();
+        $as->getJson('/api/volunteer/chat/threads')->assertJsonCount(1, 'data');
     }
 
     public function test_retired_model_falls_through_to_a_current_one(): void
