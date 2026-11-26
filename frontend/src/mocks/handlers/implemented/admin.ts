@@ -48,13 +48,13 @@ export const adminHandlers = [
         first_name: { required: true, type: 'string', max: 60 },
         last_name: { required: true, type: 'string', max: 60 },
         email: { required: true, type: 'email', max: 100, custom: (v) => (find.userByEmail(String(v)) ? 'The email has already been taken.' : null) },
+        password: { required: true, type: 'string', min: 8, custom: (v) => (v === b.password_confirmation ? null : 'The two passwords do not match.') },
       });
       if (invalid) return invalid;
-      const row = { id: nextId(db.t.users), org_id: actor.user.org_id, full_name: `${b.first_name} ${b.last_name}`, email: String(b.email), password: 'invited', role: 'Coordinator' as const, is_active: true, profile_photo_path: null, last_login: null, created_at: nowIso() };
+      const row = { id: nextId(db.t.users), org_id: actor.user.org_id, full_name: `${b.first_name} ${b.last_name}`, email: String(b.email), password: String(b.password), role: 'Coordinator' as const, is_active: true, profile_photo_path: null, last_login: null, created_at: nowIso() };
       db.t.users.push(row);
       audit('user.coordinator_created', actor.user, { type: 'User', id: row.id }, null, { full_name: row.full_name, email: row.email });
-      const invitation = { invite_url: `${location.origin}/invite/demo-${row.id}`, email_sent: true, expires_at: new Date(Date.now() + 72 * 3600_000).toISOString() };
-      return ok(res.user(row), `Invitation sent to ${row.email}.`, 201, { invitation });
+      return ok(res.user(row), `${row.full_name} can sign in now with ${row.email} and the password you set.`, 201);
     }),
   ),
 
@@ -119,15 +119,15 @@ export const adminHandlers = [
         admin_first_name: { required: true, type: 'string', max: 60 },
         admin_last_name: { required: true, type: 'string', max: 60 },
         admin_email: { required: true, type: 'email', max: 100, custom: (v) => (find.userByEmail(String(v)) ? 'This email already has a VolunTrack account.' : null) },
+        admin_password: { required: true, type: 'string', min: 8, custom: (v) => (v === b.admin_password_confirmation ? null : 'The two passwords do not match.') },
       });
       if (invalid) return invalid;
       const org = { id: nextId(db.t.organizations), name: String(b.org_name), email: String(b.org_email), address: `${b.org_city}, ${b.org_country}`, phone: String(b.org_phone), website: (b.org_website as string) ?? null, logo_path: null, status: 'active' as const, subscription_plan: String(b.plan ?? 'free'), primary_color: null, subdomain: null, created_at: nowIso() };
       db.t.organizations.push(org);
-      const admin = { id: nextId(db.t.users), org_id: org.id, full_name: `${b.admin_first_name} ${b.admin_last_name}`, email: String(b.admin_email), password: 'invited', role: 'OrgAdmin' as const, is_active: true, profile_photo_path: null, last_login: null, created_at: nowIso() };
+      const admin = { id: nextId(db.t.users), org_id: org.id, full_name: `${b.admin_first_name} ${b.admin_last_name}`, email: String(b.admin_email), password: String(b.admin_password), role: 'OrgAdmin' as const, is_active: true, profile_photo_path: null, last_login: null, created_at: nowIso() };
       db.t.users.push(admin);
       audit('tenant.onboarded', actor.user, { type: 'Organization', id: org.id }, null, { org_name: org.name, plan: org.subscription_plan });
-      const invitation = { invite_url: `${location.origin}/invite/demo-${admin.id}`, email_sent: true, expires_at: new Date(Date.now() + 72 * 3600_000).toISOString() };
-      return ok({ organization: res.org(org), admin: res.user(admin), invitation }, `Organization onboarded. An invitation was emailed to ${admin.email}.`, 201);
+      return ok({ organization: res.org(org), admin: res.user(admin) }, `Organization onboarded. ${admin.email} can sign in now with the password you set.`, 201);
     }),
   ),
 

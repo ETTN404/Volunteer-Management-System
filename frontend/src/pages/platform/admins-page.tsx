@@ -1,15 +1,17 @@
-import { Search, Send, ShieldCheck } from 'lucide-react';
+import { KeyRound, Search, ShieldCheck } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router';
 import { formatRelative } from '@/shared/lib/time';
 import { Avatar, Badge, Button, Card, EmptyState, ErrorState, Input, PageHeader, Skeleton, Switch, notify } from '@/shared/ui';
-import { errorMessage } from '@/shared/api/http';
-import { useOrgAdmins, useResendInvite, useToggleAdmin } from '@/features/platform/api';
+import type { User } from '@/shared/types/api';
+import { useOrgAdmins, useSetUserPassword, useToggleAdmin } from '@/features/platform/api';
+import { SetPasswordDialog } from '@/features/people/credentials';
 
 export default function AdminsPage() {
   const admins = useOrgAdmins();
   const toggle = useToggleAdmin();
-  const resend = useResendInvite();
+  const setPassword = useSetUserPassword();
+  const [pwFor, setPwFor] = useState<User | null>(null);
   const [q, setQ] = useState('');
   useEffect(() => {
     document.title = 'Org admins · VolunTrack';
@@ -59,25 +61,20 @@ export default function AdminsPage() {
                     )}
                   </td>
                   <td className="px-5 py-3 text-muted">
-                    {a.invitation_pending ? (
-                      <span className="inline-flex items-center gap-2">
+                    <span className="inline-flex items-center gap-2">
+                      {a.invitation_pending ? (
                         <Badge size="sm" tone="warning">
-                          Invitation pending
+                          Needs a password
                         </Badge>
-                        <Button
-                          size="xs"
-                          variant="ghost"
-                          loading={resend.isPending && resend.variables === a.id}
-                          onClick={() => resend.mutate(a.id, { onSuccess: (r) => notify.success(r.message ?? 'Invitation sent'), onError: (e) => notify.error(errorMessage(e)) })}
-                        >
-                          <Send /> Resend
-                        </Button>
-                      </span>
-                    ) : a.last_login ? (
-                      formatRelative(a.last_login)
-                    ) : (
-                      'Never'
-                    )}
+                      ) : a.last_login ? (
+                        formatRelative(a.last_login)
+                      ) : (
+                        'Never'
+                      )}
+                      <Button size="xs" variant="ghost" onClick={() => setPwFor(a)} aria-label={`Set a new password for ${a.full_name}`}>
+                        <KeyRound /> Set password
+                      </Button>
+                    </span>
                   </td>
                   <td className="px-5 py-3 text-right">
                     <Switch checked={a.is_active !== false} aria-label={`${a.full_name} active`} onCheckedChange={() => toggle.mutate(a.id, { onSuccess: (r) => notify.success(r.message, a.full_name), onError: (e) => notify.error(e) })} />
@@ -88,6 +85,7 @@ export default function AdminsPage() {
           </table>
         </Card>
       )}
+      <SetPasswordDialog user={pwFor} onClose={() => setPwFor(null)} save={(id, password) => setPassword.mutateAsync({ id, password })} />
     </>
   );
 }

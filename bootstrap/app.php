@@ -25,6 +25,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->append(\App\Http\Middleware\RequestLoggingMiddleware::class);
         $middleware->append(SecurityHeadersMiddleware::class);
         $middleware->append(TenantMiddleware::class);
+        $middleware->append(\App\Http\Middleware\FinishResponseBeforeDeferred::class);
         $middleware->alias([
             'role'              => CheckRole::class,
             'volunteer.profile' => EnsureVolunteerProfile::class,

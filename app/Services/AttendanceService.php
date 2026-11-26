@@ -401,7 +401,9 @@ class AttendanceService
                 $volunteer->forceFill(['total_hours' => $newHours, 'impact_score' => $impact])->save();
 
                 foreach ($this->impact->checkMilestones($volunteer, $prevHours, $newHours) as $milestone) {
-                    GenerateCertificateJob::dispatch($volunteer->id, (float) $milestone, $attendance->shift->event->org_id);
+                    // PDF rendering is slow — do it after the response is sent.
+                    $args = [$volunteer->id, (float) $milestone, $attendance->shift->event->org_id];
+                    Notifier::afterResponse(fn () => GenerateCertificateJob::dispatchSync(...$args));
                 }
             }
 

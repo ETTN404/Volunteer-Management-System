@@ -68,5 +68,21 @@ describe('http client', () => {
     const err = await http.get('/down').catch((e) => e);
     expect(err.kind).toBe('network');
     expect(err.status).toBe(0);
+    expect(err.outcomeUnknown).toBe(false); // a failed read changed nothing
+  });
+
+  it('flags writes whose outcome is unknown so the UI re-reads instead of claiming failure', async () => {
+    server.use(mswHttp.post(url('/assign'), () => HttpResponse.error()));
+    const dropped = await http.post('/assign', {}).catch((e) => e);
+    expect(dropped.outcomeUnknown).toBe(true);
+    expect(dropped.message).toMatch(/may already be saved/i);
+
+    server.use(mswHttp.post(url('/boom'), () => HttpResponse.json({}, { status: 502 })));
+    const proxy = await http.post('/boom', {}).catch((e) => e);
+    expect(proxy.outcomeUnknown).toBe(true);
+
+    server.use(mswHttp.post(url('/bad'), () => HttpResponse.json({ message: 'Nope.' }, { status: 422 })));
+    const invalid = await http.post('/bad', {}).catch((e) => e);
+    expect(invalid.outcomeUnknown).toBe(false);
   });
 });

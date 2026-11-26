@@ -1,9 +1,9 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Copy, MailCheck, MailWarning, MoreHorizontal, Pencil, Power, Send, UserPlus, UsersRound } from 'lucide-react';
+import { KeyRound, MoreHorizontal, Pencil, Power, UserPlus, UsersRound } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { z } from 'zod';
-import type { Invitation, User } from '@/shared/types/api';
+import type { User } from '@/shared/types/api';
 import { formatRelative } from '@/shared/lib/time';
 import { errorMessage, isApiError } from '@/shared/api/http';
 import {
@@ -18,62 +18,39 @@ import {
   ErrorState,
   Field,
   FormError,
-  InlineAlert,
   Input,
   Menu,
   MenuContent,
   MenuItem,
   MenuTrigger,
   PageHeader,
+  PasswordInput,
   PhoneInput,
   Skeleton,
   formatPhone,
   isValidPhone,
   notify,
 } from '@/shared/ui';
-import { useAllMembers, useBilling, useCreateCoordinator, useResendCoordinatorInvite, useToggleCoordinator, useUpdateCoordinator } from '@/features/organization/api';
+import { useAllMembers, useBilling, useCreateCoordinator, useSetCoordinatorPassword, useToggleCoordinator, useUpdateCoordinator } from '@/features/organization/api';
 import { PlanLimitNotice } from '@/features/organization/plan-notice';
+import { CredentialsCard, SetPasswordDialog, type Credentials } from '@/features/people/credentials';
 
-// Mirrors CreateCoordinatorRequest — no password: the coordinator is invited by email.
+// Mirrors CreateCoordinatorRequest: the admin sets the password and shares it — no email needed.
 const schema = z.object({
   first_name: z.string().trim().min(1, 'Enter their first name.').max(60),
   last_name: z.string().trim().min(1, 'Enter their last name.').max(60),
   email: z.string().trim().email('Enter a valid email.').max(100),
   phone: z.string().refine((v) => !v || isValidPhone(v), 'Enter a valid phone number.'),
+  password: z.string().min(8, 'At least 8 characters.').max(100),
 });
 type Values = z.infer<typeof schema>;
 
-function InvitationResult({ invitation, email }: { invitation: Invitation; email: string }) {
-  return (
-    <div className="space-y-3">
-      {invitation.email_sent ? (
-        <InlineAlert tone="success" icon={<MailCheck />} title={`Invitation sent to ${email}`}>
-          It contains a temporary password and a one-time link that expires {new Date(invitation.expires_at).toLocaleString()}. Opening the link confirms they own the email address; they then choose their own password.
-        </InlineAlert>
-      ) : (
-        <InlineAlert tone="warning" icon={<MailWarning />} title="The email could not be sent">
-          Share the one-time link below with them directly (e.g. on Telegram). It works once.
-        </InlineAlert>
-      )}
-      <Button
-        variant="secondary"
-        onClick={() => {
-          void navigator.clipboard.writeText(invitation.invite_url);
-          notify.success('Invitation link copied');
-        }}
-      >
-        <Copy /> Copy invitation link
-      </Button>
-    </div>
-  );
-}
-
 function AddCoordinatorDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
   const create = useCreateCoordinator();
-  const [result, setResult] = useState<{ invitation: Invitation; email: string } | null>(null);
-  const { register, control, handleSubmit, reset, formState, setError } = useForm<Values>({
+  const [result, setResult] = useState<Credentials | null>(null);
+  const { register, control, handleSubmit, reset, formState, setError, setValue } = useForm<Values>({
     resolver: zodResolver(schema),
-    defaultValues: { first_name: '', last_name: '', email: '', phone: '' },
+    defaultValues: { first_name: '', last_name: '', email: '', phone: '', password: '' },
   });
   useEffect(() => {
     if (open) {
@@ -85,10 +62,10 @@ function AddCoordinatorDialog({ open, onOpenChange }: { open: boolean; onOpenCha
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent title={result ? 'Coordinator invited' : 'Invite a coordinator'} description={result ? undefined : 'They can manage events, applications, attendance and reports for your organization.'}>
+      <DialogContent title={result ? 'Coordinator added' : 'Add a coordinator'} description={result ? undefined : 'They can manage events, applications, attendance and reports for your organization.'}>
         {result ? (
           <>
-            <InvitationResult invitation={result.invitation} email={result.email} />
+            <CredentialsCard creds={result} />
             <DialogActions>
               <Button onClick={() => onOpenChange(false)}>Done</Button>
             </DialogActions>
@@ -99,9 +76,9 @@ function AddCoordinatorDialog({ open, onOpenChange }: { open: boolean; onOpenCha
             className="space-y-4"
             onSubmit={handleSubmit((v) =>
               create.mutate(
-                { ...v, phone: v.phone || null },
+                { ...v, phone: v.phone || null, password_confirmation: v.password },
                 {
-                  onSuccess: (r) => setResult({ invitation: r.invitation, email: v.email }),
+                  onSuccess: () => setResult({ name: `${v.first_name} ${v.last_name}`.trim(), email: v.email.trim().toLowerCase(), password: v.password }),
                   onError: (e) => {
                     if (isApiError(e)) for (const [f, m] of Object.entries(e.fieldErrors)) setError(f as keyof Values, { message: m[0] });
                   },
@@ -118,8 +95,11 @@ function AddCoordinatorDialog({ open, onOpenChange }: { open: boolean; onOpenCha
                 <Input {...register('last_name')} autoComplete="off" />
               </Field>
             </div>
-            <Field label="Work email" error={formState.errors.email?.message} hint="The invitation goes here. Opening it verifies the address.">
+            <Field label="Email" error={formState.errors.email?.message} hint="They sign in with this email.">
               <Input type="email" {...register('email')} autoComplete="off" />
+            </Field>
+            <Field label="Password" error={formState.errors.password?.message} hint="At least 8 characters. Tap the wand to generate one.">
+              <PasswordInput {...register('password')} onGenerate={(pw) => setValue('password', pw, { shouldValidate: true })} />
             </Field>
             <Field label="Mobile" optional error={formState.errors.phone?.message} hint="Lets volunteers and you reach them on the day.">
               <Controller control={control} name="phone" render={({ field }) => <PhoneInput country="ET" value={field.value} onChange={field.onChange} />} />
@@ -129,7 +109,7 @@ function AddCoordinatorDialog({ open, onOpenChange }: { open: boolean; onOpenCha
                 Cancel
               </Button>
               <Button type="submit" loading={create.isPending}>
-                <Send /> Send invitation
+                <UserPlus /> Add coordinator
               </Button>
             </DialogActions>
           </form>
@@ -197,10 +177,10 @@ export default function TeamPage() {
   const members = useAllMembers();
   const billing = useBilling();
   const toggle = useToggleCoordinator();
-  const resend = useResendCoordinatorInvite();
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<User | null>(null);
-  const [resent, setResent] = useState<{ invitation: Invitation; email: string } | null>(null);
+  const [pwFor, setPwFor] = useState<User | null>(null);
+  const setPassword = useSetCoordinatorPassword();
   useEffect(() => {
     document.title = 'Coordinators · VolunTrack';
   }, []);
@@ -213,10 +193,10 @@ export default function TeamPage() {
       <PageHeader
         eyebrow="Team"
         title="Coordinators"
-        description="Staff who run events and approve volunteers. Each one is invited by email — nobody shares passwords."
+        description="Staff who run events and approve volunteers. You set their password when you add them — they can sign in right away."
         actions={
           <Button onClick={() => setAdding(true)} disabled={atLimit}>
-            <UserPlus /> Invite a coordinator
+            <UserPlus /> Add a coordinator
           </Button>
         }
       />
@@ -226,7 +206,7 @@ export default function TeamPage() {
       ) : members.error ? (
         <ErrorState error={members.error} onRetry={() => members.refetch()} />
       ) : coords.length === 0 ? (
-        <EmptyState icon={<UsersRound />} title="No coordinators yet" description="Invite someone to manage events and approve volunteers." action={<Button onClick={() => setAdding(true)}>Invite a coordinator</Button>} />
+        <EmptyState icon={<UsersRound />} title="No coordinators yet" description="Add someone to manage events and approve volunteers." action={<Button onClick={() => setAdding(true)}>Add a coordinator</Button>} />
       ) : (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {coords.map((c) => (
@@ -248,18 +228,9 @@ export default function TeamPage() {
                     <MenuItem onSelect={() => setEditing(c)}>
                       <Pencil /> Edit details
                     </MenuItem>
-                    {c.invitation_pending && (
-                      <MenuItem
-                        onSelect={() =>
-                          resend.mutate(c.id, {
-                            onSuccess: (r) => setResent({ invitation: r.invitation, email: c.email }),
-                            onError: (e) => notify.error(errorMessage(e)),
-                          })
-                        }
-                      >
-                        <Send /> Resend invitation
-                      </MenuItem>
-                    )}
+                    <MenuItem onSelect={() => setPwFor(c)}>
+                      <KeyRound /> Set new password
+                    </MenuItem>
                     <MenuItem danger={c.is_active} onSelect={() => toggle.mutate(c.id, { onSuccess: (r) => notify.success(r.message), onError: (e) => notify.error(e) })}>
                       <Power /> {c.is_active ? 'Deactivate' : 'Reactivate'}
                     </MenuItem>
@@ -267,9 +238,9 @@ export default function TeamPage() {
                 </Menu>
               </div>
               <div className="mt-5 flex items-center justify-between text-[12.5px]">
-                {c.invitation_pending ? (
+                {c.invitation_pending && c.is_active ? (
                   <Badge tone="warning" size="sm" dot>
-                    Invitation pending
+                    Needs a password
                   </Badge>
                 ) : (
                   <Badge tone={c.is_active ? 'success' : 'neutral'} size="sm" dot>
@@ -284,14 +255,7 @@ export default function TeamPage() {
       )}
       <AddCoordinatorDialog open={adding} onOpenChange={setAdding} />
       <EditDialog user={editing} onClose={() => setEditing(null)} />
-      <Dialog open={Boolean(resent)} onOpenChange={(o) => !o && setResent(null)}>
-        <DialogContent title="New invitation sent" size="sm">
-          {resent && <InvitationResult invitation={resent.invitation} email={resent.email} />}
-          <DialogActions>
-            <Button onClick={() => setResent(null)}>Done</Button>
-          </DialogActions>
-        </DialogContent>
-      </Dialog>
+      <SetPasswordDialog user={pwFor} onClose={() => setPwFor(null)} save={(id, password) => setPassword.mutateAsync({ id, password })} />
     </>
   );
 }

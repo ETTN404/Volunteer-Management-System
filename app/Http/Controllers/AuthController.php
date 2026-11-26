@@ -147,8 +147,9 @@ class AuthController extends Controller
                 ['token' => Hash::make($token), 'created_at' => now()]
             );
             $url = $this->frontend->to('/reset-password/' . $token . '?email=' . urlencode($user->email));
-            try {
-                $user->notify(new class($url) extends Notification {
+            // Sent after the response so a slow mail server never stalls the form.
+            \App\Services\Notifier::afterResponse(function () use ($user, $url) { try {
+                $user->notifyNow(new class($url) extends Notification {
                     public function __construct(private string $url) {}
                     public function via($n): array { return ['mail']; }
                     public function toMail($n): MailMessage
@@ -161,7 +162,7 @@ class AuthController extends Controller
                 });
             } catch (\Throwable $e) {
                 Log::warning('Reset email failed: ' . $e->getMessage());
-            }
+            } });
         }
 
         // Never reveal whether the email exists.

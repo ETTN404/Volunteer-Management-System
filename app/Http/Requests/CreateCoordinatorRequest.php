@@ -12,9 +12,9 @@ class CreateCoordinatorRequest extends FormRequest
     }
 
     /**
-     * No password field: the coordinator receives an invitation email with a
-     * temporary password and a one-time link (see InvitationService). Opening the
-     * link proves they own the email address.
+     * The admin sets the coordinator's password and shares it with them; the
+     * coordinator can sign in immediately (no email needed) and can change it
+     * later from Account settings.
      */
     public function rules(): array
     {
@@ -23,6 +23,7 @@ class CreateCoordinatorRequest extends FormRequest
             'last_name'  => 'required|string|max:60',
             'email'      => 'required|string|email:rfc|max:100|unique:users,email',
             'phone'      => ['nullable', 'string', 'regex:/^\+[1-9]\d{6,14}$/'],
+            'password'   => 'required|string|min:8|max:100|confirmed',
         ];
     }
 
@@ -39,6 +40,8 @@ class CreateCoordinatorRequest extends FormRequest
         return [
             'email.unique' => 'Someone already uses this email on VolunTrack.',
             'phone.regex'  => 'Use international format, e.g. +251911234567.',
+            'password.min' => 'The password must be at least 8 characters.',
+            'password.confirmed' => 'The two passwords do not match.',
         ];
     }
 }

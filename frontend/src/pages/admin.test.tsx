@@ -24,17 +24,18 @@ describe('organization admin', () => {
     expect(screen.getByRole('heading', { name: /check-in & check-out rules/i })).toBeInTheDocument();
   });
 
-  it('invites a coordinator by email — no password is typed', async () => {
+  it('adds a coordinator with a password they can use right away (no email needed)', async () => {
     const { screen, user } = await renderApp('/o/team', { as: DEMO.orgadmin });
-    await user.click(await screen.findByRole('button', { name: /invite a coordinator/i }, T));
+    await user.click(await screen.findByRole('button', { name: /add a coordinator/i }, T));
     const dialog = await screen.findByRole('dialog', {}, T);
-    expect(within(dialog).queryByLabelText(/password/i)).not.toBeInTheDocument();
     await user.type(within(dialog).getByLabelText('First name'), 'Selam');
     await user.type(within(dialog).getByLabelText('Last name'), 'Bekele');
-    await user.type(within(dialog).getByLabelText(/work email/i), 'selam.coord@redcross.org');
-    await user.click(within(dialog).getByRole('button', { name: /send invitation/i }));
-    expect(await screen.findByText(/invitation sent to selam.coord@redcross.org/i, {}, T)).toBeInTheDocument();
-    expect(db.t.users.some((u) => u.email === 'selam.coord@redcross.org' && u.role === 'Coordinator' && u.full_name === 'Selam Bekele')).toBe(true);
+    await user.type(within(dialog).getByLabelText('Email'), 'selam.coord@redcross.org');
+    await user.type(within(dialog).getByLabelText('Password'), 'selam2025');
+    await user.click(within(dialog).getByRole('button', { name: /add coordinator/i }));
+    expect(await screen.findByText(/selam bekele can sign in now/i, {}, T)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /copy sign-in details/i })).toBeInTheDocument();
+    expect(db.t.users.some((u) => u.email === 'selam.coord@redcross.org' && u.role === 'Coordinator' && u.full_name === 'Selam Bekele' && u.password === 'selam2025')).toBe(true);
   });
 
   it('pauses a volunteer account', async () => {
@@ -58,23 +59,25 @@ async function fillOnboarding(screen: Awaited<ReturnType<typeof renderApp>>['scr
   await user.type(screen.getByLabelText('First name'), 'Lensa');
   await user.type(screen.getByLabelText('Last name'), 'Admin');
   await user.type(screen.getByLabelText('Email'), 'lensa@hawassa.org');
+  await user.type(screen.getByLabelText('Password'), 'lensa2025');
+  await user.type(screen.getByLabelText('Confirm password'), 'lensa2025');
 }
 
 describe('platform admin', () => {
-  it('onboards an organization and sends an invitation (country, city, phone with dial code)', async () => {
+  it('onboards an organization with the admin password set (country, city, phone with dial code)', async () => {
     const { screen, user } = await renderApp('/p/onboard', { as: DEMO.superadmin });
     await fillOnboarding(screen, user, 'hello@hawassa.org');
-    expect(screen.queryByLabelText(/temporary password/i)).not.toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: /onboard & send invitation/i }));
+    await user.click(screen.getByRole('button', { name: /onboard organization/i }));
     expect(await screen.findByRole('heading', { name: /hawassa youth volunteers is on voluntrack/i }, T)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /copy invitation link/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /copy sign-in details/i })).toBeInTheDocument();
+    expect(db.t.users.find((u) => u.email === 'lensa@hawassa.org')?.password).toBe('lensa2025');
     expect(db.t.organizations.find((o) => o.email === 'hello@hawassa.org')?.phone).toBe('+251911234567');
   });
 
   it('flags a duplicate organization email from the server', async () => {
     const { screen, user } = await renderApp('/p/onboard', { as: DEMO.superadmin });
     await fillOnboarding(screen, user, 'contact@redcross.org');
-    await user.click(screen.getByRole('button', { name: /onboard & send invitation/i }));
+    await user.click(screen.getByRole('button', { name: /onboard organization/i }));
     expect((await screen.findAllByText(/already on voluntrack/i, {}, T)).length).toBeGreaterThan(0);
   });
 

@@ -42,6 +42,11 @@ export interface CoordinatorInput {
   phone?: string | null;
 }
 
+export interface NewCoordinatorInput extends CoordinatorInput {
+  password: string;
+  password_confirmation: string;
+}
+
 export interface BillingInfo extends BillingSnapshot {
   catalog: PlanDefinition[];
   payment_methods: { key: string; name: string; account: string; needs_suffix: boolean; reference_hint: string }[];
@@ -95,10 +100,12 @@ export const orgApi = {
     );
     return [first, ...rest].flatMap((p) => p.items);
   },
-  createCoordinator: async (input: CoordinatorInput) => {
+  createCoordinator: async (input: NewCoordinatorInput) => {
     const r = await http.post<User>('/admin/coordinators', input);
-    return { user: r.data, invitation: r.raw.invitation as Invitation, message: r.message };
+    return { user: r.data, message: r.message };
   },
+  setCoordinatorPassword: async (id: number, password: string) =>
+    (await http.patch(`/admin/coordinators/${id}/password`, { password, password_confirmation: password })).message,
   updateCoordinator: async (id: number, input: Partial<CoordinatorInput>) => (await http.patch<User>(`/admin/coordinators/${id}`, input)).data,
   toggleCoordinator: async (id: number) => (await http.patch(`/admin/coordinators/${id}/status`)).raw as { is_active: boolean; message: string },
   resendCoordinatorInvite: async (id: number) => {
@@ -163,6 +170,8 @@ export const useUpdateCoordinator = () =>
   useOrgMutation(({ id, ...input }: Partial<CoordinatorInput> & { id: number }) => orgApi.updateCoordinator(id, input));
 export const useToggleCoordinator = () => useOrgMutation(orgApi.toggleCoordinator);
 export const useResendCoordinatorInvite = () => useOrgMutation(orgApi.resendCoordinatorInvite);
+export const useSetCoordinatorPassword = () =>
+  useOrgMutation(({ id, password }: { id: number; password: string }) => orgApi.setCoordinatorPassword(id, password));
 export const useToggleVolunteer = () => useOrgMutation(orgApi.toggleVolunteer);
 export const useSubmitPayment = () => useOrgMutation(orgApi.submitPayment);
 

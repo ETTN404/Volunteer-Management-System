@@ -1,8 +1,20 @@
-import { QueryClient } from '@tanstack/react-query';
+import { MutationCache, QueryClient } from '@tanstack/react-query';
 import { isApiError } from './http';
 
 export function createQueryClient() {
-  return new QueryClient({
+  // Writes whose outcome is unknown (timeout, dropped connection, 5xx) may have been
+  // saved anyway. Re-read everything — now and again a moment later, when the server
+  // has surely finished — so the screen shows what really happened instead of a
+  // stale "failed" state the user only fixes by refreshing.
+  const mutationCache = new MutationCache({
+    onError: (error) => {
+      if (!isApiError(error) || !error.outcomeUnknown) return;
+      void client.invalidateQueries();
+      setTimeout(() => void client.invalidateQueries(), 5_000);
+    },
+  });
+  const client: QueryClient = new QueryClient({
+    mutationCache,
     defaultOptions: {
       queries: {
         staleTime: 30_000,
@@ -18,4 +30,5 @@ export function createQueryClient() {
       mutations: { retry: false },
     },
   });
+  return client;
 }

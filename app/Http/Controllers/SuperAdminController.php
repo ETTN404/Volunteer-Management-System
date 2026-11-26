@@ -266,6 +266,21 @@ class SuperAdminController extends Controller
         return response()->json(['status' => 'success', 'message' => 'A new invitation was sent to ' . $user->email . '.', 'invitation' => $invite]);
     }
 
+    /** Set a new password for any non-SuperAdmin account (forgotten password; no email needed). */
+    public function setUserPassword(Request $request, $id)
+    {
+        $user = User::withoutGlobalScopes()->whereIn('role', ['OrgAdmin', 'Coordinator', 'Volunteer'])->findOrFail($id);
+        $data = $request->validate(['password' => 'required|string|min:8|max:100|confirmed'], [
+            'password.confirmed' => 'The two passwords do not match.',
+        ]);
+        $user->forceFill(['password' => \Illuminate\Support\Facades\Hash::make($data['password']), 'must_change_password' => false])->save();
+        $user->tokens()->delete();
+        \App\Models\Invitation::where('user_id', $user->id)->whereNull('used_at')->update(['used_at' => now()]);
+        $this->audit->log('user.password_set_by_admin', $user, [], ['full_name' => $user->full_name]);
+
+        return response()->json(['status' => 'success', 'message' => "New password saved. Share it with {$user->full_name}."]);
+    }
+
     public function listUsers(Request $request)
     {
         $q = User::withoutGlobalScopes()->with('organization')->latest();

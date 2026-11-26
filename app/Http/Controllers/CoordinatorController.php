@@ -70,9 +70,12 @@ class CoordinatorController extends Controller
 
     private function validateShiftWindow(Event $event, string $start, string $end): ?string
     {
-        $s = Carbon::parse($start)->toDateString();
-        $e = Carbon::parse($end)->toDateString();
-        if ($s < $event->start_date->toDateString() || $e > $event->end_date->toDateString()) {
+        // Shift times arrive in UTC but event dates are the organizer's local calendar
+        // days (Addis Ababa is UTC+3, so a 01:00 shift is 22:00 UTC the day before).
+        // Allow the widest real-world offsets (UTC-12 … UTC+14) around the event days.
+        $earliest = $event->start_date->copy()->startOfDay()->subHours(14);
+        $latest   = $event->end_date->copy()->addDay()->startOfDay()->addHours(12);
+        if (Carbon::parse($start)->lt($earliest) || Carbon::parse($end)->gt($latest)) {
             return 'Shift timings must fall within the event boundaries (' . $event->start_date->toDateString() . ' to ' . $event->end_date->toDateString() . ').';
         }
         if (Carbon::parse($end)->lte(Carbon::parse($start))) {

@@ -242,7 +242,7 @@ export default function RegisterPage() {
                   )}
                 />
                 <Field label={t('Date of birth')} optional hint={t('Volunteers under 18 need a parental consent form before joining shifts.')} error={formState.errors.date_of_birth?.message && t(formState.errors.date_of_birth.message)}>
-                  <Controller control={control} name="date_of_birth" render={({ field }) => <DatePicker value={field.value} onChange={field.onChange} max={new Date().toISOString().slice(0, 10)} placeholder={t('Select your birthday')} />} />
+                  <Controller control={control} name="date_of_birth" render={({ field }) => <DatePicker yearPicker value={field.value} onChange={field.onChange} max={new Date().toISOString().slice(0, 10)} placeholder={t('Select your birthday')} />} />
                 </Field>
                 {age != null && age < 18 && (
                   <InlineAlert tone="warning" title={t('Parental consent needed')}>

@@ -2,12 +2,12 @@
  * shadcn-style date & time pickers built on react-day-picker 9.
  * Values are plain strings so they drop straight into forms and API payloads:
  *   DatePicker   → 'yyyy-MM-dd'
- *   TimePicker   → 'HH:mm' (24h)
+ *   TimePicker   → 'HH:mm' (24h, any minute)
  *   DateRangePicker → { from, to } 'yyyy-MM-dd'
  */
 import { format, isValid, parse } from 'date-fns';
-import { CalendarDays, ChevronLeft, ChevronRight, Clock } from 'lucide-react';
-import { useMemo, useState, type ComponentProps } from 'react';
+import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight, Clock } from 'lucide-react';
+import { useState, type ComponentProps } from 'react';
 import { DayPicker, type DateRange } from 'react-day-picker';
 import { cn } from '@/shared/lib/cn';
 import { useFieldControl } from './field';
@@ -45,10 +45,17 @@ export function Calendar({ className, classNames, ...props }: ComponentProps<typ
         range_end: '[&>button]:rounded-l-none',
         range_middle: '[&>button]:rounded-none [&>button]:bg-accent-soft [&>button]:text-accent-text',
         hidden: 'invisible',
+        // Month / year dropdowns (captionLayout="dropdown"): a styled label with a
+        // transparent native <select> on top — big, scrollable, works on phones.
+        dropdowns: 'relative z-10 flex items-center gap-1.5',
+        dropdown_root:
+          'relative inline-flex h-8 items-center rounded-md bg-surface-2 px-2.5 text-sm font-medium text-text shadow-[inset_0_0_0_1px_var(--line)] hover:shadow-[inset_0_0_0_1px_var(--line-strong)] has-focus-visible:shadow-[inset_0_0_0_1px_var(--accent),0_0_0_3px_var(--accent-soft)]',
+        dropdown: 'absolute inset-0 w-full cursor-pointer opacity-0',
         ...classNames,
       }}
       components={{
-        Chevron: ({ orientation }) => (orientation === 'left' ? <ChevronLeft /> : <ChevronRight />),
+        Chevron: ({ orientation }) =>
+          orientation === 'left' ? <ChevronLeft /> : orientation === 'down' ? <ChevronDown className="ml-1 size-3.5 text-faint" /> : <ChevronRight />,
       }}
       {...props}
     />
@@ -73,9 +80,14 @@ export interface DatePickerProps {
   invalid?: boolean;
   className?: string;
   'aria-describedby'?: string;
+  /**
+   * Show month + year dropdowns so far-away dates (e.g. a birthday) are one pick
+   * away instead of dozens of arrow clicks. `true` = the last 100 years.
+   */
+  yearPicker?: boolean | { from: number; to?: number };
 }
 
-export function DatePicker({ value, onChange, placeholder = 'Pick a date', min, max, disabled, id, invalid, className, ...aria }: DatePickerProps) {
+export function DatePicker({ value, onChange, placeholder = 'Pick a date', min, max, disabled, id, invalid, className, yearPicker, ...aria }: DatePickerProps) {
   const fc = useFieldControl();
   id = id ?? fc?.id;
   invalid = invalid ?? fc?.invalid;
@@ -83,6 +95,17 @@ export function DatePicker({ value, onChange, placeholder = 'Pick a date', min, 
   const selected = toDate(value);
   const minD = toDate(min);
   const maxD = toDate(max);
+  const thisYear = new Date().getFullYear();
+  const years = yearPicker ? (yearPicker === true ? { from: thisYear - 100, to: maxD?.getFullYear() ?? thisYear + 5 } : yearPicker) : null;
+  const dropdownProps = years
+    ? {
+        captionLayout: 'dropdown' as const,
+        startMonth: minD ?? new Date(years.from, 0),
+        endMonth: maxD ?? new Date(years.to ?? thisYear + 5, 11),
+      }
+    : {};
+  // Birthdays: open around a typical adult age instead of today.
+  const fallbackMonth = years && !minD ? new Date(Math.min(thisYear - 20, maxD?.getFullYear() ?? thisYear), 0) : minD;
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild disabled={disabled}>
@@ -102,13 +125,14 @@ export function DatePicker({ value, onChange, placeholder = 'Pick a date', min, 
         <Calendar
           mode="single"
           selected={selected}
-          defaultMonth={selected ?? minD}
+          defaultMonth={selected ?? fallbackMonth}
           onSelect={(d) => {
             if (d) onChange(toStr(d));
             setOpen(false);
           }}
           disabled={[...(minD ? [{ before: minD }] : []), ...(maxD ? [{ after: maxD }] : [])]}
           autoFocus
+          {...dropdownProps}
         />
       </PopoverContent>
     </Popover>
@@ -175,11 +199,25 @@ export function DateRangePicker({
   );
 }
 
-/** 15-minute time slots in a scrollable list — no fiddly native time inputs on phones. */
+const pad = (n: number) => String(n).padStart(2, '0');
+const HOURS = [12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
+const MINUTES = Array.from({ length: 60 }, (_, i) => i);
+const QUICK = ['06:00', '08:00', '09:00', '12:00', '13:00', '14:00', '17:00', '18:00'];
+
+function timeLabel(t: string) {
+  const [h, m] = t.split(':').map(Number);
+  const d = new Date();
+  d.setHours(h ?? 0, m ?? 0, 0, 0);
+  return format(d, 'h:mm a');
+}
+
+/**
+ * Hour · minute · AM/PM columns: any minute of the day, easy to tap on phones.
+ * The value is 'HH:mm' (24h). Quick picks cover the usual round times.
+ */
 export function TimePicker({
   value,
   onChange,
-  step = 15,
   placeholder = 'Time',
   id,
   invalid,
@@ -187,66 +225,95 @@ export function TimePicker({
 }: {
   value?: string | null;
   onChange: (v: string) => void;
+  /** @deprecated every minute can be picked now; kept for old call sites. */
   step?: number;
   placeholder?: string;
   id?: string;
   invalid?: boolean;
-  /** Slots before this 'HH:mm' are disabled. */
+  /** Times before this 'HH:mm' are dimmed (still pickable; the form validates). */
   min?: string;
 }) {
   const fc = useFieldControl();
   id = id ?? fc?.id;
   invalid = invalid ?? fc?.invalid;
   const [open, setOpen] = useState(false);
-  const slots = useMemo(() => {
-    const out: string[] = [];
-    for (let m = 0; m < 24 * 60; m += step) out.push(`${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`);
-    return out;
-  }, [step]);
-  const label = (t: string) => {
-    const [h, m] = t.split(':').map(Number);
-    const d = new Date();
-    d.setHours(h ?? 0, m ?? 0, 0, 0);
-    return format(d, 'h:mm a');
-  };
+  const current = value && /^\d{1,2}:\d{2}$/.test(value) ? value : '09:00';
+  const [h24 = 9, m = 0] = current.split(':').map(Number);
+  const pm = h24 >= 12;
+  const h12 = h24 % 12 === 0 ? 12 : h24 % 12;
+  const to24 = (hour12: number, minute: number, isPm: boolean) => `${pad((hour12 % 12) + (isPm ? 12 : 0))}:${pad(minute)}`;
+  const set = (hour12: number, minute: number, isPm: boolean) => onChange(to24(hour12, minute, isPm));
+  const before = (t: string) => Boolean(min && t < min);
+  const center = (el: HTMLElement | null) => el?.querySelector<HTMLElement>('[aria-selected="true"]')?.scrollIntoView({ block: 'center' });
+  const cell = (selected: boolean, dim = false) =>
+    cn(
+      'flex h-8 w-full shrink-0 items-center justify-center rounded-sm text-sm tabular-nums transition-colors hover:bg-surface-2',
+      dim && 'text-faint/60',
+      selected && 'bg-accent font-semibold text-accent-fg hover:bg-accent',
+    );
+
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <button type="button" id={id} aria-invalid={invalid || undefined} data-placeholder={!value} className={trigger}>
           <Clock className="size-4 shrink-0 text-faint" />
-          <span className="truncate">{value ? label(value) : placeholder}</span>
+          <span className="truncate">{value ? timeLabel(value) : placeholder}</span>
         </button>
       </PopoverTrigger>
-      <PopoverContent align="start" className="w-40 p-1">
-        <div
-          role="listbox"
-          aria-label="Choose a time"
-          className="max-h-64 overflow-y-auto overscroll-contain"
-          ref={(el) => el?.querySelector<HTMLElement>('[aria-selected="true"]')?.scrollIntoView({ block: 'center' })}
-        >
-          {slots.map((t) => {
-            const disabled = Boolean(min && t < min);
-            return (
-              <button
-                key={t}
-                type="button"
-                role="option"
-                aria-selected={t === value}
-                disabled={disabled}
-                onClick={() => {
-                  onChange(t);
-                  setOpen(false);
-                }}
-                className={cn(
-                  'flex w-full items-center rounded-sm px-2.5 py-1.5 text-left text-sm tabular-nums hover:bg-surface-2 disabled:pointer-events-none disabled:opacity-35',
-                  t === value && 'bg-accent text-accent-fg hover:bg-accent',
-                )}
-              >
-                {label(t)}
-              </button>
-            );
-          })}
+      <PopoverContent align="start" className="w-[252px] p-2">
+        <div className="mb-1.5 grid grid-cols-[1fr_1fr_60px] gap-1.5 px-0.5 text-[10.5px] font-semibold uppercase tracking-wide text-faint">
+          <span className="text-center">Hour</span>
+          <span className="text-center">Minute</span>
+          <span />
         </div>
+        <div className="grid grid-cols-[1fr_1fr_60px] gap-1.5">
+          <div role="listbox" aria-label="Hour" className="max-h-56 space-y-0.5 overflow-y-auto overscroll-contain pr-0.5" ref={center}>
+            {HOURS.map((h) => (
+              <button key={h} type="button" role="option" aria-selected={h === h12} className={cell(h === h12, before(to24(h, m, pm)))} onClick={() => set(h, m, pm)}>
+                {h}
+              </button>
+            ))}
+          </div>
+          <div role="listbox" aria-label="Minute" className="max-h-56 space-y-0.5 overflow-y-auto overscroll-contain pr-0.5" ref={center}>
+            {MINUTES.map((mm) => (
+              <button key={mm} type="button" role="option" aria-selected={mm === m} className={cell(mm === m, before(to24(h12, mm, pm)))} onClick={() => set(h12, mm, pm)}>
+                {pad(mm)}
+              </button>
+            ))}
+          </div>
+          <div role="listbox" aria-label="AM or PM" className="space-y-0.5">
+            {(['AM', 'PM'] as const).map((p) => (
+              <button key={p} type="button" role="option" aria-selected={(p === 'PM') === pm} className={cell((p === 'PM') === pm)} onClick={() => set(h12, m, p === 'PM')}>
+                {p}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="mt-2 flex flex-wrap gap-1 border-t border-line pt-2">
+          {QUICK.map((q) => (
+            <button
+              key={q}
+              type="button"
+              onClick={() => {
+                onChange(q);
+                setOpen(false);
+              }}
+              className={cn('rounded-full bg-surface-2 px-2 py-1 text-[11.5px] font-medium text-muted hover:text-text', q === value && 'bg-accent-soft text-accent-text')}
+            >
+              {timeLabel(q)}
+            </button>
+          ))}
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            if (!value) onChange(current);
+            setOpen(false);
+          }}
+          className="mt-2 h-9 w-full rounded-md bg-accent text-sm font-semibold text-accent-fg hover:opacity-90"
+        >
+          Done · {timeLabel(current)}
+        </button>
       </PopoverContent>
     </Popover>
   );

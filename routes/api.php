@@ -82,6 +82,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/admins', [SuperAdminController::class, 'listAdmins']);
         Route::patch('/admins/{id}/status', [SuperAdminController::class, 'toggleAdminStatus']);
         Route::post('/users/{id}/resend-invite', [SuperAdminController::class, 'resendInvite']);
+        Route::patch('/users/{id}/password', [SuperAdminController::class, 'setUserPassword']);
         Route::get('/users', [SuperAdminController::class, 'listUsers']);
         Route::patch('/users/{id}/status', [SuperAdminController::class, 'toggleAdminStatus']);
 
@@ -117,6 +118,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::patch('/coordinators/{id}', [OrgAdminController::class, 'updateCoordinator']);
         Route::patch('/coordinators/{id}/status', [OrgAdminController::class, 'toggleCoordinatorStatus']);
         Route::post('/coordinators/{id}/resend-invite', [OrgAdminController::class, 'resendCoordinatorInvite']);
+        Route::patch('/coordinators/{id}/password', [OrgAdminController::class, 'setCoordinatorPassword']);
 
         Route::get('/members', [OrgAdminController::class, 'listMembers']);
         Route::patch('/volunteers/{userId}/status', [OrgAdminController::class, 'toggleVolunteerStatus']);

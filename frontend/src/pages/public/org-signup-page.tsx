@@ -1,7 +1,7 @@
 import { BadgeCheck, Building2, MailCheck, ShieldCheck, Sparkles } from 'lucide-react';
 import { useEffect } from 'react';
 import { Link } from 'react-router';
-import { Button, Card, InlineAlert, Logo } from '@/shared/ui';
+import { Button, Card, Logo } from '@/shared/ui';
 import { useOrganizationSignup, usePublicPlans } from '@/features/public/api';
 import { OrgOnboardForm } from '@/features/platform/org-onboard-form';
 import { formatNumber } from '@/shared/lib/format';
@@ -75,11 +75,6 @@ export default function OrgSignupPage() {
               </div>
               <h2 className="type-headline text-2xl text-text">Welcome, {signup.data.organization.name}</h2>
               <p className="mt-3 text-[15px] text-muted">{signup.data.message}</p>
-              {!signup.data.email_sent && (
-                <InlineAlert tone="warning" className="mt-5 text-left">
-                  We couldn’t send the email right now. Use “Invitation expired?” on the sign-in page in a few minutes to get it again.
-                </InlineAlert>
-              )}
               <Button asChild className="mt-6">
                 <Link to="/login">Go to sign in</Link>
               </Button>
@@ -106,6 +101,8 @@ export default function OrgSignupPage() {
                     admin_last_name: v.admin_last_name,
                     admin_email: v.admin_email,
                     admin_phone: v.admin_phone || null,
+                    admin_password: v.admin_password,
+                    admin_password_confirmation: v.admin_password_confirmation,
                     documents: v.documents.map((d) => ({ file: d.file, type: d.type as never, title: d.title })),
                     accept_terms: v.accept_terms,
                   })

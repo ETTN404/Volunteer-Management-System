@@ -17,11 +17,13 @@ export class ApiError extends Error {
   readonly fieldErrors: Record<string, string[]>;
   readonly body: Record<string, unknown>;
   readonly kind: 'network' | 'timeout' | 'http';
+  readonly method: HttpMethod;
 
   constructor(opts: {
     message: string;
     status: number;
     kind: ApiError['kind'];
+    method?: HttpMethod;
     fieldErrors?: Record<string, string[]>;
     body?: Record<string, unknown>;
   }) {
@@ -29,8 +31,20 @@ export class ApiError extends Error {
     this.name = 'ApiError';
     this.status = opts.status;
     this.kind = opts.kind;
+    this.method = opts.method ?? 'GET';
     this.fieldErrors = opts.fieldErrors ?? {};
     this.body = opts.body ?? {};
+  }
+
+  /**
+   * A write whose outcome is unknown: the connection dropped, the browser gave up
+   * waiting, or a proxy/server error came back. The server may well have saved the
+   * change before that happened, so the UI must re-read data instead of assuming
+   * nothing changed.
+   */
+  get outcomeUnknown(): boolean {
+    if (this.method === 'GET') return false;
+    return this.kind !== 'http' || this.status >= 500;
   }
 
   get isValidation() {
@@ -186,7 +200,9 @@ export async function request<T>(method: HttpMethod, path: string, opts: Request
   const controller = new AbortController();
   const onAbort = () => controller.abort(opts.signal?.reason);
   opts.signal?.addEventListener('abort', onAbort);
-  const timeout = setTimeout(() => controller.abort('timeout'), opts.timeoutMs ?? 45_000);
+  // Writes get longer: a cold Render start plus the work itself can pass 45 s, and
+  // giving up early is what made saved changes look like failures.
+  const timeout = setTimeout(() => controller.abort('timeout'), opts.timeoutMs ?? (method === 'GET' ? 45_000 : 90_000));
   let markedSlow = false;
   const slowTimer = setTimeout(() => {
     if (opts.silent) return;
@@ -200,12 +216,18 @@ export async function request<T>(method: HttpMethod, path: string, opts: Request
   } catch (e) {
     const timedOut = controller.signal.reason === 'timeout';
     if (opts.signal?.aborted) throw e;
+    const write = method !== 'GET';
     throw new ApiError({
       status: 0,
+      method,
       kind: timedOut ? 'timeout' : 'network',
-      message: timedOut
-        ? 'The server took too long to answer. It may be waking up — try again.'
-        : 'Can’t reach the server. Check your connection and try again.',
+      message: write
+        ? timedOut
+          ? 'The server didn’t confirm in time, but your change may already be saved. We refreshed the page, so check it before trying again.'
+          : 'The connection dropped before the server confirmed. Your change may already be saved. We refreshed the page, so check it before trying again.'
+        : timedOut
+          ? 'The server took too long to answer. It may be waking up — try again.'
+          : 'Can’t reach the server. Check your connection and try again.',
     });
   } finally {
     clearTimeout(timeout);
@@ -222,12 +244,16 @@ export async function request<T>(method: HttpMethod, path: string, opts: Request
   const json = ((await res.json().catch(() => ({}))) ?? {}) as Record<string, unknown>;
 
   if (!res.ok) {
-    const message = laravelMessage(json, res.status);
+    let message = laravelMessage(json, res.status);
+    if (method !== 'GET' && res.status >= 500 && !(typeof json.message === 'string' && json.message)) {
+      message = 'The server hit a problem while saving. Part of the change may already be saved. We refreshed the page, so check it before trying again.';
+    }
     if (res.status === 401 && !opts.skipAuthRedirect) hooks.onUnauthorized();
     if (res.status === 403 && (json.error === 'Organization Suspended' || json.error === 'Organization Inactive' || json.code === 'account_inactive') && !opts.skipAuthRedirect)
       hooks.onSuspended(message);
     throw new ApiError({
       status: res.status,
+      method,
       kind: 'http',
       message,
       fieldErrors: (json.errors as Record<string, string[]>) ?? {},

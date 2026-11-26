@@ -1,9 +1,10 @@
-import { Search, Users } from 'lucide-react';
+import { KeyRound, Search, Users } from 'lucide-react';
 import { useDeferredValue, useEffect, useState } from 'react';
-import type { Role } from '@/shared/types/api';
+import type { Role, User } from '@/shared/types/api';
 import { formatRelative } from '@/shared/lib/time';
 import { Avatar, Badge, Button, Card, EmptyState, ErrorState, Input, PageHeader, Segmented, Skeleton, Switch, formatPhone, notify } from '@/shared/ui';
-import { usePlatformUsers, useToggleUser } from '@/features/platform/api';
+import { usePlatformUsers, useSetUserPassword, useToggleUser } from '@/features/platform/api';
+import { SetPasswordDialog } from '@/features/people/credentials';
 import { ROLE_LABEL } from '@/features/auth/session-store';
 
 const ROLE_TONE: Record<Role, 'accent' | 'info' | 'success' | 'neutral'> = { SuperAdmin: 'accent', OrgAdmin: 'info', Coordinator: 'success', Volunteer: 'neutral' };
@@ -15,6 +16,8 @@ export default function UsersPage() {
   const deferred = useDeferredValue(q);
   const users = usePlatformUsers(deferred, role, page);
   const toggle = useToggleUser();
+  const setPassword = useSetUserPassword();
+  const [pwFor, setPwFor] = useState<User | null>(null);
   const rows = users.data?.items ?? [];
   const pg = users.data?.pagination;
   useEffect(() => {
@@ -86,11 +89,16 @@ export default function UsersPage() {
                   <td className="px-5 py-3 text-muted">{u.last_login ? formatRelative(u.last_login) : 'Never'}</td>
                   <td className="px-5 py-3 text-right">
                     {u.role !== 'SuperAdmin' && (
-                      <Switch
-                        checked={u.is_active !== false}
-                        aria-label={`${u.full_name} active`}
-                        onCheckedChange={() => toggle.mutate(u.id, { onSuccess: (r) => notify.success(r.message, u.full_name), onError: (e) => notify.error(e) })}
-                      />
+                      <span className="inline-flex items-center gap-2">
+                        <Button size="icon-sm" variant="ghost" onClick={() => setPwFor(u)} aria-label={`Set a new password for ${u.full_name}`} title="Set a new password">
+                          <KeyRound />
+                        </Button>
+                        <Switch
+                          checked={u.is_active !== false}
+                          aria-label={`${u.full_name} active`}
+                          onCheckedChange={() => toggle.mutate(u.id, { onSuccess: (r) => notify.success(r.message, u.full_name), onError: (e) => notify.error(e) })}
+                        />
+                      </span>
                     )}
                   </td>
                 </tr>
@@ -113,6 +121,7 @@ export default function UsersPage() {
           </div>
         </Card>
       )}
+      <SetPasswordDialog user={pwFor} onClose={() => setPwFor(null)} save={(id, password) => setPassword.mutateAsync({ id, password })} />
     </>
   );
 }

@@ -211,9 +211,10 @@ describe('org admin & platform', () => {
     const org = await orgApi.update({ phone: '+251 900 000 000' });
     expect(org.phone).toBe('+251 900 000 000');
     await expect(orgApi.update({ website: 'not a url' })).rejects.toMatchObject({ status: 422 });
-    const c = await orgApi.createCoordinator({ first_name: 'Coord', last_name: 'Two', email: 'coord2@rc.org' });
+    await expect(orgApi.createCoordinator({ first_name: 'Coord', last_name: 'Two', email: 'coord2@rc.org', password: 'short', password_confirmation: 'short' })).rejects.toMatchObject({ status: 422 });
+    const c = await orgApi.createCoordinator({ first_name: 'Coord', last_name: 'Two', email: 'coord2@rc.org', password: 'coord2pass', password_confirmation: 'coord2pass' });
     expect(c.user.role).toBe('Coordinator');
-    expect(c.invitation.invite_url).toContain('/invite/');
+    expect(await orgApi.setCoordinatorPassword(c.user.id, 'another123')).toContain('New password saved');
     const toggled = await orgApi.toggleCoordinator(c.user.id);
     expect(toggled.is_active).toBe(false);
     const members = await orgApi.allMembers();
@@ -235,9 +236,10 @@ describe('org admin & platform', () => {
       admin_first_name: 'Ngo',
       admin_last_name: 'Admin',
       admin_email: 'admin@new.org',
+      admin_password: 'ngoadmin1',
+      admin_password_confirmation: 'ngoadmin1',
     });
     expect(result.admin.role).toBe('OrgAdmin');
-    expect(result.invitation.email_sent).toBe(true);
     expect((await platformApi.metrics()).total_organizations).toBe(m.total_organizations + 1);
     const updated = await platformApi.updateStatus(result.organization.id, { status: 'suspended' });
     expect(updated.status).toBe('suspended');

@@ -93,6 +93,8 @@ class WaitlistAndAlertsTest extends TestCase
 
         // Any app notification now also goes to Telegram.
         app(\App\Services\Notifier::class)->send($u->fresh(), new \App\Notifications\AppNotification('shift_changed', 'Shift time changed', 'New time 10:00'));
+        // Outside-world delivery runs after the response; outside a request we flush it ourselves.
+        \Illuminate\Support\defer()->invoke();
         Http::assertSent(fn ($r) => str_contains($r->url(), 'sendMessage') && $r['chat_id'] === '5551234' && str_contains($r['text'], 'Shift time changed'));
     }
 

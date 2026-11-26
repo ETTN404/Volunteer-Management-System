@@ -9,15 +9,12 @@ use App\Models\Organization;
 use App\Models\User;
 use App\Notifications\AppNotification;
 use App\Services\AuditLogService;
-use App\Services\InvitationService;
 use App\Services\Notifier;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 
 class TenantOnboardingController extends Controller
 {
     public function __construct(
-        private InvitationService $invitations,
         private AuditLogService $audit,
         private Notifier $notifier,
     ) {}
@@ -25,18 +22,15 @@ class TenantOnboardingController extends Controller
     /** SuperAdmin onboarding: verified immediately, plan chosen by the admin (Free by default). */
     public function onboard(OnboardTenantRequest $request)
     {
-        [$org, $admin, $invite] = $this->create($request, verified: true, plan: $request->plan ?? 'free');
+        [$org, $admin] = $this->create($request, verified: true, plan: $request->plan ?? 'free');
         $this->audit->log('tenant.onboarded', $org, [], ['org_name' => $org->name, 'plan' => $org->subscription_plan, 'admin' => $admin->email]);
 
         return response()->json([
             'status'  => 'success',
-            'message' => $invite['email_sent']
-                ? "Organization onboarded. An invitation was emailed to {$admin->email}."
-                : 'Organization onboarded, but the invitation email could not be sent. Copy the invitation link below.',
+            'message' => "Organization onboarded. {$admin->email} can sign in now with the password you set.",
             'data'    => [
                 'organization' => new OrganizationResource($org),
                 'admin'        => new UserResource($admin),
-                'invitation'   => $invite,
             ],
         ], 201);
     }
@@ -48,7 +42,7 @@ class TenantOnboardingController extends Controller
      */
     public function signup(OnboardTenantRequest $request)
     {
-        [$org, $admin, $invite] = $this->create($request, verified: false, plan: 'free');
+        [$org, $admin] = $this->create($request, verified: false, plan: 'free');
         $this->audit->log('tenant.signed_up', $org, [], ['org_name' => $org->name, 'admin' => $admin->email]);
 
         $this->notifier->send($this->notifier->superAdmins(), new AppNotification(
@@ -60,15 +54,15 @@ class TenantOnboardingController extends Controller
 
         return response()->json([
             'status'  => 'success',
-            'message' => "Thanks! Check {$admin->email} for your invitation. Volunteers will see your events once our team verifies your documents (usually within 2 business days).",
+            'message' => "Your organization is set up. Sign in with {$admin->email} and the password you chose. Volunteers will see your events once our team verifies your documents (usually within 2 business days).",
             'data'    => [
                 'organization' => ['id' => $org->id, 'name' => $org->name, 'verification_status' => $org->verification_status],
-                'email_sent'   => $invite['email_sent'],
+                'admin_email'  => $admin->email,
             ],
         ], 201);
     }
 
-    /** @return array{0: Organization, 1: User, 2: array} */
+    /** @return array{0: Organization, 1: User} */
     private function create(OnboardTenantRequest $request, bool $verified, string $plan): array
     {
         $result = DB::transaction(function () use ($request, $verified, $plan) {
@@ -92,7 +86,8 @@ class TenantOnboardingController extends Controller
                 'last_name'  => trim($request->admin_last_name),
                 'email'      => strtolower(trim($request->admin_email)),
                 'phone'      => $request->admin_phone,
-                'password'   => Str::random(40),
+                'password'   => $request->admin_password, // hashed by the model cast
+                'must_change_password' => false,
                 'role'       => 'OrgAdmin',
             ]);
 
@@ -112,8 +107,7 @@ class TenantOnboardingController extends Controller
         });
 
         [$org, $admin] = $result;
-        $invite = $this->invitations->issue($admin, $request->user());
 
-        return [$org->fresh(), $admin->fresh(), $invite];
+        return [$org->fresh(), $admin->fresh()];
     }
 }

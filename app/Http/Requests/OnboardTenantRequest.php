@@ -7,7 +7,8 @@ use Illuminate\Foundation\Http\FormRequest;
 
 /**
  * Organization onboarding — used by SuperAdmins and by the public sign-up form.
- * No password is typed by anyone: the admin receives an invitation email.
+ * The admin's password is set right here (no invitation email needed), so the
+ * account works immediately even when the server cannot send mail.
  */
 class OnboardTenantRequest extends FormRequest
 {
@@ -36,6 +37,7 @@ class OnboardTenantRequest extends FormRequest
             'admin_last_name'  => 'required|string|max:60',
             'admin_email'      => 'required|string|email:rfc|max:100|unique:users,email',
             'admin_phone'      => ['nullable', 'string', 'regex:/^\+[1-9]\d{6,14}$/'],
+            'admin_password'   => 'required|string|min:8|max:100|confirmed',
 
             // Verification documents (public sign-up must include at least one)
             'documents'          => ($public ? 'required' : 'nullable') . '|array|max:5',
@@ -53,6 +55,8 @@ class OnboardTenantRequest extends FormRequest
             'admin_phone.regex'    => 'Enter a valid phone number for the selected country.',
             'org_email.unique'     => 'An organization with this email is already on VolunTrack.',
             'admin_email.unique'   => 'This email already has a VolunTrack account.',
+            'admin_password.min'   => 'The password must be at least 8 characters.',
+            'admin_password.confirmed' => 'The two passwords do not match.',
             'documents.required'   => 'Upload at least one registration document so we can verify your organization.',
             'accept_terms.accepted'=> 'Please accept the terms to continue.',
         ];

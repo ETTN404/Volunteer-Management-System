@@ -139,7 +139,7 @@ export default function ProfilePage() {
                     <Controller
                       control={control}
                       name="date_of_birth"
-                      render={({ field }) => <DatePicker value={field.value} onChange={field.onChange} max={new Date().toISOString().slice(0, 10)} placeholder="Select your birthday" />}
+                      render={({ field }) => <DatePicker yearPicker value={field.value} onChange={field.onChange} max={new Date().toISOString().slice(0, 10)} placeholder="Select your birthday" />}
                     />
                   </Field>
                 </>

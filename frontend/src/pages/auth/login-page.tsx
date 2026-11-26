@@ -111,10 +111,6 @@ export default function LoginPage() {
         <Link to="/signup/organization" className="font-medium text-accent-text hover:underline">
           {t('Register it for free')}
         </Link>
-        {' · '}
-        <Link to="/invite/resend" className="font-medium text-accent-text hover:underline">
-          {t('Invitation expired?')}
-        </Link>
       </p>
 
       {env.showDemoAccounts && (

@@ -1,11 +1,13 @@
-import { ArrowLeft, BadgeCheck, FileText, Flag, Globe, Mail, MapPin, MessageSquare, Phone, Send, Settings2, ShieldX } from 'lucide-react';
+import { ArrowLeft, BadgeCheck, FileText, Flag, Globe, KeyRound, Mail, MapPin, MessageSquare, Phone, Settings2, ShieldX } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { formatDate, formatRelative } from '@/shared/lib/time';
 import { formatBytes, formatNumber } from '@/shared/lib/format';
 import { errorMessage } from '@/shared/api/http';
 import { Avatar, Badge, Button, Card, CardBody, CardHeader, Dialog, DialogActions, DialogContent, ErrorState, KeyValue, PageHeader, Skeleton, Textarea, countryName, formatPhone, notify } from '@/shared/ui';
-import { REPORT_CATEGORY_LABEL, useOrganizationDetail, usePlatformAudit, useResendInvite, useReviewVerification } from '@/features/platform/api';
+import type { User } from '@/shared/types/api';
+import { REPORT_CATEGORY_LABEL, useOrganizationDetail, usePlatformAudit, useReviewVerification, useSetUserPassword } from '@/features/platform/api';
+import { SetPasswordDialog } from '@/features/people/credentials';
 import { OrgStatusDialog } from '@/features/platform/org-status-dialog';
 import { actionLabel } from '@/features/audit/audit-trail';
 import { LIMIT_LABELS } from '@/features/organization/api';
@@ -15,7 +17,8 @@ export default function OrganizationDetailPage() {
   const detail = useOrganizationDetail(id);
   const audit = usePlatformAudit({ org_id: id });
   const review = useReviewVerification();
-  const resend = useResendInvite();
+  const setPassword = useSetUserPassword();
+  const [pwFor, setPwFor] = useState<User | null>(null);
   const [managing, setManaging] = useState(false);
   const [rejecting, setRejecting] = useState(false);
   const [notes, setNotes] = useState('');
@@ -216,27 +219,20 @@ export default function OrganizationDetailPage() {
                     <div className="truncate text-sm font-medium text-text">{a.full_name}</div>
                     <div className="truncate text-[12px] text-faint">{a.email}</div>
                   </div>
-                  {a.must_change_password ? (
-                    <Button
-                      size="xs"
-                      variant="secondary"
-                      loading={resend.isPending && resend.variables === a.id}
-                      onClick={() => resend.mutate(a.id, { onSuccess: (r) => notify.success(r.message ?? 'Invitation sent'), onError: (e) => notify.error(errorMessage(e)) })}
-                    >
-                      <Send /> Resend invite
-                    </Button>
-                  ) : (
-                    a.is_active === false && (
-                      <Badge size="sm" tone="danger">
-                        Inactive
-                      </Badge>
-                    )
+                  {a.is_active === false && (
+                    <Badge size="sm" tone="danger">
+                      Inactive
+                    </Badge>
                   )}
+                  <Button size="xs" variant={a.must_change_password ? 'secondary' : 'ghost'} onClick={() => setPwFor(a)} aria-label={`Set a new password for ${a.full_name}`}>
+                    <KeyRound /> Set password
+                  </Button>
                 </div>
               ))}
               {(d.admins ?? []).length === 0 && <p className="text-sm text-muted">No admins found.</p>}
             </CardBody>
           </Card>
+          <SetPasswordDialog user={pwFor} onClose={() => setPwFor(null)} save={(id, password) => setPassword.mutateAsync({ id, password })} />
           {(d.payments ?? []).length > 0 && (
             <Card>
               <CardHeader title="Payments" action={<Link to="/p/payments" className="text-[13px] font-medium text-accent-text hover:underline">All</Link>} />

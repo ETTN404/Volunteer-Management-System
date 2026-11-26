@@ -321,6 +321,19 @@ export const staffPending = [
     }),
   ),
   http.patch(
+    api('/admin/coordinators/:id/password'),
+    authed(['OrgAdmin'], async (ctx) => {
+      const u = db.t.users.find((x) => x.id === param(ctx, 'id') && x.org_id === ctx.actor.user.org_id && x.role === 'Coordinator');
+      if (!u) return fail('Target database resource not found.', 404);
+      const b = await body(ctx.request);
+      const invalid = validate(b, { password: { required: true, type: 'string', min: 8, custom: (v) => (v === b.password_confirmation ? null : 'The two passwords do not match.') } });
+      if (invalid) return invalid;
+      u.password = String(b.password);
+      audit('user.password_set_by_admin', ctx.actor.user, { type: 'User', id: u.id });
+      return ok(null, `New password saved. Share it with ${u.full_name}.`);
+    }),
+  ),
+  http.patch(
     api('/admin/coordinators/:id/status'),
     authed(['OrgAdmin'], (ctx) => {
       const u = db.t.users.find((x) => x.id === param(ctx, 'id') && x.org_id === ctx.actor.user.org_id && x.role === 'Coordinator');

@@ -16,6 +16,8 @@ export interface OrganizationSignupInput {
   admin_last_name: string;
   admin_email: string;
   admin_phone?: string | null;
+  admin_password: string;
+  admin_password_confirmation: string;
   documents: { file: File; type: OrgDocumentType; title?: string }[];
   accept_terms: boolean;
 }
@@ -46,7 +48,7 @@ export const publicApi = {
       form.append(`documents[${i}][type]`, d.type);
       if (d.title) form.append(`documents[${i}][title]`, d.title);
     });
-    const r = await http.post<{ organization: { id: number; name: string }; email_sent: boolean }>('/public/organizations/signup', form, { skipAuthRedirect: true });
+    const r = await http.post<{ organization: { id: number; name: string }; admin_email: string }>('/public/organizations/signup', form, { skipAuthRedirect: true });
     return { ...r.data, message: r.message };
   },
 };

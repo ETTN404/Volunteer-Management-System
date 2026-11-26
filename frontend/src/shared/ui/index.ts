@@ -23,3 +23,4 @@ export * from './combobox';
 export * from './geo-inputs';
 export { LocationPicker, type VenueValue } from './location-picker';
 export * from './premium';
+export * from './password-input';

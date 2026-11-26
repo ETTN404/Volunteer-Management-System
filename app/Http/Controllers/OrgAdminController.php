@@ -110,7 +110,7 @@ class OrgAdminController extends Controller
     }
 
     // ------------------------------------------------------------------
-    // Coordinators (G19) — invitation based, no typed passwords
+    // Coordinators — the admin sets the password; no email required
     // ------------------------------------------------------------------
 
     public function createCoordinator(CreateCoordinatorRequest $request)
@@ -119,28 +119,40 @@ class OrgAdminController extends Controller
         $this->plans->ensureWithinLimit($org, 'coordinators');
 
         $coordinator = User::create([
-            'org_id'     => $org->id,
-            'first_name' => trim($request->first_name),
-            'last_name'  => trim($request->last_name),
-            'email'      => strtolower(trim($request->email)),
-            'phone'      => $request->phone,
-            'password'   => Str::random(40), // replaced by the invitation
-            'role'       => 'Coordinator',
+            'org_id'               => $org->id,
+            'first_name'           => trim($request->first_name),
+            'last_name'            => trim($request->last_name),
+            'email'                => strtolower(trim($request->email)),
+            'phone'                => $request->phone,
+            'password'             => $request->password, // hashed by the model cast
+            'must_change_password' => false,
+            'role'                 => 'Coordinator',
         ]);
-        $invite = $this->invitations->issue($coordinator, auth()->user());
 
         $this->audit->log('user.coordinator_created', $coordinator, [], [
-            'full_name' => $coordinator->full_name, 'email' => $coordinator->email, 'phone' => $coordinator->phone, 'invitation_emailed' => $invite['email_sent'],
+            'full_name' => $coordinator->full_name, 'email' => $coordinator->email, 'phone' => $coordinator->phone,
         ]);
 
         return response()->json([
-            'status'     => 'success',
-            'message'    => $invite['email_sent']
-                ? "Invitation sent to {$coordinator->email}."
-                : 'Coordinator created, but the email could not be sent. Share the invitation link yourself.',
-            'data'       => new UserResource($coordinator),
-            'invitation' => $invite,
+            'status'  => 'success',
+            'message' => "{$coordinator->full_name} can sign in now with {$coordinator->email} and the password you set.",
+            'data'    => new UserResource($coordinator),
         ], 201);
+    }
+
+    /** Admin sets a new password for a coordinator (forgotten password, first sign-in help). */
+    public function setCoordinatorPassword(Request $request, $id)
+    {
+        $user = User::where('org_id', auth()->user()->org_id)->where('role', 'Coordinator')->findOrFail($id);
+        $data = $request->validate(['password' => 'required|string|min:8|max:100|confirmed'], [
+            'password.confirmed' => 'The two passwords do not match.',
+        ]);
+        $user->forceFill(['password' => \Illuminate\Support\Facades\Hash::make($data['password']), 'must_change_password' => false])->save();
+        $user->tokens()->delete(); // sign out old sessions
+        \App\Models\Invitation::where('user_id', $user->id)->whereNull('used_at')->update(['used_at' => now()]);
+        $this->audit->log('user.password_set_by_admin', $user, [], ['full_name' => $user->full_name]);
+
+        return response()->json(['status' => 'success', 'message' => "New password saved. Share it with {$user->full_name}."]);
     }
 
     public function updateCoordinator(Request $request, $id)

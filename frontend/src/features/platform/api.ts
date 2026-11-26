@@ -30,6 +30,8 @@ export interface OnboardInput {
   admin_last_name: string;
   admin_email: string;
   admin_phone?: string | null;
+  admin_password: string;
+  admin_password_confirmation: string;
   documents?: { file: File; type: string; title?: string }[];
 }
 
@@ -114,7 +116,7 @@ export const platformApi = {
   reviewVerification: async (id: number, input: { status: 'verified' | 'rejected' | 'pending'; notes?: string }) =>
     (await http.patch<Organization>(`/superadmin/organizations/${id}/verification`, input)).data,
   onboard: async (input: OnboardInput) => {
-    const r = await http.post<{ organization: Organization; admin: User; invitation: Invitation }>('/superadmin/onboard-tenant', onboardForm({ ...input }));
+    const r = await http.post<{ organization: Organization; admin: User }>('/superadmin/onboard-tenant', onboardForm({ ...input }));
     return { ...r.data, message: r.message };
   },
 
@@ -124,6 +126,8 @@ export const platformApi = {
 
   admins: async (q = '') => page(await http.get<(User & { invitation_pending: boolean })[]>('/superadmin/admins', { query: { q, per_page: 100 } })),
   toggleUser: async (id: number) => (await http.patch(`/superadmin/users/${id}/status`)).raw as { is_active: boolean; message: string },
+  setUserPassword: async (id: number, password: string) =>
+    (await http.patch(`/superadmin/users/${id}/password`, { password, password_confirmation: password })).message,
   resendInvite: async (id: number) => {
     const r = await http.post(`/superadmin/users/${id}/resend-invite`);
     return { invitation: r.raw.invitation as Invitation, message: r.message };
@@ -196,6 +200,8 @@ export const useToggleUser = () => usePlatformMutation(platformApi.toggleUser);
 /** @deprecated alias kept for older imports */
 export const useToggleAdmin = useToggleUser;
 export const useResendInvite = () => usePlatformMutation(platformApi.resendInvite);
+export const useSetUserPassword = () =>
+  usePlatformMutation(({ id, password }: { id: number; password: string }) => platformApi.setUserPassword(id, password));
 export const useReviewPayment = () =>
   usePlatformMutation(({ id, ...input }: { id: number; status: 'verified' | 'rejected'; notes?: string }) => platformApi.reviewPayment(id, input));
 export const useRetryPayment = () => usePlatformMutation(platformApi.retryPayment);

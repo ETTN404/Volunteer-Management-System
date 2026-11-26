@@ -7,7 +7,7 @@ import type { OrgDocumentType, PlanKey } from '@/shared/types/api';
 import { formatBytes } from '@/shared/lib/format';
 import { errorMessage, isApiError } from '@/shared/api/http';
 import { cn } from '@/shared/lib/cn';
-import { Button, Card, CardBody, CardHeader, Checkbox, CitySelect, CountrySelect, Field, FormError, Input, PhoneInput, Segmented, Select, isValidPhone } from '@/shared/ui';
+import { Button, Card, CardBody, CardHeader, Checkbox, CitySelect, CountrySelect, Field, FormError, Input, PasswordInput, PhoneInput, Segmented, Select, isValidPhone } from '@/shared/ui';
 
 export const ORG_DOC_TYPES: { value: OrgDocumentType; label: string }[] = [
   { value: 'registration_certificate', label: 'Registration certificate' },
@@ -29,6 +29,8 @@ const schema = z
     admin_last_name: z.string().trim().min(1, 'Enter a last name.').max(60),
     admin_email: z.string().trim().email('Enter a valid email.').max(100),
     admin_phone: z.string().optional(),
+    admin_password: z.string().min(8, 'At least 8 characters.').max(100),
+    admin_password_confirmation: z.string(),
     plan: z.enum(['free', 'pro', 'enterprise']),
     documents: z.array(z.object({ file: z.instanceof(File), type: z.string(), title: z.string().optional() })),
     accept_terms: z.boolean(),
@@ -36,6 +38,7 @@ const schema = z
   .superRefine((v, ctx) => {
     if (!isValidPhone(v.org_phone, v.org_country)) ctx.addIssue({ code: 'custom', path: ['org_phone'], message: 'This isn’t a valid phone number for the selected country.' });
     if (v.admin_phone && !isValidPhone(v.admin_phone, v.org_country)) ctx.addIssue({ code: 'custom', path: ['admin_phone'], message: 'This isn’t a valid phone number.' });
+    if (v.admin_password !== v.admin_password_confirmation) ctx.addIssue({ code: 'custom', path: ['admin_password_confirmation'], message: 'The two passwords don’t match.' });
   });
 
 export type OrgOnboardValues = z.infer<typeof schema>;
@@ -71,6 +74,8 @@ export function OrgOnboardForm({
       admin_last_name: '',
       admin_email: '',
       admin_phone: '',
+      admin_password: '',
+      admin_password_confirmation: '',
       plan: 'free',
       documents: [],
       accept_terms: false,
@@ -157,7 +162,10 @@ export function OrgOnboardForm({
       </Card>
 
       <Card>
-        <CardHeader title="Administrator" description="Gets an invitation email with a temporary password and a one-time link. Nobody types a password for them." />
+        <CardHeader
+          title="Administrator"
+          description={mode === 'public' ? 'The person who manages your organization on VolunTrack. You sign in with this email and password.' : 'Set their password here and share it with them — they can sign in right away and change it later.'}
+        />
         <CardBody className="grid gap-4 sm:grid-cols-2">
           <Field label="First name" error={err.admin_first_name?.message}>
             <Input {...register('admin_first_name')} autoComplete="given-name" />
@@ -170,6 +178,22 @@ export function OrgOnboardForm({
           </Field>
           <Field label="Mobile" optional error={err.admin_phone?.message}>
             <Controller control={control} name="admin_phone" render={({ field }) => <PhoneInput country={country} value={field.value} onChange={field.onChange} />} />
+          </Field>
+          <Field label="Password" hint={mode === 'platform' ? 'At least 8 characters. Tap the wand to generate one.' : 'At least 8 characters.'} error={err.admin_password?.message}>
+            <PasswordInput
+              {...register('admin_password')}
+              onGenerate={
+                mode === 'platform'
+                  ? (pw) => {
+                      setValue('admin_password', pw, { shouldValidate: true });
+                      setValue('admin_password_confirmation', pw, { shouldValidate: true });
+                    }
+                  : undefined
+              }
+            />
+          </Field>
+          <Field label="Confirm password" error={err.admin_password_confirmation?.message}>
+            <PasswordInput {...register('admin_password_confirmation')} />
           </Field>
         </CardBody>
       </Card>
@@ -239,7 +263,7 @@ export function OrgOnboardForm({
       <FormError message={error && !(isApiError(error) && error.isValidation) ? errorMessage(error) : isApiError(error) && error.isValidation ? error.message : null} />
       <div className="flex justify-end">
         <Button type="submit" size="lg" loading={submitting}>
-          {mode === 'public' ? 'Create organization' : 'Onboard & send invitation'}
+          {mode === 'public' ? 'Create organization' : 'Onboard organization'}
         </Button>
       </div>
     </form>

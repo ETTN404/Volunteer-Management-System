@@ -200,25 +200,32 @@ class ReviewFixesTest extends TestCase
         $this->withHeader('Authorization', "Bearer $token")->getJson('/api/coordinator/events')->assertStatus(403)->assertJsonPath('code', 'organization_inactive');
     }
 
-    // #34 #35 #36 #25 — invitations: no typed password, one-time link, forced change, resend
-    public function test_coordinator_invitation_flow(): void
+    // Coordinators are created with a password the admin sets — no email needed.
+    public function test_admin_creates_coordinator_with_password_and_can_reset_it(): void
     {
-        $res = $this->actingAs($this->admin, 'sanctum')->postJson('/api/admin/coordinators', [
+        $this->actingAs($this->admin, 'sanctum')->postJson('/api/admin/coordinators', [
             'first_name' => 'Selam', 'last_name' => 'Bekele', 'email' => 'selam@rc.org', 'phone' => '+251911000111',
-        ])->assertStatus(201);
-        $token = basename($res->json('invitation.invite_url'));
-        $user  = User::where('email', 'selam@rc.org')->first();
-        $this->assertTrue($user->must_change_password);
-        $this->assertEquals('Selam Bekele', $user->full_name);
+            'password' => 'short', 'password_confirmation' => 'short',
+        ])->assertStatus(422)->assertJsonValidationErrors('password');
 
-        $this->getJson("/api/invitations/{$token}")->assertOk()->assertJsonPath('data.usable', true);
-        $this->postJson("/api/invitations/{$token}/accept", ['password' => 'newpass123', 'password_confirmation' => 'newpass123'])->assertOk();
-        $this->postJson("/api/invitations/{$token}/accept", ['password' => 'again12345', 'password_confirmation' => 'again12345'])->assertStatus(410);
+        $this->actingAs($this->admin, 'sanctum')->postJson('/api/admin/coordinators', [
+            'first_name' => 'Selam', 'last_name' => 'Bekele', 'email' => 'selam@rc.org', 'phone' => '+251911000111',
+            'password' => 'selam12345', 'password_confirmation' => 'selam12345',
+        ])->assertStatus(201)->assertJsonMissingPath('invitation');
 
-        $user->refresh();
+        $user = User::where('email', 'selam@rc.org')->first();
         $this->assertFalse($user->must_change_password);
-        $this->assertNotNull($user->email_verified_at);
-        $this->postJson('/api/login', ['email' => 'selam@rc.org', 'password' => 'newpass123'])->assertOk()->assertJsonPath('must_change_password', false);
+        $this->assertEquals('Selam Bekele', $user->full_name);
+        $this->assertEquals(0, \App\Models\Invitation::where('user_id', $user->id)->count());
+        $this->postJson('/api/login', ['email' => 'selam@rc.org', 'password' => 'selam12345'])->assertOk()
+            ->assertJsonPath('must_change_password', false)->assertJsonPath('user.role', 'Coordinator');
+
+        // Forgotten password: the admin sets a new one.
+        $this->actingAs($this->admin, 'sanctum')->patchJson("/api/admin/coordinators/{$user->id}/password", ['password' => 'fresh12345', 'password_confirmation' => 'nope'])
+            ->assertStatus(422);
+        $this->actingAs($this->admin, 'sanctum')->patchJson("/api/admin/coordinators/{$user->id}/password", ['password' => 'fresh12345', 'password_confirmation' => 'fresh12345'])
+            ->assertOk();
+        $this->assertTrue(Hash::check('fresh12345', $user->fresh()->password));
     }
 
     // #11 — change password
@@ -244,7 +251,7 @@ class ReviewFixesTest extends TestCase
     {
         $this->post('/api/public/organizations/signup', [
             'org_name' => 'Mekedonia', 'org_email' => 'info@mekedonia.org', 'org_country' => 'ET', 'org_city' => 'Addis Ababa', 'org_phone' => '+251911222333',
-            'admin_first_name' => 'Binyam', 'admin_last_name' => 'Belete', 'admin_email' => 'binyam@mekedonia.org', 'accept_terms' => '1',
+            'admin_first_name' => 'Binyam', 'admin_last_name' => 'Belete', 'admin_email' => 'binyam@mekedonia.org', 'admin_password' => 'binyam12345', 'admin_password_confirmation' => 'binyam12345', 'accept_terms' => '1',
             'documents' => [['file' => UploadedFile::fake()->create('license.pdf', 120, 'application/pdf'), 'type' => 'registration_certificate']],
         ], ['Accept' => 'application/json'])->assertStatus(201);
 
@@ -254,13 +261,15 @@ class ReviewFixesTest extends TestCase
         $this->assertEquals(1, $org->documents()->count());
         $this->assertFalse($org->isPublic());
         $this->assertEquals(1, $this->super->notifications()->where('data->type', 'organization_signup')->count());
+        // The admin can sign in right away with the password they chose.
+        $this->postJson('/api/login', ['email' => 'binyam@mekedonia.org', 'password' => 'binyam12345'])->assertOk();
     }
 
     // #44 — plan limits are enforced server-side
     public function test_free_plan_limits_coordinators_and_branding(): void
     {
         User::create(['org_id' => $this->org->id, 'full_name' => 'Second Coord', 'email' => 'c2@rc.org', 'password' => 'x', 'role' => 'Coordinator']);
-        $this->actingAs($this->admin, 'sanctum')->postJson('/api/admin/coordinators', ['first_name' => 'A', 'last_name' => 'B', 'email' => 'c3@rc.org'])
+        $this->actingAs($this->admin, 'sanctum')->postJson('/api/admin/coordinators', ['first_name' => 'A', 'last_name' => 'B', 'email' => 'c3@rc.org', 'password' => 'password1', 'password_confirmation' => 'password1'])
             ->assertStatus(402)->assertJsonPath('code', 'plan_limit');
         $this->actingAs($this->admin, 'sanctum')->patchJson('/api/admin/organization', ['primary_color' => '#3341B8'])
             ->assertStatus(402)->assertJsonPath('required_plan', 'pro');
